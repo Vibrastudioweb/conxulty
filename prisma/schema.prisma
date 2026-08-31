@@ -1,0 +1,336 @@
+// Esquema inicial de CONXULTY — Fase 0.
+// Cubre únicamente las entidades núcleo aprobadas para esta fase.
+// Documentos personalizados (PlantillaDocumento/Documento), Conversacion/Mensaje (WhatsApp)
+// e integraciones (IA, CUADRAO) se modelan como arquitectura de código (interfaces/puertos)
+// en src/modules e src/integrations, sin tablas todavía.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// La URL de conexión ya no vive aquí (Prisma 7): se define en prisma.config.ts
+// y se resuelve desde DATABASE_URL en tiempo de ejecución.
+datasource db {
+  provider = "postgresql"
+}
+
+/// Tenant raíz: consultorio o clínica.
+model Organizacion {
+  id        String   @id @default(cuid())
+  nombre    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuarios               Usuario[]
+  medicos                Medico[]
+  pacientes              Paciente[]
+  citas                  Cita[]
+  consultas              Consulta[]
+  documentos             Documento[]
+  cobros                 Cobro[]
+  cajas                  Caja[]
+  movimientosCaja        MovimientoCaja[]
+  registrosTrazabilidad  RegistroTrazabilidad[]
+
+  @@map("organizaciones")
+}
+
+enum RolUsuario {
+  MEDICO
+  ADMIN
+  STAFF
+}
+
+/// Cuenta con la que se inicia sesión. Puede tener un perfil Medico asociado.
+model Usuario {
+  id             String     @id @default(cuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  nombre         String
+  email          String     @unique
+  passwordHash   String
+  rol            RolUsuario @default(MEDICO)
+  activo         Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  medico                 Medico?
+  cajasAbiertas           Caja[]                 @relation("CajaAbiertaPor")
+  movimientosRegistrados  MovimientoCaja[]        @relation("MovimientoRegistradoPor")
+  registrosTrazabilidad   RegistroTrazabilidad[]  @relation("TrazabilidadActor")
+
+  @@index([organizacionId])
+  @@map("usuarios")
+}
+
+/// Perfil profesional del médico: lo que lo identifica en agenda, consulta y documentos.
+model Medico {
+  id              String   @id @default(cuid())
+  usuarioId       String   @unique
+  usuario         Usuario  @relation(fields: [usuarioId], references: [id])
+  organizacionId  String
+  organizacion    Organizacion @relation(fields: [organizacionId], references: [id])
+  especialidad    String?
+  numeroColegiado String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  citas      Cita[]
+  consultas  Consulta[]
+  documentos Documento[]
+  cobros     Cobro[]
+
+  @@index([organizacionId])
+  @@map("medicos")
+}
+
+model Paciente {
+  id              String    @id @default(cuid())
+  organizacionId  String
+  organizacion    Organizacion @relation(fields: [organizacionId], references: [id])
+  nombre          String
+  apellido        String
+  fechaNacimiento DateTime?
+  sexo            String?
+  telefono        String?
+  email           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  citas     Cita[]
+  consultas Consulta[]
+  cobros    Cobro[]
+
+  @@index([organizacionId])
+  @@map("pacientes")
+}
+
+enum EstadoCita {
+  PENDIENTE
+  CONFIRMADA
+  ATENDIDA
+  CANCELADA
+  NO_ASISTIO
+}
+
+model Cita {
+  id             String     @id @default(cuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  pacienteId     String
+  paciente       Paciente   @relation(fields: [pacienteId], references: [id], onDelete: Restrict)
+  medicoId       String
+  medico         Medico     @relation(fields: [medicoId], references: [id], onDelete: Restrict)
+  fechaHora      DateTime
+  estado         EstadoCita @default(PENDIENTE)
+  motivo         String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  consulta Consulta?
+
+  @@index([organizacionId, fechaHora])
+  @@map("citas")
+}
+
+enum EstadoConsulta {
+  EN_CURSO
+  CERRADA
+  /// Anulación lógica: la consulta se registró por error o no debe contar
+  /// como válida, pero se conserva (nunca se borra físicamente).
+  ANULADA
+}
+
+/// Núcleo operativo: conecta Paciente -> Cita -> Consulta y de aquí cuelgan
+/// documentos y cobros, evitando que el médico repita información.
+model Consulta {
+  id             String   @id @default(cuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  pacienteId     String
+  paciente       Paciente @relation(fields: [pacienteId], references: [id], onDelete: Restrict)
+  medicoId       String
+  medico         Medico   @relation(fields: [medicoId], references: [id], onDelete: Restrict)
+  citaId         String?  @unique
+  cita           Cita?    @relation(fields: [citaId], references: [id], onDelete: Restrict)
+
+  motivoConsulta String?
+  anamnesis      String?
+  antecedentes   String?
+  examenFisico   String?
+  evaluacion     String?
+  diagnostico    String?
+  tratamiento    String?
+
+  estado    EstadoConsulta @default(EN_CURSO)
+  fechaHora DateTime       @default(now())
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  documentos Documento[]
+  cobros     Cobro[]
+
+  @@index([organizacionId, pacienteId])
+  @@map("consultas")
+}
+
+enum TipoDocumento {
+  RECETA
+}
+
+/// Documento clínico inmutable emitido desde una Consulta (receta; en el
+/// futuro informe/constancia/orden — agregar el valor al enum no requiere
+/// rediseñar este modelo). Una vez creado nunca se edita: un error se
+/// corrige emitiendo un documento nuevo, no modificando el existente — por
+/// eso no tiene updatedAt, y fechaEmision (siempre server-side, nunca
+/// enviada por el cliente) es su único timestamp relevante.
+///
+/// `contenido` es JSON porque su forma depende de `tipo`: una receta es una
+/// lista de medicamentos, un futuro informe sería texto libre — evita tener
+/// que crear una tabla nueva por cada tipo de documento. No lleva
+/// pacienteId propio: se deriva de consulta.pacienteId (relación real, no
+/// opcional) para no duplicar un dato que ya vive en el schema.
+model Documento {
+  id             String        @id @default(cuid())
+  organizacionId String
+  organizacion   Organizacion  @relation(fields: [organizacionId], references: [id])
+  consultaId     String
+  consulta       Consulta      @relation(fields: [consultaId], references: [id], onDelete: Restrict)
+  medicoId       String
+  medico         Medico        @relation(fields: [medicoId], references: [id], onDelete: Restrict)
+
+  tipo         TipoDocumento
+  contenido    Json
+  fechaEmision DateTime      @default(now())
+
+  @@index([organizacionId, consultaId])
+  @@map("documentos")
+}
+
+enum EstadoCobro {
+  PENDIENTE
+  PAGADO
+  PARCIAL
+  ANULADO
+}
+
+/// Obligación/pago asociado a una consulta. Una consulta puede tener 0, 1 o varios cobros
+/// (cobro posterior, pagos parciales, distintos conceptos, consulta de cortesía sin cobro).
+model Cobro {
+  id             String   @id @default(cuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  consultaId     String?
+  consulta       Consulta? @relation(fields: [consultaId], references: [id], onDelete: Restrict)
+  pacienteId     String
+  paciente       Paciente @relation(fields: [pacienteId], references: [id], onDelete: Restrict)
+  medicoId       String
+  medico         Medico   @relation(fields: [medicoId], references: [id], onDelete: Restrict)
+
+  concepto   String
+  monto      Decimal     @db.Decimal(10, 2)
+  moneda     String      @default("USD")
+  metodoPago String?
+  estado     EstadoCobro @default(PENDIENTE)
+  fecha      DateTime    @default(now())
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  movimientosCaja MovimientoCaja[]
+
+  @@index([organizacionId, consultaId])
+  @@map("cobros")
+}
+
+enum EstadoCaja {
+  ABIERTA
+  CERRADA
+}
+
+model Caja {
+  id             String    @id @default(cuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  abiertaPorId   String
+  abiertaPor     Usuario   @relation("CajaAbiertaPor", fields: [abiertaPorId], references: [id])
+  fechaApertura  DateTime  @default(now())
+  fechaCierre    DateTime?
+  montoInicial   Decimal   @default(0) @db.Decimal(10, 2)
+  montoFinal     Decimal?  @db.Decimal(10, 2)
+  estado         EstadoCaja @default(ABIERTA)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  movimientos MovimientoCaja[]
+
+  @@index([organizacionId, estado])
+  @@map("cajas")
+}
+
+enum TipoMovimientoCaja {
+  INGRESO
+  EGRESO
+}
+
+/// Origen del movimiento: permite distinguir dinero que llegó por un Cobro de
+/// movimientos manuales (ingreso autorizado, egreso, devolución, retiro, ajuste),
+/// manteniendo trazabilidad hacia el Cobro cuando exista relación.
+enum OrigenMovimientoCaja {
+  COBRO
+  INGRESO_MANUAL
+  EGRESO
+  DEVOLUCION
+  RETIRO
+  AJUSTE
+}
+
+/// Movimiento real de dinero en caja. Distinto de Cobro: un Cobro representa la
+/// obligación/pago; el MovimientoCaja representa que el dinero efectivamente entró o salió.
+///
+/// Lleva organizacionId propio (denormalizado desde Caja.organizacionId) para que
+/// cualquier repositorio pueda filtrar por organización directamente, sin depender
+/// de un join a través de Caja. Ver src/db/consistenciaOrganizacional.ts, que valida
+/// en tiempo de escritura que ambos valores coincidan.
+model MovimientoCaja {
+  id             String @id @default(cuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  cajaId String
+  caja   Caja   @relation(fields: [cajaId], references: [id], onDelete: Restrict)
+  cobroId String?
+  cobro   Cobro? @relation(fields: [cobroId], references: [id], onDelete: Restrict)
+
+  tipo             TipoMovimientoCaja
+  origen           OrigenMovimientoCaja @default(INGRESO_MANUAL)
+  monto            Decimal              @db.Decimal(10, 2)
+  moneda           String               @default("USD")
+  descripcion      String?
+  registradoPorId  String
+  registradoPor    Usuario              @relation("MovimientoRegistradoPor", fields: [registradoPorId], references: [id])
+  fecha            DateTime             @default(now())
+  createdAt        DateTime             @default(now())
+
+  @@index([organizacionId])
+  @@index([cajaId])
+  @@map("movimientos_caja")
+}
+
+/// Trazabilidad funcional (distinta de logs técnicos): quién hizo qué, sobre qué
+/// entidad, cuándo y qué cambió. Pensada para consultorios/clínicas multiusuario.
+model RegistroTrazabilidad {
+  id             String   @id @default(cuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  actorId        String
+  actor          Usuario  @relation("TrazabilidadActor", fields: [actorId], references: [id])
+  accion         String
+  entidadTipo    String
+  entidadId      String
+  pacienteId     String?
+  cambios        Json?
+  fecha          DateTime @default(now())
+
+  @@index([organizacionId, entidadTipo, entidadId])
+  @@index([organizacionId, pacienteId])
+  @@map("registros_trazabilidad")
+}

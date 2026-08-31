@@ -1,0 +1,94 @@
+/**
+ * Tokens de diseño — identidad oficial de CONXULTY (Figma Brand System v1.0).
+ *
+ * Fuente de verdad: especificación validada desde el sitio oficial de Figma
+ * (https://cheer-polish-15026754.figma.site). Los nombres de aquí son
+ * semánticos (representan intención de uso), nunca los alias internos del
+ * CSS publicado por ese sitio — su "--color-teal-700", por ejemplo, vale en
+ * realidad #6d28d9 (Violeta), no teal. Ese tipo de nombre no se copia.
+ *
+ * Cada valor cita entre paréntesis su token oficial de Figma. Los marcados
+ * "no oficial" son aproximaciones necesarias para que la interfaz funcione,
+ * sin equivalente publicado en la especificación.
+ */
+
+@theme inline {
+  /* Tipografía — next/font/google expone --font-archivo/--font-inter/
+     --font-jetbrains-mono en :root (ver layout.tsx); aquí se alían a los
+     nombres de rol que Tailwind usa para generar font-display/font-sans/
+     font-mono. */
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Marca — Violeta 700 es el color dominante de la identidad. */
+  --color-brand-primary: #6d28d9;       /* Violeta 700 */
+  --color-brand-primary-hover: #5b21b6; /* Violeta 800 — presente en la escala real
+                                            publicada por Figma, aunque no aparece
+                                            listado en el texto de la sección Color;
+                                            se usa para oscurecer en :hover, igual
+                                            dirección que el acento anterior. */
+  --color-brand-primary-soft: #f5f3ff; /* Violeta 50 */
+  --color-brand-secondary: #4361ee;    /* Azul 500 */
+
+  /* Degradado de firma — 120° · #38BDF8 → #4361EE → #7C3AED */
+  --gradient-brand: linear-gradient(120deg, #38bdf8, #4361ee, #7c3aed);
+
+  /* Fondo y superficie — Cream/Paper, nunca gris genérico */
+  --color-background: #fafafe;    /* Cream */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f3fb; /* Paper */
+
+  /* Texto — escala Tinta / Índigo */
+  --color-text-primary: #121028;   /* Tinta 900 */
+  --color-text-secondary: #565478; /* Tinta 500 */
+  --color-text-faint: #7c7aa0;     /* Índigo 400 */
+
+  /* Bordes */
+  --color-border: #d6d5e6; /* Índigo 200 */
+
+  /* Estados funcionales */
+  --color-success: #12a150;
+  --color-warning: #d99312;
+  --color-danger: #e0454e;
+  --color-info: #4361ee; /* = Azul 500 (mismo valor en la propia tabla de Figma) */
+
+  /* Fondos suaves para Badge/Alert — Figma no publica un tono "soft" para
+     estos cuatro estados; se derivan por mezcla del color oficial con blanco
+     en vez de inventar un hex nuevo. */
+  --color-success-soft: color-mix(in srgb, var(--color-success) 14%, white);
+  --color-warning-soft: color-mix(in srgb, var(--color-warning) 14%, white);
+  --color-danger-soft: color-mix(in srgb, var(--color-danger) 14%, white);
+  --color-info-soft: color-mix(in srgb, var(--color-info) 14%, white);
+  --color-neutral-soft: var(--color-surface-muted);
+
+  /* Variantes de TEXTO accesibles de los 4 estados funcionales — auditoría de
+     accesibilidad detectó que el color oficial puro, usado como texto sobre
+     su fondo *-soft (Badge) o sobre el fondo de página (Alert), no alcanza
+     4.5:1 WCAG AA. Los colores base (--color-success/warning/danger/info)
+     NO se tocan — se mantienen exactos a Figma. Estas son variantes
+     oscurecidas derivadas matemáticamente del color oficial (color-mix hacia
+     negro), pensadas únicamente para renderizar texto legible; el porcentaje
+     de mezcla es el mínimo necesario para superar 4.5:1 con margen, calculado
+     contra los fondos reales de Badge/Alert:
+       éxito       -> 5.4:1 (Badge) / 5.9:1 (Alert)
+       advertencia -> 5.6:1 (Badge) / 6.0:1 (Alert)
+       error       -> 5.0:1 (Badge) / 5.7:1 (Alert)
+       información -> 4.9:1 (Badge) / 5.7:1 (Alert) */
+  --color-success-text: color-mix(in srgb, var(--color-success) 70%, black);
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 60%, black);
+  --color-danger-text: color-mix(in srgb, var(--color-danger) 80%, black);
+  --color-info-text: color-mix(in srgb, var(--color-info) 90%, black);
+
+  /* Radios por rol de componente (Figma: Input 8 · Button 10 · Card 16).
+     Input y Card coinciden con rounded-lg/rounded-2xl de Tailwind; se
+     nombran igual para que el token exprese intención, no un valor físico. */
+  --radius-input: 8px;
+  --radius-button: 10px; /* sin equivalente nativo en la escala de Tailwind */
+  --radius-card: 16px;
+
+  /* Sombra — Figma nombra los niveles sm/md/lg/xl sin publicar valores de
+     blur/offset/opacidad. Esta es una aproximación conservadora propia,
+     NO un token oficial de la identidad. */
+  --shadow-card: 0 1px 2px rgba(18, 16, 40, 0.04), 0 8px 20px -12px rgba(18, 16, 40, 0.18);
+}
