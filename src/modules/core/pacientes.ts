@@ -28,6 +28,14 @@ export async function obtenerPaciente(input: {
   });
 }
 
+export async function listarPacientes(input: { organizacionId: string }) {
+  return prisma.paciente.findMany({
+    where: { organizacionId: input.organizacionId },
+    orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
+    take: 20,
+  });
+}
+
 export async function buscarPacientes(input: {
   organizacionId: string;
   texto: string;

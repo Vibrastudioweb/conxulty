@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireMedico } from "@/modules/core/autorizacion";
-import { buscarPacientes } from "@/modules/core/pacientes";
+import { buscarPacientes, listarPacientes } from "@/modules/core/pacientes";
 import { crearPacienteAction } from "./actions";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -22,7 +22,9 @@ export default async function PacientesPage({
         organizacionId: session.user.organizacionId,
         texto: q,
       })
-    : [];
+    : await listarPacientes({
+        organizacionId: session.user.organizacionId,
+      });
 
   return (
     <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6">
@@ -42,22 +44,22 @@ export default async function PacientesPage({
         />
       </form>
 
-      {q && (
-        <ul className="mt-4 space-y-2">
-          {resultados.length === 0 && (
-            <li>
-              <EmptyState message="Sin resultados." />
-            </li>
-          )}
-          {resultados.map((paciente) => (
-            <li key={paciente.id}>
-              <Card href={`/pacientes/${paciente.id}`}>
-                {paciente.nombre} {paciente.apellido}
-              </Card>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="mt-4 space-y-2">
+        {resultados.length === 0 && (
+          <li>
+            <EmptyState
+              message={q ? "Sin resultados." : "Aún no hay pacientes."}
+            />
+          </li>
+        )}
+        {resultados.map((paciente) => (
+          <li key={paciente.id}>
+            <Card href={`/pacientes/${paciente.id}`}>
+              {paciente.nombre} {paciente.apellido}
+            </Card>
+          </li>
+        ))}
+      </ul>
 
       <details className="mt-6">
         <summary className="cursor-pointer text-sm font-medium text-brand-primary">
