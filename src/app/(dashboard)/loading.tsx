@@ -9,6 +9,10 @@ import { Skeleton } from "@/components/feedback/Skeleton";
  */
 export default function DashboardLoading() {
   return (
+    // Deliberadamente <div>, no <main>: es un fallback de Suspense
+    // transitorio (loading.js) que puede coexistir brevemente en el HTML
+    // en streaming junto con el <main> real de la página mientras se
+    // resuelve — no es un landmark de contenido en sí mismo.
     <div className="mx-auto max-w-md px-4 py-6">
       <Skeleton className="h-6 w-32" />
       <div className="mt-6 space-y-3">

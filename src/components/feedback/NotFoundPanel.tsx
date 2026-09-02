@@ -19,7 +19,7 @@ export function NotFoundPanel({
   backLabel: string;
 }) {
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-16 text-center">
+    <main className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-16 text-center">
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-soft text-text-faint">
         <SearchX size={24} aria-hidden="true" />
       </span>
@@ -35,6 +35,6 @@ export function NotFoundPanel({
       >
         {backLabel}
       </Link>
-    </div>
+    </main>
   );
 }

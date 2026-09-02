@@ -32,7 +32,10 @@ export function AppShell({
 
       <div className="flex min-h-screen flex-1 flex-col">
         <MobileHeader className="lg:hidden" />
-        <main className="flex-1 pb-20 lg:pb-0 print:pb-0">{children}</main>
+        {/* No es <main>: cada página ya renderiza su propio <main> — anidar
+            landmarks "main" es inválido en HTML y duplica el landmark para
+            lectores de pantalla. */}
+        <div className="flex-1 pb-20 lg:pb-0 print:pb-0">{children}</div>
       </div>
 
       <BottomNav items={primaryItems} className="lg:hidden" />
