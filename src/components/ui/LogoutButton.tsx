@@ -1,3 +1,4 @@
+import { LogOut } from "lucide-react";
 import { signOut } from "@/auth";
 
 async function cerrarSesion() {
@@ -10,8 +11,9 @@ export function LogoutButton() {
     <form action={cerrarSesion}>
       <button
         type="submit"
-        className="text-xs text-text-faint hover:text-text-secondary"
+        className="inline-flex items-center gap-1.5 text-caption text-text-faint transition hover:text-text-secondary"
       >
+        <LogOut size={14} aria-hidden="true" />
         Cerrar sesión
       </button>
     </form>

@@ -36,7 +36,9 @@ export function Card({
     PADDING_CLASSES[padding],
     highlighted ? "border-brand-primary" : "border-border",
     elevated ? "shadow-card" : "",
-    href ? "block transition hover:border-brand-primary" : "",
+    href
+      ? "block transition hover:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+      : "",
     className,
   ]
     .filter(Boolean)

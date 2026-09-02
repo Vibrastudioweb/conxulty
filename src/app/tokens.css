@@ -91,4 +91,38 @@
      blur/offset/opacidad. Esta es una aproximación conservadora propia,
      NO un token oficial de la identidad. */
   --shadow-card: 0 1px 2px rgba(18, 16, 40, 0.04), 0 8px 20px -12px rgba(18, 16, 40, 0.18);
+
+  /* Escala tipográfica semántica — NO oficial de Figma (la spec no publica
+     una escala de texto), es una decisión propia del Design System de esta
+     fase para reemplazar la dependencia casi total de text-sm/text-xs que
+     tenía la interfaz. Cada nivel define tamaño + interlineado emparejados
+     (sintaxis de Tailwind v4: --text-<nombre> / --text-<nombre>--line-height);
+     el peso de fuente y la familia (font-display/font-sans) se aplican por
+     separado en cada uso, igual que ya se hacía antes de este cambio.
+     Genera las utilidades: text-display, text-page-title, text-section-title,
+     text-card-title, text-body, text-body-secondary, text-caption,
+     text-eyebrow. */
+  --text-display: 2rem; /* 32px — portadas de marca (login, error/empty de sistema) */
+  --text-display--line-height: 2.375rem;
+
+  --text-page-title: 1.375rem; /* 22px — <h1> de cada pantalla */
+  --text-page-title--line-height: 1.75rem;
+
+  --text-section-title: 1.0625rem; /* 17px — títulos de sección dentro de una pantalla */
+  --text-section-title--line-height: 1.5rem;
+
+  --text-card-title: 0.9375rem; /* 15px — títulos dentro de Card/EmptyState */
+  --text-card-title--line-height: 1.375rem;
+
+  --text-body: 0.9375rem; /* 15px — texto de lectura principal */
+  --text-body--line-height: 1.5rem;
+
+  --text-body-secondary: 0.8125rem; /* 13px — texto de apoyo, metadatos */
+  --text-body-secondary--line-height: 1.25rem;
+
+  --text-caption: 0.75rem; /* 12px — pies de campo, timestamps, ayudas */
+  --text-caption--line-height: 1rem;
+
+  --text-eyebrow: 0.6875rem; /* 11px — etiquetas de sección en mayúsculas */
+  --text-eyebrow--line-height: 1rem;
 }

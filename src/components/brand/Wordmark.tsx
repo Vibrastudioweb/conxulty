@@ -4,8 +4,10 @@
  * El isotipo oficial (la "X" de dos cintas cruzadas en degradado azul→violeta)
  * todavía no existe como asset exportado dentro de public/ — ver
  * public/brand/README.md. Este componente es un sustituto de solo texto,
- * nunca una recreación del isotipo, y es el único lugar del código que debe
- * cambiar cuando el SVG oficial esté disponible.
+ * nunca una recreación del isotipo, y es uno de los dos únicos lugares del
+ * código (junto con BrandMark.tsx) que deben cambiar cuando el SVG oficial
+ * esté disponible. `Logo` es quien los combina — el resto de la app nunca
+ * debería importar Wordmark/BrandMark directamente.
  */
 export function Wordmark({ className = "" }: { className?: string }) {
   return (

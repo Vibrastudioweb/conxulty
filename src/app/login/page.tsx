@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
-import { Wordmark } from "@/components/ui/Wordmark";
+import { Wordmark } from "@/components/brand/Wordmark";
+import { VibraSignature } from "@/components/brand/VibraSignature";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -32,9 +33,9 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
       <Card padding="spacious" elevated className="w-full max-w-sm">
-        <Wordmark className="text-2xl" />
+        <Wordmark className="text-display" />
         <p className="mt-2 text-sm text-text-secondary">
           Inicia sesión para continuar
         </p>
@@ -67,6 +68,10 @@ export default async function LoginPage({
           </Button>
         </form>
       </Card>
+
+      <div className="mt-6">
+        <VibraSignature className="text-center" />
+      </div>
     </main>
   );
 }
