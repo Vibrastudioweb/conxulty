@@ -65,7 +65,7 @@ export function NavList({
   }
 
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {items.map((item) => {
         const active = isActive(item.href);
         const Icon = ICONS[item.iconKey];
@@ -74,13 +74,13 @@ export function NavList({
             <Link
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-button px-3 py-2 text-body-secondary font-medium transition ${
+              className={`flex items-center gap-3.5 rounded-button px-3 py-3 text-body transition ${
                 active
-                  ? "bg-brand-primary-soft text-brand-primary"
-                  : "text-text-secondary hover:bg-surface-muted hover:text-text-primary"
+                  ? "bg-brand-primary-soft font-semibold text-brand-primary"
+                  : "font-medium text-text-secondary hover:bg-surface-muted hover:text-text-primary"
               }`}
             >
-              <Icon size={20} strokeWidth={active ? 2.25 : 2} aria-hidden="true" />
+              <Icon size={24} strokeWidth={active ? 2.25 : 2} aria-hidden="true" />
               {item.label}
             </Link>
           </li>

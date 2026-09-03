@@ -21,18 +21,18 @@ export function Sidebar({
 }) {
   return (
     <aside
-      className={`w-64 shrink-0 flex-col border-r border-border bg-surface px-4 py-6 print:hidden ${className}`}
+      className={`w-80 shrink-0 flex-col border-r border-border bg-surface px-6 py-8 print:hidden ${className}`}
     >
       <Link href="/" className="block px-2">
-        <Logo size="sm" />
+        <Logo size="md" />
       </Link>
 
-      <nav aria-label="Navegación principal" className="mt-8 flex-1">
+      <nav aria-label="Navegación principal" className="mt-10 flex-1">
         <NavList items={items} variant="sidebar" />
       </nav>
 
       <div className="border-t border-border pt-4">
-        <p className="truncate px-2 text-body-secondary font-medium text-text-primary">
+        <p className="truncate px-2 text-body font-medium text-text-primary">
           {user.name}
         </p>
         <p className="truncate px-2 text-caption text-text-faint">{user.email}</p>

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/feedback/toast/ToastProvider";
 
-const archivo = Archivo({
-  variable: "--font-archivo",
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
 });
 
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${geist.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ToastProvider>{children}</ToastProvider>
