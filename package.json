@@ -11,7 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.mjs",
     "db:studio": "prisma studio",
-    "postinstall": "node scripts/patch-next-webpack.mjs"
+    "postinstall": "node scripts/patch-next-webpack.mjs && prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
