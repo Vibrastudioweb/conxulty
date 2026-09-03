@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Home, Video } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import type { listarCitasDelDia } from "@/modules/core/citas";
+
+const ICONO_MODALIDAD = {
+  VIDEOCONSULTA: Video,
+  DOMICILIO: Home,
+} as const;
 
 /**
  * Compartido entre /hoy y /agenda para no duplicar el render de una cita ni
@@ -25,10 +30,21 @@ export const TONO_ESTADO_CITA: Record<string, BadgeTone> = {
   NO_ASISTIO: "danger",
 };
 
+export const ETIQUETAS_MODALIDAD: Record<string, string> = {
+  PRESENCIAL: "Presencial",
+  VIDEOCONSULTA: "Videoconsulta",
+  DOMICILIO: "Domicilio",
+};
+
 export type CitaDelDia = Awaited<ReturnType<typeof listarCitasDelDia>>[number];
 
 export function formatearHora(fecha: Date) {
   return fecha.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+}
+
+export function formatearRangoHora(fecha: Date, duracionMinutos: number) {
+  const fin = new Date(fecha.getTime() + duracionMinutos * 60_000);
+  return `${formatearHora(fecha)} – ${formatearHora(fin)}`;
 }
 
 export function CitaCard({
@@ -54,10 +70,13 @@ export function CitaCard({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="font-display text-display font-semibold text-text-primary">
-              {formatearHora(cita.fechaHora)}
+              {formatearRangoHora(cita.fechaHora, cita.duracionMinutos)}
             </p>
             <p className="mt-1.5 text-section-title font-medium text-text-primary">
               {cita.paciente.nombre} {cita.paciente.apellido}
+            </p>
+            <p className="mt-1 text-body-secondary text-text-secondary">
+              {ETIQUETAS_MODALIDAD[cita.modalidad] ?? cita.modalidad}
             </p>
             {cita.motivo && (
               <p className="mt-1 text-body-secondary text-text-secondary">
@@ -99,6 +118,9 @@ export function CitaCard({
       ? "En curso"
       : (ETIQUETAS_ESTADO_CITA[cita.estado] ?? cita.estado);
 
+    const IconoModalidad =
+      ICONO_MODALIDAD[cita.modalidad as keyof typeof ICONO_MODALIDAD];
+
     return (
       <Link
         href={rowHref}
@@ -107,8 +129,17 @@ export function CitaCard({
         <span className="w-14 shrink-0 tabular-nums text-body-secondary font-medium text-text-secondary">
           {formatearHora(cita.fechaHora)}
         </span>
-        <span className="flex-1 truncate text-body font-medium text-text-primary">
-          {cita.paciente.nombre} {cita.paciente.apellido}
+        <span className="flex flex-1 items-center gap-1.5 truncate text-body font-medium text-text-primary">
+          {IconoModalidad && (
+            <IconoModalidad
+              size={14}
+              className="shrink-0 text-text-faint"
+              aria-label={ETIQUETAS_MODALIDAD[cita.modalidad]}
+            />
+          )}
+          <span className="truncate">
+            {cita.paciente.nombre} {cita.paciente.apellido}
+          </span>
         </span>
         <Badge tone={tone}>{etiqueta}</Badge>
       </Link>
@@ -119,12 +150,15 @@ export function CitaCard({
     <Card href={href}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-text-primary">
-          {formatearHora(cita.fechaHora)} — {cita.paciente.nombre}{" "}
-          {cita.paciente.apellido}
+          {formatearRangoHora(cita.fechaHora, cita.duracionMinutos)} —{" "}
+          {cita.paciente.nombre} {cita.paciente.apellido}
         </span>
         <Badge tone={TONO_ESTADO_CITA[cita.estado] ?? "neutral"}>
           {ETIQUETAS_ESTADO_CITA[cita.estado] ?? cita.estado}
         </Badge>
+      </div>
+      <div className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
+        <span>{ETIQUETAS_MODALIDAD[cita.modalidad] ?? cita.modalidad}</span>
       </div>
       {cita.consulta && (
         <span className="mt-1 block text-xs text-brand-primary">

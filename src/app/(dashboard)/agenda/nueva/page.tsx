@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { requireMedico } from "@/modules/core/autorizacion";
 import { buscarPacientes, obtenerPaciente } from "@/modules/core/pacientes";
+import { DURACION_MINUTOS_DEFECTO } from "@/modules/core/citas";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ETIQUETAS_MODALIDAD } from "@/components/citas/CitaCard";
 import { fechaDesdeParam, formatearFechaISO } from "@/components/citas/fecha";
 import { crearCitaAction } from "../actions";
 
@@ -138,6 +140,48 @@ export default async function NuevaCitaPage({
           <Input id="hora" name="hora" type="time" required />
         </div>
 
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor="duracionMinutos"
+              className="mb-1 block text-sm font-medium text-text-primary"
+            >
+              Duración (min)
+            </label>
+            <Input
+              id="duracionMinutos"
+              name="duracionMinutos"
+              type="number"
+              min={5}
+              max={480}
+              step={5}
+              defaultValue={DURACION_MINUTOS_DEFECTO}
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="modalidad"
+              className="mb-1 block text-sm font-medium text-text-primary"
+            >
+              Modalidad
+            </label>
+            <select
+              id="modalidad"
+              name="modalidad"
+              defaultValue="PRESENCIAL"
+              className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+              {Object.entries(ETIQUETAS_MODALIDAD).map(([valor, etiqueta]) => (
+                <option key={valor} value={valor}>
+                  {etiqueta}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <div>
           <label
             htmlFor="motivo"
@@ -146,6 +190,21 @@ export default async function NuevaCitaPage({
             Motivo (opcional)
           </label>
           <Textarea id="motivo" name="motivo" rows={2} />
+        </div>
+
+        <div>
+          <label
+            htmlFor="notas"
+            className="mb-1 block text-sm font-medium text-text-primary"
+          >
+            Notas operativas (opcional)
+          </label>
+          <Textarea
+            id="notas"
+            name="notas"
+            rows={2}
+            placeholder="Solo información de agenda, no clínica."
+          />
         </div>
 
         <Button type="submit" fullWidth>

@@ -88,19 +88,24 @@ model Paciente {
 }
 
 model Cita {
-  id             String       @id @default(cuid())
-  organizacionId String
-  pacienteId     String
-  medicoId       String
-  fechaHora      DateTime
-  estado         EstadoCita   @default(PENDIENTE)
-  motivo         String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  medico         Medico       @relation(fields: [medicoId], references: [id])
-  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
-  paciente       Paciente     @relation(fields: [pacienteId], references: [id])
-  consulta       Consulta?
+  id              String        @id @default(cuid())
+  organizacionId  String
+  pacienteId      String
+  medicoId        String
+  fechaHora       DateTime
+  duracionMinutos Int           @default(30)
+  modalidad       ModalidadCita @default(PRESENCIAL)
+  estado          EstadoCita    @default(PENDIENTE)
+  motivo          String?
+  /// Notas operativas de agenda (p.ej. "confirmar por teléfono"). Nunca
+  /// contenido clínico: eso vive exclusivamente en Consulta.
+  notas           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  medico          Medico        @relation(fields: [medicoId], references: [id])
+  organizacion    Organizacion  @relation(fields: [organizacionId], references: [id])
+  paciente        Paciente      @relation(fields: [pacienteId], references: [id])
+  consulta        Consulta?
 
   @@index([organizacionId, fechaHora])
   @@map("citas")
@@ -271,6 +276,12 @@ enum EstadoCita {
   ATENDIDA
   CANCELADA
   NO_ASISTIO
+}
+
+enum ModalidadCita {
+  PRESENCIAL
+  VIDEOCONSULTA
+  DOMICILIO
 }
 
 enum EstadoConsulta {

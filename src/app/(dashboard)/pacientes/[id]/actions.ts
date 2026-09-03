@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
-import { abrirOCrearConsulta } from "@/modules/core/consultas";
+import { abrirOCrearConsulta, CitaNoDisponibleError } from "@/modules/core/consultas";
 
 export async function iniciarConsultaAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
@@ -15,13 +15,21 @@ export async function iniciarConsultaAction(formData: FormData) {
     throw new Error("Falta el paciente para iniciar la consulta.");
   }
 
-  const { consultaId } = await abrirOCrearConsulta({
-    organizacionId: session.user.organizacionId,
-    actorId: session.user.id,
-    medicoId: medico.id,
-    pacienteId,
-    citaId,
-  });
+  let consultaId: string;
+  try {
+    ({ consultaId } = await abrirOCrearConsulta({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      medicoId: medico.id,
+      pacienteId,
+      citaId,
+    }));
+  } catch (err) {
+    if (err instanceof CitaNoDisponibleError) {
+      redirect(`/pacientes/${pacienteId}?error=cita_no_disponible`);
+    }
+    throw err;
+  }
 
   redirect(`/consultas/${consultaId}`);
 }

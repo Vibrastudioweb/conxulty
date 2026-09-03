@@ -7,6 +7,7 @@ import { listarConsultasDelPaciente } from "@/modules/core/consultas";
 import { iniciarConsultaAction } from "./actions";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConsultaHistorialCard } from "@/components/consultas/ConsultaHistorialCard";
 
@@ -15,12 +16,12 @@ export default async function PacientePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cita?: string }>;
+  searchParams: Promise<{ cita?: string; error?: string }>;
 }) {
   const session = await requireMedico();
 
   const { id } = await params;
-  const { cita: citaId } = await searchParams;
+  const { cita: citaId, error } = await searchParams;
 
   const paciente = await obtenerPaciente({
     organizacionId: session.user.organizacionId,
@@ -77,13 +78,34 @@ export default async function PacientePage({
         </div>
       )}
 
-      <form action={iniciarConsultaAction} className="mt-6">
-        <input type="hidden" name="pacienteId" value={paciente.id} />
-        {citaId && <input type="hidden" name="citaId" value={citaId} />}
-        <Button type="submit" fullWidth>
-          {cita?.consulta ? "Continuar consulta" : "Iniciar consulta"}
-        </Button>
-      </form>
+      {error === "cita_no_disponible" && (
+        <div className="mt-3">
+          <Alert tone="danger">
+            Esa cita está cancelada o marcada como no asistida: no se puede
+            iniciar una consulta a partir de ella.
+          </Alert>
+        </div>
+      )}
+
+      {(() => {
+        const citaNoDisponible =
+          cita && !cita.consulta &&
+          (cita.estado === "CANCELADA" || cita.estado === "NO_ASISTIO");
+
+        if (citaNoDisponible) {
+          return null;
+        }
+
+        return (
+          <form action={iniciarConsultaAction} className="mt-6">
+            <input type="hidden" name="pacienteId" value={paciente.id} />
+            {citaId && <input type="hidden" name="citaId" value={citaId} />}
+            <Button type="submit" fullWidth>
+              {cita?.consulta ? "Continuar consulta" : "Iniciar consulta"}
+            </Button>
+          </form>
+        );
+      })()}
 
       <section className="mt-8 border-t border-border pt-4">
         <h2 className="text-xs font-medium uppercase tracking-wide text-text-secondary">

@@ -23,6 +23,13 @@ export class EstadoConsultaInvalidoError extends Error {
   }
 }
 
+export class CitaNoDisponibleError extends Error {
+  constructor() {
+    super("No se puede iniciar una consulta a partir de una cita cancelada o no asistida.");
+    this.name = "CitaNoDisponibleError";
+  }
+}
+
 const CAMPOS_CLINICOS = [
   "motivoConsulta",
   "anamnesis",
@@ -115,6 +122,10 @@ export async function abrirOCrearConsulta(input: {
 
     if (cita.consulta) {
       return { consultaId: cita.consulta.id, creada: false };
+    }
+
+    if (cita.estado === "CANCELADA" || cita.estado === "NO_ASISTIO") {
+      throw new CitaNoDisponibleError();
     }
 
     medicoEfectivo = cita.medicoId;
