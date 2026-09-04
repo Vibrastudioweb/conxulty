@@ -93,6 +93,15 @@ export async function validarConsistenciaConsulta(input: {
   }
 }
 
+/** AntecedenteMedico -> Paciente + Médico */
+export async function validarConsistenciaAntecedente(input: {
+  organizacionId: string;
+  pacienteId: string;
+  medicoId: string;
+}): Promise<void> {
+  await validarConsistenciaCita(input);
+}
+
 /** Documento -> Consulta + Médico */
 export async function validarConsistenciaDocumento(input: {
   organizacionId: string;

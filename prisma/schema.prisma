@@ -12,6 +12,7 @@ model Organizacion {
   nombre                String
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  antecedentesMedicos   AntecedenteMedico[]
   cajas                 Caja[]
   citas                 Cita[]
   cobros                Cobro[]
@@ -49,42 +50,84 @@ model Usuario {
 
 /// Perfil profesional del médico: lo que lo identifica en agenda, consulta y documentos.
 model Medico {
-  id              String       @id @default(cuid())
-  usuarioId       String       @unique
-  organizacionId  String
-  especialidad    String?
-  numeroColegiado String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  citas           Cita[]
-  cobros          Cobro[]
-  consultas       Consulta[]
-  documentos      Documento[]
-  organizacion    Organizacion @relation(fields: [organizacionId], references: [id])
-  usuario         Usuario      @relation(fields: [usuarioId], references: [id])
+  id                  String              @id @default(cuid())
+  usuarioId           String              @unique
+  organizacionId      String
+  especialidad        String?
+  numeroColegiado     String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  antecedentesMedicos AntecedenteMedico[]
+  citas               Cita[]
+  cobros              Cobro[]
+  consultas           Consulta[]
+  documentos          Documento[]
+  organizacion        Organizacion        @relation(fields: [organizacionId], references: [id])
+  usuario             Usuario             @relation(fields: [usuarioId], references: [id])
 
   @@index([organizacionId])
   @@map("medicos")
 }
 
 model Paciente {
-  id              String       @id @default(cuid())
-  organizacionId  String
-  nombre          String
-  apellido        String
-  fechaNacimiento DateTime?
-  sexo            String?
-  telefono        String?
-  email           String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  citas           Cita[]
-  cobros          Cobro[]
-  consultas       Consulta[]
-  organizacion    Organizacion @relation(fields: [organizacionId], references: [id])
+  id                         String              @id @default(cuid())
+  organizacionId             String
+  nombre                     String
+  apellido                   String
+  fechaNacimiento            DateTime?
+  sexo                       String?
+  telefono                   String?
+  email                      String?
+  /// Cédula/DNI/pasaporte. Único por organización, nunca globalmente — dos
+  /// organizaciones distintas pueden tener cada una un paciente con el mismo
+  /// documento sin que choquen entre sí (ver @@unique más abajo).
+  documentoIdentidad         String?
+  direccion                  String?
+  contactoEmergenciaNombre   String?
+  contactoEmergenciaTelefono String?
+  /// Archivado lógico: un paciente nunca se borra, se desactiva. Las citas,
+  /// consultas y cobros ya existentes se conservan intactos.
+  activo                     Boolean             @default(true)
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+  antecedentesMedicos        AntecedenteMedico[]
+  citas                      Cita[]
+  cobros                     Cobro[]
+  consultas                  Consulta[]
+  organizacion               Organizacion        @relation(fields: [organizacionId], references: [id])
 
+  @@unique([organizacionId, documentoIdentidad])
   @@index([organizacionId])
+  @@index([organizacionId, activo])
   @@map("pacientes")
+}
+
+/// Información clínica persistente del paciente (alergias, enfermedades
+/// crónicas, cirugías, medicación habitual, hábitos, antecedentes personales
+/// y familiares, observaciones) — distinta de `Consulta.antecedentes`, que es
+/// lo documentado durante un episodio puntual. Un AntecedenteMedico se
+/// consulta ANTES de futuras consultas (p.ej. alertar alergias); nunca se
+/// edita in-place una vez creado, para no perder el registro de qué se supo
+/// y cuándo — una corrección se hace desactivando el registro (`activo =
+/// false`) y creando uno nuevo, mismo criterio que Documento con la
+/// inmutabilidad clínica.
+model AntecedenteMedico {
+  id             String          @id @default(cuid())
+  organizacionId String
+  pacienteId     String
+  medicoId       String
+  tipo           TipoAntecedente
+  descripcion    String
+  activo         Boolean         @default(true)
+  fecha          DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  medico         Medico          @relation(fields: [medicoId], references: [id])
+  organizacion   Organizacion    @relation(fields: [organizacionId], references: [id])
+  paciente       Paciente        @relation(fields: [pacienteId], references: [id])
+
+  @@index([organizacionId, pacienteId])
+  @@map("antecedentes_medicos")
 }
 
 model Cita {
@@ -282,6 +325,17 @@ enum ModalidadCita {
   PRESENCIAL
   VIDEOCONSULTA
   DOMICILIO
+}
+
+enum TipoAntecedente {
+  ALERGIA
+  ENFERMEDAD_CRONICA
+  CIRUGIA
+  MEDICAMENTO_HABITUAL
+  HABITO
+  ANTECEDENTE_FAMILIAR
+  ANTECEDENTE_PERSONAL
+  OBSERVACION
 }
 
 enum EstadoConsulta {

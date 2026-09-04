@@ -1,6 +1,7 @@
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 import { validarConsistenciaConsulta } from "@/db/consistenciaOrganizacional";
+import { PacienteArchivadoError } from "@/modules/core/pacientes";
 
 export class ConsultaNoEncontradaError extends Error {
   constructor() {
@@ -129,6 +130,17 @@ export async function abrirOCrearConsulta(input: {
     }
 
     medicoEfectivo = cita.medicoId;
+  }
+
+  // Continuar una consulta EN_CURSO ya existente (retorno arriba) nunca se
+  // bloquea aunque el paciente se archive después; solo se bloquea INICIAR
+  // una consulta nueva — igual que crearCita en modules/core/citas.ts.
+  const paciente = await prisma.paciente.findUnique({
+    where: { id: input.pacienteId },
+    select: { activo: true },
+  });
+  if (!paciente?.activo) {
+    throw new PacienteArchivadoError();
   }
 
   await validarConsistenciaConsulta({

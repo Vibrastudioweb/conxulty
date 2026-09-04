@@ -2,6 +2,7 @@ import type { EstadoCita, ModalidadCita } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 import { validarConsistenciaCita } from "@/db/consistenciaOrganizacional";
+import { PacienteArchivadoError } from "@/modules/core/pacientes";
 
 /**
  * Casos de uso de Cita. Toda lectura y escritura va scoped por
@@ -189,6 +190,30 @@ export async function listarCitasEnRango(input: {
   });
 }
 
+/**
+ * Todas las citas de un paciente (cualquier médico de la organización que lo
+ * haya atendido), más recientes primero — para la sección "Citas" de la
+ * ficha del paciente. La UI separa próximas/anteriores comparando
+ * `fechaHora` contra "ahora"; el dominio devuelve la lista completa porque
+ * separar es una decisión de presentación, no de negocio.
+ */
+export async function listarCitasDelPaciente(input: {
+  organizacionId: string;
+  pacienteId: string;
+}) {
+  return prisma.cita.findMany({
+    where: {
+      organizacionId: input.organizacionId,
+      pacienteId: input.pacienteId,
+    },
+    include: {
+      medico: { select: { id: true, usuario: { select: { nombre: true } } } },
+      consulta: { select: { id: true, estado: true } },
+    },
+    orderBy: { fechaHora: "desc" },
+  });
+}
+
 export async function obtenerCita(input: {
   organizacionId: string;
   citaId: string;
@@ -235,7 +260,9 @@ async function obtenerCitaDelMedico(input: {
 /**
  * Crea una cita para el médico de la sesión. Valida consistencia
  * organizacional (paciente/médico) antes de escribir, igual que el resto de
- * los casos de uso que escriben Cita/Consulta.
+ * los casos de uso que escriben Cita/Consulta. Un paciente archivado no
+ * puede recibir citas nuevas (ver PacienteArchivadoError) — puede seguir
+ * consultándose, solo se bloquea la creación.
  */
 export async function crearCita(input: {
   organizacionId: string;
@@ -253,6 +280,14 @@ export async function crearCita(input: {
     pacienteId: input.pacienteId,
     medicoId: input.medicoId,
   });
+
+  const paciente = await prisma.paciente.findUnique({
+    where: { id: input.pacienteId },
+    select: { activo: true },
+  });
+  if (!paciente?.activo) {
+    throw new PacienteArchivadoError();
+  }
 
   const conflicto = await hayConflictoHorario({
     organizacionId: input.organizacionId,

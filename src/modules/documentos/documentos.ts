@@ -107,6 +107,35 @@ export async function listarDocumentosDeConsulta(input: {
   });
 }
 
+/**
+ * Documentos de TODAS las consultas de un paciente, más recientes primero —
+ * para la sección "Documentos" de la ficha del paciente. `documento` no
+ * tiene `pacienteId` propio (se deriva de `consulta.pacienteId`, ver
+ * comentario del modelo en schema.prisma), así que se filtra por relación
+ * anidada en vez de por un campo directo.
+ */
+export async function listarDocumentosDelPaciente(input: {
+  organizacionId: string;
+  pacienteId: string;
+}) {
+  return prisma.documento.findMany({
+    where: {
+      organizacionId: input.organizacionId,
+      consulta: { pacienteId: input.pacienteId },
+    },
+    select: {
+      id: true,
+      tipo: true,
+      fechaEmision: true,
+      consultaId: true,
+      medico: {
+        select: { usuario: { select: { nombre: true } } },
+      },
+    },
+    orderBy: { fechaEmision: "desc" },
+  });
+}
+
 /** Documento completo, con lo necesario para la vista de detalle/impresión. */
 export async function obtenerDocumento(input: {
   organizacionId: string;

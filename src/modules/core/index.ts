@@ -8,5 +8,6 @@
 
 export * from "./sesionMedica";
 export * from "./pacientes";
+export * from "./antecedentes";
 export * from "./citas";
 export * from "./consultas";

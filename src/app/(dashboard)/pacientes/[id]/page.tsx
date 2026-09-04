@@ -2,26 +2,64 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMedico } from "@/modules/core/autorizacion";
 import { obtenerPaciente } from "@/modules/core/pacientes";
-import { obtenerCita } from "@/modules/core/citas";
+import { obtenerCita, listarCitasDelPaciente } from "@/modules/core/citas";
 import { listarConsultasDelPaciente } from "@/modules/core/consultas";
-import { iniciarConsultaAction } from "./actions";
+import { listarAntecedentesDelPaciente } from "@/modules/core/antecedentes";
+import { listarDocumentosDelPaciente } from "@/modules/documentos/documentos";
+import { listarEventosDelPaciente } from "@/modules/trazabilidad";
+import { formatearFechaISO } from "@/components/citas/fecha";
+import {
+  iniciarConsultaAction,
+  archivarPacienteAction,
+  reactivarPacienteAction,
+  crearAntecedenteAction,
+  editarAntecedenteAction,
+  desactivarAntecedenteAction,
+} from "./actions";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SectionLabel } from "@/components/ui/SectionLabel";
 import { ConsultaHistorialCard } from "@/components/consultas/ConsultaHistorialCard";
+import { AlertaAlergias } from "@/components/pacientes/AlertaAlergias";
+import { AntecedentesSeccion } from "@/components/pacientes/AntecedentesSeccion";
+import { CitasPacienteSeccion } from "@/components/pacientes/CitasPacienteSeccion";
+import { DocumentosPacienteSeccion } from "@/components/pacientes/DocumentosPacienteSeccion";
+import { TrazabilidadPacienteSeccion } from "@/components/pacientes/TrazabilidadPacienteSeccion";
+
+function calcularEdad(fechaNacimiento: Date): number {
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+  const aunNoCumple =
+    hoy.getMonth() < fechaNacimiento.getMonth() ||
+    (hoy.getMonth() === fechaNacimiento.getMonth() && hoy.getDate() < fechaNacimiento.getDate());
+  if (aunNoCumple) edad -= 1;
+  return edad;
+}
+
+const MENSAJES_EXITO: Record<string, string> = {
+  actualizado: "Paciente actualizado.",
+  archivado: "Paciente archivado.",
+  reactivado: "Paciente reactivado.",
+  antecedente_creado: "Antecedente registrado.",
+  antecedente_editado: "Antecedente actualizado.",
+  antecedente_desactivado: "Antecedente desactivado.",
+};
 
 export default async function PacientePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cita?: string; error?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const session = await requireMedico();
 
   const { id } = await params;
-  const { cita: citaId, error } = await searchParams;
+  const { cita: citaId, error, ...resto } = await searchParams;
+  const mensajeExito = Object.keys(MENSAJES_EXITO).find((clave) => clave in resto);
 
   const paciente = await obtenerPaciente({
     organizacionId: session.user.organizacionId,
@@ -33,42 +71,100 @@ export default async function PacientePage({
   }
 
   const cita = citaId
-    ? await obtenerCita({
-        organizacionId: session.user.organizacionId,
-        citaId,
-      })
+    ? await obtenerCita({ organizacionId: session.user.organizacionId, citaId })
     : null;
 
-  const consultasPrevias = await listarConsultasDelPaciente({
-    organizacionId: session.user.organizacionId,
-    pacienteId: paciente.id,
-  });
+  const [consultasPrevias, citas, antecedentes, documentos, eventos] = await Promise.all([
+    listarConsultasDelPaciente({
+      organizacionId: session.user.organizacionId,
+      pacienteId: paciente.id,
+    }),
+    listarCitasDelPaciente({
+      organizacionId: session.user.organizacionId,
+      pacienteId: paciente.id,
+    }),
+    listarAntecedentesDelPaciente({
+      organizacionId: session.user.organizacionId,
+      pacienteId: paciente.id,
+    }),
+    listarDocumentosDelPaciente({
+      organizacionId: session.user.organizacionId,
+      pacienteId: paciente.id,
+    }),
+    listarEventosDelPaciente({
+      organizacionId: session.user.organizacionId,
+      pacienteId: paciente.id,
+    }),
+  ]);
+
+  const citaNoDisponible =
+    cita && !cita.consulta && (cita.estado === "CANCELADA" || cita.estado === "NO_ASISTIO");
+  const hoyISO = formatearFechaISO(new Date());
 
   return (
-    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6">
-      <Link href="/hoy" className="text-sm text-brand-primary hover:underline">
-        ← Volver a Hoy
-      </Link>
+    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 pb-16 lg:max-w-4xl lg:px-10 lg:py-12">
+      <PageHeader
+        eyebrow={paciente.activo ? undefined : "Archivado"}
+        title={`${paciente.nombre} ${paciente.apellido}`}
+        description={[
+          paciente.fechaNacimiento ? `${calcularEdad(paciente.fechaNacimiento)} años` : null,
+          paciente.sexo,
+          paciente.documentoIdentidad ? `Doc. ${paciente.documentoIdentidad}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || undefined}
+        context={
+          <Link href="/pacientes" className="text-sm text-brand-primary hover:underline">
+            ← Volver a Pacientes
+          </Link>
+        }
+        secondaryActions={
+          <Link
+            href={`/pacientes/${paciente.id}/editar`}
+            className="rounded-button border border-border px-3 py-1.5 text-caption font-semibold text-text-secondary hover:border-brand-primary hover:text-brand-primary"
+          >
+            Editar
+          </Link>
+        }
+      />
 
-      <h1 className="mt-2 font-display text-lg font-semibold text-text-primary">
-        {paciente.nombre} {paciente.apellido}
-      </h1>
+      {mensajeExito && (
+        <div className="mt-4">
+          <Alert tone="success">{MENSAJES_EXITO[mensajeExito]}</Alert>
+        </div>
+      )}
+      {error === "cita_no_disponible" && (
+        <div className="mt-4">
+          <Alert tone="danger">
+            Esa cita está cancelada o marcada como no asistida: no se puede iniciar una consulta
+            a partir de ella.
+          </Alert>
+        </div>
+      )}
+      {error === "antecedente_invalido" && (
+        <div className="mt-4">
+          <Alert tone="danger">Completa tipo y descripción del antecedente.</Alert>
+        </div>
+      )}
+      {error === "antecedente_no_editable" && (
+        <div className="mt-4">
+          <Alert tone="danger">
+            Ese antecedente está desactivado y ya no puede editarse.
+          </Alert>
+        </div>
+      )}
+      {error === "paciente_archivado" && (
+        <div className="mt-4">
+          <Alert tone="danger">
+            Este paciente está archivado: reactívalo antes de iniciar una consulta nueva.
+          </Alert>
+        </div>
+      )}
 
-      <dl className="mt-3 space-y-1 text-sm text-text-secondary">
-        {paciente.telefono && <div>Tel: {paciente.telefono}</div>}
-        {paciente.email && <div>Email: {paciente.email}</div>}
-        {paciente.fechaNacimiento && (
-          <div>
-            Nacimiento: {paciente.fechaNacimiento.toLocaleDateString("es")}
-          </div>
-        )}
-        {!paciente.telefono && !paciente.email && !paciente.fechaNacimiento && (
-          <div className="text-text-secondary">Sin datos adicionales.</div>
-        )}
-      </dl>
+      <AlertaAlergias antecedentes={antecedentes} />
 
       {cita && (
-        <div className="mt-3">
+        <div className="mt-4">
           <Card padding="cozy">
             <span className="text-text-secondary">
               Cita de hoy — {cita.estado}
@@ -78,53 +174,93 @@ export default async function PacientePage({
         </div>
       )}
 
-      {error === "cita_no_disponible" && (
-        <div className="mt-3">
-          <Alert tone="danger">
-            Esa cita está cancelada o marcada como no asistida: no se puede
-            iniciar una consulta a partir de ella.
+      {!paciente.activo ? (
+        <div className="mt-6">
+          <Alert tone="warning">
+            Este paciente está archivado. Reactívalo para poder crearle citas o consultas nuevas.
           </Alert>
+          <form action={reactivarPacienteAction} className="mt-3">
+            <input type="hidden" name="pacienteId" value={paciente.id} />
+            <Button type="submit" variant="secondary">
+              Reactivar paciente
+            </Button>
+          </form>
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          {!citaNoDisponible && (
+            <form action={iniciarConsultaAction}>
+              <input type="hidden" name="pacienteId" value={paciente.id} />
+              {citaId && <input type="hidden" name="citaId" value={citaId} />}
+              <Button type="submit">
+                {cita?.consulta ? "Continuar consulta" : "Iniciar consulta"}
+              </Button>
+            </form>
+          )}
+          <Link
+            href={`/agenda/nueva?fecha=${hoyISO}&pacienteId=${paciente.id}`}
+            className="inline-flex items-center rounded-button border border-brand-primary px-4 py-2 text-body-secondary font-semibold text-brand-primary transition hover:bg-brand-primary-soft"
+          >
+            + Nueva cita
+          </Link>
+          <form action={archivarPacienteAction} className="ml-auto">
+            <input type="hidden" name="pacienteId" value={paciente.id} />
+            <Button type="submit" variant="ghost" size="sm">
+              Archivar paciente
+            </Button>
+          </form>
         </div>
       )}
 
-      {(() => {
-        const citaNoDisponible =
-          cita && !cita.consulta &&
-          (cita.estado === "CANCELADA" || cita.estado === "NO_ASISTIO");
+      <AntecedentesSeccion
+        pacienteId={paciente.id}
+        antecedentes={antecedentes}
+        crearAction={crearAntecedenteAction}
+        editarAction={editarAntecedenteAction}
+        desactivarAction={desactivarAntecedenteAction}
+      />
 
-        if (citaNoDisponible) {
-          return null;
-        }
+      <CitasPacienteSeccion citas={citas} />
 
-        return (
-          <form action={iniciarConsultaAction} className="mt-6">
-            <input type="hidden" name="pacienteId" value={paciente.id} />
-            {citaId && <input type="hidden" name="citaId" value={citaId} />}
-            <Button type="submit" fullWidth>
-              {cita?.consulta ? "Continuar consulta" : "Iniciar consulta"}
-            </Button>
-          </form>
-        );
-      })()}
+      <section className="mt-8">
+        <SectionLabel>Historia clínica</SectionLabel>
+        <div className="mt-2">
+          {consultasPrevias.length === 0 ? (
+            <EmptyState compact message="Sin consultas anteriores." />
+          ) : (
+            <ul className="space-y-2">
+              {consultasPrevias.map((consulta) => (
+                <li key={consulta.id}>
+                  <ConsultaHistorialCard consulta={consulta} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <DocumentosPacienteSeccion documentos={documentos} />
 
       <section className="mt-8 border-t border-border pt-4">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-          Historia clínica
-        </h2>
-        {consultasPrevias.length === 0 ? (
-          <div className="mt-2">
-            <EmptyState message="Sin consultas anteriores." />
-          </div>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {consultasPrevias.map((consulta) => (
-              <li key={consulta.id}>
-                <ConsultaHistorialCard consulta={consulta} />
-              </li>
-            ))}
-          </ul>
-        )}
+        <SectionLabel>Datos de contacto</SectionLabel>
+        <dl className="mt-2 space-y-1 text-body-secondary text-text-secondary">
+          {paciente.telefono && <div>Tel: {paciente.telefono}</div>}
+          {paciente.email && <div>Email: {paciente.email}</div>}
+          {paciente.direccion && <div>Dirección: {paciente.direccion}</div>}
+          {paciente.contactoEmergenciaNombre && (
+            <div>
+              Emergencia: {paciente.contactoEmergenciaNombre}
+              {paciente.contactoEmergenciaTelefono && ` — ${paciente.contactoEmergenciaTelefono}`}
+            </div>
+          )}
+          {!paciente.telefono &&
+            !paciente.email &&
+            !paciente.direccion &&
+            !paciente.contactoEmergenciaNombre && <div>Sin datos adicionales.</div>}
+        </dl>
       </section>
+
+      <TrazabilidadPacienteSeccion eventos={eventos} />
     </main>
   );
 }

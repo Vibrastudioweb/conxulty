@@ -18,6 +18,7 @@ import {
   CitaConsultaEnCursoError,
   DURACION_MINUTOS_DEFECTO,
 } from "@/modules/core/citas";
+import { PacienteArchivadoError } from "@/modules/core/pacientes";
 import { combinarFechaHora } from "@/components/citas/fecha";
 
 const MODALIDADES = ["PRESENCIAL", "VIDEOCONSULTA", "DOMICILIO"] as const;
@@ -82,6 +83,9 @@ export async function crearCitaAction(formData: FormData) {
   } catch (err) {
     if (err instanceof CitaConflictoHorarioError) {
       redirect(`/agenda/nueva?fecha=${fecha}&pacienteId=${pacienteId}&error=conflicto`);
+    }
+    if (err instanceof PacienteArchivadoError) {
+      redirect(`/agenda/nueva?fecha=${fecha}&pacienteId=${pacienteId}&error=paciente_archivado`);
     }
     throw err;
   }

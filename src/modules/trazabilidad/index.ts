@@ -35,3 +35,27 @@ export async function registrarEvento(input: RegistrarEventoInput) {
     },
   });
 }
+
+/**
+ * Eventos registrados sobre un paciente (o sobre entidades suyas: sus
+ * citas, consultas, antecedentes — todo lo que se registró con `pacienteId`
+ * informado), más recientes primero. Es la primera lectura real de
+ * RegistroTrazabilidad en todo el sistema — hasta el Bloque 02 el modelo
+ * solo se escribía y nunca se consultaba.
+ */
+export async function listarEventosDelPaciente(input: {
+  organizacionId: string;
+  pacienteId: string;
+}) {
+  return prisma.registroTrazabilidad.findMany({
+    where: {
+      organizacionId: input.organizacionId,
+      pacienteId: input.pacienteId,
+    },
+    include: {
+      actor: { select: { nombre: true } },
+    },
+    orderBy: { fecha: "desc" },
+    take: 50,
+  });
+}

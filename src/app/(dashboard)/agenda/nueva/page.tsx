@@ -35,12 +35,12 @@ export default async function NuevaCitaPage({
     : null;
 
   if (!paciente) {
-    const resultados = q
+    const { items: resultados } = q
       ? await buscarPacientes({
           organizacionId: session.user.organizacionId,
           texto: q,
         })
-      : [];
+      : { items: [] };
 
     return (
       <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6">
@@ -106,7 +106,9 @@ export default async function NuevaCitaPage({
           <Alert tone="danger">
             {error === "conflicto"
               ? "Ya existe una cita en ese horario."
-              : "Completa fecha, hora y paciente."}
+              : error === "paciente_archivado"
+                ? "Este paciente está archivado: reactívalo antes de crear una cita nueva."
+                : "Completa fecha, hora y paciente."}
           </Alert>
         </div>
       )}
