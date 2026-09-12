@@ -6,8 +6,20 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import fs from "node:fs";
+import path from "node:path";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+// Misma estrategia TLS que src/db/client.ts: se valida explícitamente
+// contra la CA de Supabase en vez de desactivar la verificación.
+const supabaseCa = fs.readFileSync(
+  path.join(process.cwd(), "prisma", "certs", "supabase-ca.crt"),
+  "utf8",
+);
+
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { ca: supabaseCa, rejectUnauthorized: true },
+});
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
