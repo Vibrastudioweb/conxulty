@@ -8,6 +8,13 @@ export class CajaYaAbiertaError extends Error {
   }
 }
 
+export class CajaNoAbiertaError extends Error {
+  constructor() {
+    super("No hay una caja abierta para esta organización.");
+    this.name = "CajaNoAbiertaError";
+  }
+}
+
 /**
  * Caja ABIERTA actual de la organización, o null si no hay ninguna. Usada
  * tanto para decidir qué mostrar en pantalla como para que registrarCobro/

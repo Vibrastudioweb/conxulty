@@ -214,15 +214,22 @@ model Documento {
   @@map("documentos")
 }
 
-/// Obligación/pago asociado a una consulta. Una consulta puede tener 0, 1 o varios cobros
-/// (cobro posterior, pagos parciales, distintos conceptos, consulta de cortesía sin cobro).
+/// Obligación/pago de un paciente, opcionalmente asociado a una consulta. Una
+/// consulta puede tener 0, 1 o varios cobros (cobro posterior, pagos
+/// parciales, distintos conceptos, consulta de cortesía sin cobro). También
+/// puede no haber consulta en absoluto ("cobro rápido": venta de un
+/// producto, un abono suelto) — en ese caso `concepto` es obligatorio a
+/// nivel de aplicación (no de constraint de DB, mismo criterio que `nota` en
+/// Gasto) para que el cobro tenga un texto descriptivo en el reporte de
+/// caja; cuando sí hay consulta, la consulta ya da el contexto y `concepto`
+/// queda opcional.
 model Cobro {
   id              String           @id @default(cuid())
   organizacionId  String
   consultaId      String?
   pacienteId      String
   medicoId        String
-  concepto        String
+  concepto        String?
   monto           Decimal          @db.Decimal(10, 2)
   moneda          String           @default("USD")
   metodoPago      String?
