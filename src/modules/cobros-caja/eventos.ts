@@ -1,10 +1,9 @@
 /**
  * Eventos de dominio del módulo cobros-caja.
  *
- * El módulo emite estos eventos sin saber quién los escucha. La integración
- * opcional con CUADRAO (src/integrations/cuadrao) es un suscriptor más: si no
- * está configurada, el evento simplemente no tiene listener. El núcleo de
- * cobros/caja no importa nada de src/integrations/cuadrao.
+ * El módulo emite estos eventos sin saber quién los escucha: es un punto de
+ * extensión para futuros suscriptores (hoy ninguno configurado). El núcleo
+ * de cobros/caja no depende de ningún suscriptor externo.
  */
 
 export interface CobroRegistrado {
