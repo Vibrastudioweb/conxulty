@@ -1,12 +1,9 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { requireSesion } from "@/modules/core/autorizacion";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 export default async function StaffPage() {
-  const session = await auth();
-  if (!session?.user) {
-    redirect("/login");
-  }
+  const session = await requireSesion();
 
   if (session.user.rol !== "STAFF") {
     redirect("/");

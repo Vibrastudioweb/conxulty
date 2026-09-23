@@ -3,16 +3,28 @@ import { auth } from "@/auth";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
 
 /**
+ * Guarda mínima compartida por toda ruta/acción autenticada, sin importar
+ * el rol: exige sesión y redirige a /login si no existe. MEDICO, ADMIN y
+ * STAFF parten de aquí; quien necesite además restringir por rol lo hace
+ * después de llamar a esta función (ver requireMedico más abajo, o el
+ * chequeo de rol en admin/page.tsx y staff/page.tsx).
+ */
+export async function requireSesion() {
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+  return session;
+}
+
+/**
  * Punto único de guarda para rutas y acciones clínicas. Si no hay sesión,
  * redirige a /login; si la sesión existe pero el rol no es MEDICO, redirige
  * al destino que le corresponde (/admin o /staff) en vez de dejarlo avanzar
  * hacia una pantalla u operación clínica.
  */
 export async function requireMedico() {
-  const session = await auth();
-  if (!session?.user) {
-    redirect("/login");
-  }
+  const session = await requireSesion();
 
   if (session.user.rol !== "MEDICO") {
     redirect(session.user.rol === "ADMIN" ? "/admin" : "/staff");

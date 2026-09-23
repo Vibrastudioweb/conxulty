@@ -18,6 +18,7 @@ model Organizacion {
   cobros                Cobro[]
   consultas             Consulta[]
   documentos            Documento[]
+  gastos                Gasto[]
   medicos               Medico[]
   movimientosCaja       MovimientoCaja[]
   pacientes             Paciente[]
@@ -39,6 +40,7 @@ model Usuario {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   cajasAbiertas          Caja[]                 @relation("CajaAbiertaPor")
+  gastosRegistrados      Gasto[]                @relation("GastoRegistradoPor")
   medico                 Medico?
   movimientosRegistrados MovimientoCaja[]       @relation("MovimientoRegistradoPor")
   registrosTrazabilidad  RegistroTrazabilidad[] @relation("TrazabilidadActor")
@@ -238,6 +240,11 @@ model Cobro {
   @@map("cobros")
 }
 
+/// Arqueo al cierre: montoEsperado se calcula desde MovimientoCaja (nunca se
+/// edita a mano) y queda congelado en este campo; montoContado es lo que la
+/// persona contó físicamente (obligatorio para cerrar); diferencia = contado
+/// - esperado, se guarda siempre — si no cuadra, queda registrada y visible,
+/// nunca se oculta ajustando montoEsperado.
 model Caja {
   id             String           @id @default(cuid())
   organizacionId String
@@ -245,12 +252,15 @@ model Caja {
   fechaApertura  DateTime         @default(now())
   fechaCierre    DateTime?
   montoInicial   Decimal          @default(0) @db.Decimal(10, 2)
-  montoFinal     Decimal?         @db.Decimal(10, 2)
+  montoContado   Decimal?         @db.Decimal(10, 2)
+  montoEsperado  Decimal?         @db.Decimal(10, 2)
+  diferencia     Decimal?         @db.Decimal(10, 2)
   estado         EstadoCaja       @default(ABIERTA)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   abiertaPor     Usuario          @relation("CajaAbiertaPor", fields: [abiertaPorId], references: [id])
   organizacion   Organizacion     @relation(fields: [organizacionId], references: [id])
+  gastos         Gasto[]
   movimientos    MovimientoCaja[]
 
   @@index([organizacionId, estado])
@@ -269,6 +279,7 @@ model MovimientoCaja {
   organizacionId  String
   cajaId          String
   cobroId         String?
+  gastoId         String?
   tipo            TipoMovimientoCaja
   origen          OrigenMovimientoCaja @default(INGRESO_MANUAL)
   monto           Decimal              @db.Decimal(10, 2)
@@ -279,12 +290,37 @@ model MovimientoCaja {
   createdAt       DateTime             @default(now())
   caja            Caja                 @relation(fields: [cajaId], references: [id])
   cobro           Cobro?               @relation(fields: [cobroId], references: [id], onDelete: Restrict)
+  gasto           Gasto?               @relation(fields: [gastoId], references: [id], onDelete: Restrict)
   organizacion    Organizacion         @relation(fields: [organizacionId], references: [id])
   registradoPor   Usuario              @relation("MovimientoRegistradoPor", fields: [registradoPorId], references: [id])
 
   @@index([organizacionId])
   @@index([cajaId])
   @@map("movimientos_caja")
+}
+
+/// Gasto operativo del consultorio (alquiler, insumos, personal, servicios),
+/// registrado dentro de una Caja abierta. Igual que MovimientoCaja y
+/// Documento, es un hecho financiero inmutable: no tiene updatedAt, una
+/// corrección se hace con un movimiento nuevo, no editando este registro.
+model Gasto {
+  id              String           @id @default(cuid())
+  organizacionId  String
+  cajaId          String
+  categoria       CategoriaGasto
+  monto           Decimal          @db.Decimal(10, 2)
+  moneda          String           @default("USD")
+  nota            String?
+  registradoPorId String
+  fecha           DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  caja            Caja             @relation(fields: [cajaId], references: [id])
+  organizacion    Organizacion     @relation(fields: [organizacionId], references: [id])
+  registradoPor   Usuario          @relation("GastoRegistradoPor", fields: [registradoPorId], references: [id])
+  movimientosCaja MovimientoCaja[]
+
+  @@index([organizacionId, cajaId])
+  @@map("gastos")
 }
 
 /// Trazabilidad funcional (distinta de logs técnicos): quién hizo qué, sobre qué
@@ -362,6 +398,14 @@ enum EstadoCaja {
   CERRADA
 }
 
+enum CategoriaGasto {
+  ALQUILER
+  INSUMOS
+  PERSONAL
+  SERVICIOS
+  OTRO
+}
+
 enum TipoMovimientoCaja {
   INGRESO
   EGRESO
@@ -372,6 +416,7 @@ enum TipoMovimientoCaja {
 /// manteniendo trazabilidad hacia el Cobro cuando exista relación.
 enum OrigenMovimientoCaja {
   COBRO
+  GASTO
   INGRESO_MANUAL
   EGRESO
   DEVOLUCION
