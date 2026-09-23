@@ -8,7 +8,10 @@ import {
   abrirCajaAction,
   registrarCobroConConsultaAction,
   registrarCobroRapidoAction,
+  registrarGastoAction,
 } from "./actions";
+
+const CATEGORIAS_GASTO = ["ALQUILER", "INSUMOS", "PERSONAL", "SERVICIOS", "OTRO"] as const;
 
 const MENSAJES_ERROR: Record<string, string> = {
   ya_abierta: "Ya hay una caja abierta para esta organización.",
@@ -22,10 +25,10 @@ const MENSAJES_ERROR: Record<string, string> = {
 export default async function CajaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; abierta?: string; cobro?: string }>;
+  searchParams: Promise<{ error?: string; abierta?: string; cobro?: string; gasto?: string }>;
 }) {
   const session = await requireSesion();
-  const { error, abierta, cobro } = await searchParams;
+  const { error, abierta, cobro, gasto } = await searchParams;
 
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: session.user.organizacionId,
@@ -44,6 +47,12 @@ export default async function CajaPage({
       {cobro && (
         <div className="mt-4">
           <Alert tone="success">Cobro registrado correctamente.</Alert>
+        </div>
+      )}
+
+      {gasto && (
+        <div className="mt-4">
+          <Alert tone="success">Gasto registrado correctamente.</Alert>
         </div>
       )}
 
@@ -132,6 +141,44 @@ export default async function CajaPage({
               </div>
               <Button type="submit" fullWidth variant="secondary">
                 Registrar cobro
+              </Button>
+            </form>
+          </section>
+
+          <section className="mt-8 space-y-3 border-t border-border pt-6">
+            <h2 className="text-sm font-semibold text-text-primary">Registrar gasto</h2>
+            <form action={registrarGastoAction} className="space-y-3">
+              <div>
+                <label htmlFor="categoria" className="mb-1 block text-sm text-text-primary">
+                  Categoría
+                </label>
+                <select
+                  id="categoria"
+                  name="categoria"
+                  required
+                  className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                >
+                  {CATEGORIAS_GASTO.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="monto3" className="mb-1 block text-sm text-text-primary">
+                  Monto
+                </label>
+                <Input id="monto3" name="monto" type="number" step="0.01" min="0.01" required />
+              </div>
+              <div>
+                <label htmlFor="nota" className="mb-1 block text-sm text-text-primary">
+                  Nota (opcional)
+                </label>
+                <Input id="nota" name="nota" />
+              </div>
+              <Button type="submit" fullWidth variant="secondary">
+                Registrar gasto
               </Button>
             </form>
           </section>

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { CategoriaGasto } from "@prisma/client";
 import { requireSesion } from "@/modules/core/autorizacion";
 import { abrirCaja, CajaYaAbiertaError, CajaNoAbiertaError } from "@/modules/cobros-caja/caja";
 import {
@@ -9,10 +10,13 @@ import {
   ConsultaNoCerradaError,
   ConceptoRequeridoError,
 } from "@/modules/cobros-caja/cobros";
+import { registrarGasto } from "@/modules/cobros-caja/gastos";
 import { ConsultaNoEncontradaError } from "@/modules/core/consultas";
 
 const montoInicialSchema = z.coerce.number().min(0);
 const montoCobroSchema = z.coerce.number().positive();
+const CATEGORIAS_GASTO = ["ALQUILER", "INSUMOS", "PERSONAL", "SERVICIOS", "OTRO"] as const;
+const categoriaGastoSchema = z.enum(CATEGORIAS_GASTO);
 
 function leerTexto(formData: FormData, campo: string): string | null {
   const valor = formData.get(campo);
@@ -77,6 +81,33 @@ export async function registrarCobroConConsultaAction(formData: FormData) {
   }
 
   redirect("/caja?cobro=1");
+}
+
+export async function registrarGastoAction(formData: FormData) {
+  const session = await requireSesion();
+
+  const parseoCategoria = categoriaGastoSchema.safeParse(formData.get("categoria"));
+  const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));
+  if (!parseoCategoria.success || !parseoMonto.success) {
+    redirect("/caja?error=monto_invalido");
+  }
+
+  try {
+    await registrarGasto({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      categoria: parseoCategoria.data as CategoriaGasto,
+      monto: parseoMonto.data,
+      nota: leerTexto(formData, "nota"),
+    });
+  } catch (err) {
+    if (err instanceof CajaNoAbiertaError) {
+      redirect("/caja?error=caja_cerrada");
+    }
+    throw err;
+  }
+
+  redirect("/caja?gasto=1");
 }
 
 export async function registrarCobroRapidoAction(formData: FormData) {
