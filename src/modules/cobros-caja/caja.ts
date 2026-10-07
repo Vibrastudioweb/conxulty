@@ -46,10 +46,11 @@ export async function obtenerCajaAbierta(input: { organizacionId: string }) {
  * la sesión y no de un formulario. El aislamiento entre organizaciones es
  * el propio `where: { organizacionId }` de la búsqueda de abajo.
  *
- * Nota: existe una ventana de carrera entre el findFirst y el create — dos
- * requests simultáneas podrían crear dos cajas ABIERTAS. Aceptado por ahora
- * (alcance mínimo de esta ronda); un candado real requeriría un índice
- * único parcial a nivel de base de datos, fuera de alcance aquí.
+ * El findFirst es solo la vía rápida: entre él y el create hay una ventana
+ * de carrera. El candado real es el índice único parcial
+ * cajas_una_abierta_por_organizacion en la base de datos — si dos requests
+ * simultáneas pasan el findFirst, el segundo create falla con P2002 y aquí
+ * se traduce al mismo CajaYaAbiertaError.
  */
 export async function abrirCaja(input: {
   organizacionId: string;
@@ -65,13 +66,22 @@ export async function abrirCaja(input: {
     throw new CajaYaAbiertaError();
   }
 
-  const caja = await prisma.caja.create({
-    data: {
-      organizacionId: input.organizacionId,
-      abiertaPorId: input.actorId,
-      montoInicial: input.montoInicial,
-    },
-  });
+  let caja;
+  try {
+    caja = await prisma.caja.create({
+      data: {
+        organizacionId: input.organizacionId,
+        abiertaPorId: input.actorId,
+        montoInicial: input.montoInicial,
+      },
+    });
+  } catch (err) {
+    // Aparte de la PK (cuid), el único unique de `cajas` es el índice parcial.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new CajaYaAbiertaError();
+    }
+    throw err;
+  }
 
   await registrarEvento({
     organizacionId: input.organizacionId,
