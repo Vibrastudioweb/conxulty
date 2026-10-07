@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Banknote,
   CalendarDays,
   ClipboardList,
   ShieldCheck,
@@ -16,6 +17,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   hoy: Sun,
   agenda: CalendarDays,
   pacientes: Users,
+  caja: Banknote,
   admin: ShieldCheck,
   staff: ClipboardList,
 };

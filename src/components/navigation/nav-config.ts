@@ -1,6 +1,6 @@
 import type { RolUsuario } from "@prisma/client";
 
-export type NavIconKey = "hoy" | "agenda" | "pacientes" | "admin" | "staff";
+export type NavIconKey = "hoy" | "agenda" | "pacientes" | "caja" | "admin" | "staff";
 
 export interface NavItem {
   href: string;
@@ -28,14 +28,17 @@ const NAV_MEDICO: NavItem[] = [
   { href: "/hoy", label: "Hoy", iconKey: "hoy", primary: true },
   { href: "/agenda", label: "Agenda", iconKey: "agenda", primary: true },
   { href: "/pacientes", label: "Pacientes", iconKey: "pacientes", primary: true },
+  { href: "/caja", label: "Caja", iconKey: "caja", primary: true },
 ];
 
 const NAV_ADMIN: NavItem[] = [
   { href: "/admin", label: "Admin", iconKey: "admin", primary: true },
+  { href: "/caja", label: "Caja", iconKey: "caja", primary: true },
 ];
 
 const NAV_STAFF: NavItem[] = [
   { href: "/staff", label: "Staff", iconKey: "staff", primary: true },
+  { href: "/caja", label: "Caja", iconKey: "caja", primary: true },
 ];
 
 export function navForRol(rol: RolUsuario): NavItem[] {
