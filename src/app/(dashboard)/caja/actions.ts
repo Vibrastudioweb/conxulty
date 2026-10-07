@@ -4,7 +4,13 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { CategoriaGasto } from "@prisma/client";
 import { requireSesion } from "@/modules/core/autorizacion";
-import { abrirCaja, CajaYaAbiertaError, CajaNoAbiertaError } from "@/modules/cobros-caja/caja";
+import {
+  abrirCaja,
+  cerrarCaja,
+  CajaYaAbiertaError,
+  CajaNoAbiertaError,
+  MontoContadoRequeridoError,
+} from "@/modules/cobros-caja/caja";
 import {
   registrarCobro,
   ConsultaNoCerradaError,
@@ -47,6 +53,47 @@ export async function abrirCajaAction(formData: FormData) {
   }
 
   redirect("/caja?abierta=1");
+}
+
+export async function cerrarCajaAction(formData: FormData) {
+  const session = await requireSesion();
+
+  // Distingo "campo ausente/vacío" de "0 real": Number("") es 0 en JS, así
+  // que si dejara que Zod coercionara directo, un campo vacío pasaría como
+  // si fuera un monto contado de 0. Reviso la presencia del dato primero.
+  const rawMontoContado = formData.get("montoContado");
+  if (rawMontoContado === null || String(rawMontoContado).trim() === "") {
+    redirect("/caja?error=monto_contado_requerido");
+  }
+
+  const parseo = z.coerce.number().min(0).safeParse(rawMontoContado);
+  if (!parseo.success) {
+    redirect("/caja?error=monto_invalido");
+  }
+
+  let resultado: { montoEsperado: string; diferencia: string };
+  try {
+    resultado = await cerrarCaja({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      montoContado: parseo.data,
+    });
+  } catch (err) {
+    if (err instanceof MontoContadoRequeridoError) {
+      redirect("/caja?error=monto_contado_requerido");
+    }
+    if (err instanceof CajaNoAbiertaError) {
+      redirect("/caja?error=caja_cerrada");
+    }
+    throw err;
+  }
+
+  const params = new URLSearchParams({
+    cierre: "1",
+    esperado: resultado.montoEsperado,
+    diferencia: resultado.diferencia,
+  });
+  redirect(`/caja?${params.toString()}`);
 }
 
 export async function registrarCobroConConsultaAction(formData: FormData) {

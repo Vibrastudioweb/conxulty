@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Input } from "@/components/ui/Input";
 import {
   abrirCajaAction,
+  cerrarCajaAction,
   registrarCobroConConsultaAction,
   registrarCobroRapidoAction,
   registrarGastoAction,
@@ -20,15 +21,24 @@ const MENSAJES_ERROR: Record<string, string> = {
   consulta_no_encontrada: "Esa consulta no existe o no pertenece a esta organización.",
   consulta_no_cerrada: "Solo se puede cobrar una consulta que está cerrada.",
   concepto_requerido: "El concepto es obligatorio cuando el cobro no tiene consulta.",
+  monto_contado_requerido: "El monto contado es obligatorio para cerrar la caja.",
 };
 
 export default async function CajaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; abierta?: string; cobro?: string; gasto?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    abierta?: string;
+    cobro?: string;
+    gasto?: string;
+    cierre?: string;
+    esperado?: string;
+    diferencia?: string;
+  }>;
 }) {
   const session = await requireSesion();
-  const { error, abierta, cobro, gasto } = await searchParams;
+  const { error, abierta, cobro, gasto, cierre, esperado, diferencia } = await searchParams;
 
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: session.user.organizacionId,
@@ -53,6 +63,14 @@ export default async function CajaPage({
       {gasto && (
         <div className="mt-4">
           <Alert tone="success">Gasto registrado correctamente.</Alert>
+        </div>
+      )}
+
+      {cierre && (
+        <div className="mt-4">
+          <Alert tone="success">
+            Caja cerrada. Esperado: {esperado} — Diferencia: {diferencia}
+          </Alert>
         </div>
       )}
 
@@ -179,6 +197,28 @@ export default async function CajaPage({
               </div>
               <Button type="submit" fullWidth variant="secondary">
                 Registrar gasto
+              </Button>
+            </form>
+          </section>
+
+          <section className="mt-8 space-y-3 border-t border-border pt-6">
+            <h2 className="text-sm font-semibold text-text-primary">Cerrar caja</h2>
+            <form action={cerrarCajaAction} className="space-y-3">
+              <div>
+                <label htmlFor="montoContado" className="mb-1 block text-sm text-text-primary">
+                  Monto contado (efectivo real)
+                </label>
+                <Input
+                  id="montoContado"
+                  name="montoContado"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                />
+              </div>
+              <Button type="submit" fullWidth variant="destructive">
+                Cerrar caja
               </Button>
             </form>
           </section>

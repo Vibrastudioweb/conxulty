@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 
@@ -12,6 +13,13 @@ export class CajaNoAbiertaError extends Error {
   constructor() {
     super("No hay una caja abierta para esta organización.");
     this.name = "CajaNoAbiertaError";
+  }
+}
+
+export class MontoContadoRequeridoError extends Error {
+  constructor() {
+    super("El monto contado es obligatorio para cerrar la caja.");
+    this.name = "MontoContadoRequeridoError";
   }
 }
 
@@ -74,4 +82,89 @@ export async function abrirCaja(input: {
   });
 
   return { cajaId: caja.id };
+}
+
+/**
+ * Cierra la caja abierta actual de la organización con arqueo: calcula
+ * montoEsperado a partir de montoInicial + movimientos de esa caja (nunca
+ * editado a mano), recibe montoContado (obligatorio, incluso si es 0 — lo
+ * que se rechaza es la AUSENCIA del dato, no el valor cero) y guarda
+ * diferencia = montoContado - montoEsperado. Si no cuadra, la diferencia
+ * queda registrada y visible — no hay reversión automática.
+ *
+ * No recibe cajaId: usa la caja abierta actual, mismo criterio que
+ * registrarCobro/registrarGasto. Toda la aritmética de dinero usa
+ * Prisma.Decimal (.plus()/.minus()), nunca operadores nativos de JS.
+ */
+export async function cerrarCaja(input: {
+  organizacionId: string;
+  actorId: string;
+  montoContado: number | string | null | undefined;
+}): Promise<{ cajaId: string; montoEsperado: string; diferencia: string }> {
+  if (input.montoContado === null || input.montoContado === undefined) {
+    throw new MontoContadoRequeridoError();
+  }
+
+  const cajaAbierta = await prisma.caja.findFirst({
+    where: { organizacionId: input.organizacionId, estado: "ABIERTA" },
+  });
+  if (!cajaAbierta) {
+    throw new CajaNoAbiertaError();
+  }
+
+  const montoContado = new Prisma.Decimal(input.montoContado);
+
+  const { montoEsperado, diferencia } = await prisma.$transaction(async (tx) => {
+    const [ingresos, egresos] = await Promise.all([
+      tx.movimientoCaja.aggregate({
+        where: { cajaId: cajaAbierta.id, tipo: "INGRESO" },
+        _sum: { monto: true },
+      }),
+      tx.movimientoCaja.aggregate({
+        where: { cajaId: cajaAbierta.id, tipo: "EGRESO" },
+        _sum: { monto: true },
+      }),
+    ]);
+
+    const totalIngresos = ingresos._sum.monto ?? new Prisma.Decimal(0);
+    const totalEgresos = egresos._sum.monto ?? new Prisma.Decimal(0);
+    const montoEsperado = cajaAbierta.montoInicial.plus(totalIngresos).minus(totalEgresos);
+    const diferencia = montoContado.minus(montoEsperado);
+
+    const actualizada = await tx.caja.updateMany({
+      where: { id: cajaAbierta.id, organizacionId: input.organizacionId, estado: "ABIERTA" },
+      data: {
+        estado: "CERRADA",
+        fechaCierre: new Date(),
+        montoContado,
+        montoEsperado,
+        diferencia,
+      },
+    });
+
+    if (actualizada.count !== 1) {
+      throw new CajaNoAbiertaError();
+    }
+
+    return { montoEsperado, diferencia };
+  });
+
+  await registrarEvento({
+    organizacionId: input.organizacionId,
+    actorId: input.actorId,
+    accion: "cerrar_caja",
+    entidadTipo: "Caja",
+    entidadId: cajaAbierta.id,
+    cambios: {
+      montoContado: montoContado.toString(),
+      montoEsperado: montoEsperado.toString(),
+      diferencia: diferencia.toString(),
+    },
+  });
+
+  return {
+    cajaId: cajaAbierta.id,
+    montoEsperado: montoEsperado.toString(),
+    diferencia: diferencia.toString(),
+  };
 }
