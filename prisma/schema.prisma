@@ -354,6 +354,16 @@ enum RolUsuario {
   MEDICO
   ADMIN
   STAFF
+  /// Dueño de la plataforma: gestiona solicitudes de acceso y crea
+  /// organizaciones. No es un rol de tenant (ver /superadmin).
+  SUPERADMIN
+}
+
+enum EstadoSolicitudAcceso {
+  PENDIENTE
+  CONTACTADO
+  ACTIVADO
+  RECHAZADO
 }
 
 enum EstadoCita {
@@ -429,4 +439,21 @@ enum OrigenMovimientoCaja {
   DEVOLUCION
   RETIRO
   AJUSTE
+}
+
+/// Solicitud pública de acceso desde el landing. No crea usuario ni
+/// organización: el súper-admin la revisa y activa manualmente.
+model SolicitudAcceso {
+  id                String                @id @default(cuid())
+  nombre            String
+  email             String
+  telefono          String
+  especialidad      String?
+  nombreConsultorio String
+  estado            EstadoSolicitudAcceso @default(PENDIENTE)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([estado, createdAt])
+  @@map("solicitudes_acceso")
 }

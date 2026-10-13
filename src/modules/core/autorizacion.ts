@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/db/client";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
 
 /**
@@ -27,7 +28,13 @@ export async function requireMedico() {
   const session = await requireSesion();
 
   if (session.user.rol !== "MEDICO") {
-    redirect(session.user.rol === "ADMIN" ? "/admin" : "/staff");
+    redirect(
+      session.user.rol === "ADMIN"
+        ? "/admin"
+        : session.user.rol === "SUPERADMIN"
+          ? "/superadmin"
+          : "/staff",
+    );
   }
 
   return session;
@@ -47,4 +54,30 @@ export async function requireMedicoSesion() {
     usuarioId: session.user.id,
   });
   return { session, medico };
+}
+
+/**
+ * Guarda de todo lo que cuelga de /superadmin (páginas Y server actions —
+ * estas últimas son endpoints públicos y deben validar por sí mismas).
+ * Además del rol del JWT, confirma contra la base que el usuario sigue
+ * activo y siendo SUPERADMIN: el token vive hasta que expira y no
+ * reflejaría una degradación o desactivación hecha después del login.
+ * Cualquier otro rol (incluido ADMIN de una organización) vuelve a "/".
+ */
+export async function requireSuperadmin() {
+  const session = await requireSesion();
+
+  if (session.user.rol !== "SUPERADMIN") {
+    redirect("/");
+  }
+
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: session.user.id },
+    select: { rol: true, activo: true },
+  });
+  if (!usuario || !usuario.activo || usuario.rol !== "SUPERADMIN") {
+    redirect("/");
+  }
+
+  return session;
 }

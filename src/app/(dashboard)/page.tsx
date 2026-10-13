@@ -14,5 +14,7 @@ export default async function DashboardRootPage() {
       redirect("/admin");
     case "STAFF":
       redirect("/staff");
+    case "SUPERADMIN":
+      redirect("/superadmin");
   }
 }
