@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { CalendarDays, UserPlus } from "lucide-react";
 import { auth } from "@/auth";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
+import { destinoPorRol } from "@/modules/core/autorizacion";
 import { listarCitasDelDia } from "@/modules/core/citas";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { QuickAction } from "@/components/ui/QuickAction";
@@ -23,7 +24,7 @@ export default async function HoyPage() {
   }
 
   if (session.user.rol !== "MEDICO") {
-    redirect(session.user.rol === "ADMIN" ? "/admin" : "/staff");
+    redirect(destinoPorRol(session.user.rol));
   }
 
   let medico;

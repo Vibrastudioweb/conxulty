@@ -41,6 +41,10 @@ const NAV_STAFF: NavItem[] = [
   { href: "/caja", label: "Caja", iconKey: "caja", primary: true },
 ];
 
+const NAV_SUPERADMIN: NavItem[] = [
+  { href: "/superadmin", label: "Solicitudes", iconKey: "admin", primary: true },
+];
+
 export function navForRol(rol: RolUsuario): NavItem[] {
   switch (rol) {
     case "MEDICO":
@@ -49,6 +53,8 @@ export function navForRol(rol: RolUsuario): NavItem[] {
       return NAV_ADMIN;
     case "STAFF":
       return NAV_STAFF;
+    case "SUPERADMIN":
+      return NAV_SUPERADMIN;
     default:
       return [];
   }

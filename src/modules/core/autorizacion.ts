@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/db/client";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
+import { decidirAccesoSuperadmin } from "@/modules/core/accesoSuperadmin";
 
 /**
  * Guarda mínima compartida por toda ruta/acción autenticada, sin importar
@@ -27,10 +29,44 @@ export async function requireMedico() {
   const session = await requireSesion();
 
   if (session.user.rol !== "MEDICO") {
-    redirect(session.user.rol === "ADMIN" ? "/admin" : "/staff");
+    redirect(destinoPorRol(session.user.rol));
   }
 
   return session;
+}
+
+/** Pantalla de inicio que le corresponde a cada rol no clínico. */
+export function destinoPorRol(rol: string): string {
+  if (rol === "ADMIN") return "/admin";
+  if (rol === "SUPERADMIN") return "/superadmin";
+  return "/staff";
+}
+
+/**
+ * Guarda del panel de súper-admin. Exige sesión y rol SUPERADMIN tanto en el
+ * JWT como en la base de datos (ver decidirAccesoSuperadmin). Quien no cumple
+ * vuelve a "/" (que lo envía a la pantalla de su propio rol), no ve nada del
+ * panel. Debe llamarse al inicio de CADA página y server action de /superadmin:
+ * el layout no basta, las acciones se invocan directamente.
+ */
+export async function requireSuperadmin() {
+  const session = await auth();
+  const usuarioDb = session?.user
+    ? await prisma.usuario.findUnique({
+        where: { id: session.user.id },
+        select: { rol: true, activo: true },
+      })
+    : null;
+
+  const decision = decidirAccesoSuperadmin({
+    rolSesion: session?.user?.rol,
+    usuarioDb,
+  });
+
+  if (decision === "login") redirect("/login");
+  if (decision === "denegar") redirect("/");
+
+  return session!;
 }
 
 /**
