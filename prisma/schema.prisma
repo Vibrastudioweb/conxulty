@@ -28,6 +28,26 @@ model Organizacion {
   @@map("organizaciones")
 }
 
+/// Solicitud pública de acceso de un médico nuevo. NO crea usuario ni organización:
+/// el súper-admin la revisa y activa manualmente desde /superadmin.
+model SolicitudAcceso {
+  id                String                @id @default(cuid())
+  nombre            String
+  email             String
+  telefono          String
+  especialidad      String?
+  nombreConsultorio String
+  estado            EstadoSolicitudAcceso @default(PENDIENTE)
+  /// Organización creada/usada al activar (sin FK a propósito: es solo referencia de auditoría).
+  organizacionId    String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([estado, createdAt])
+  @@index([email])
+  @@map("solicitudes_acceso")
+}
+
 /// Cuenta con la que se inicia sesión. Puede tener un perfil Medico asociado.
 model Usuario {
   id                     String                 @id @default(cuid())
@@ -354,6 +374,15 @@ enum RolUsuario {
   MEDICO
   ADMIN
   STAFF
+  /// Dueño de la plataforma: gestiona solicitudes de acceso y activa organizaciones. Sin acceso clínico.
+  SUPERADMIN
+}
+
+enum EstadoSolicitudAcceso {
+  PENDIENTE
+  CONTACTADO
+  ACTIVADO
+  RECHAZADO
 }
 
 enum EstadoCita {
