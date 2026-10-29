@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Banknote,
+  BarChart3,
   CalendarDays,
   ClipboardList,
   ShieldCheck,
@@ -18,6 +19,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   agenda: CalendarDays,
   pacientes: Users,
   caja: Banknote,
+  reportes: BarChart3,
   admin: ShieldCheck,
   staff: ClipboardList,
 };

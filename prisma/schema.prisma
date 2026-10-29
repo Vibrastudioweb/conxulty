@@ -171,6 +171,27 @@ model Consulta {
   evaluacion     String?
   diagnostico    String?
   tratamiento    String?
+  /// Signos vitales de ESTA consulta (29-oct-2026 — ver changelog de la
+  /// demo, punto 6, y la DECISIÓN del usuario de llevarlos al esquema real
+  /// en vez de dejarlos como UI sin dato). Van en Consulta, no en Paciente:
+  /// son una medición puntual del momento de la visita, no un atributo fijo
+  /// del paciente. `presionArterial` queda como texto libre
+  /// ("120/80 mmHg") en vez de dos enteros separados — distintos
+  /// consultorios anotan presión con formatos distintos (con/sin unidad,
+  /// con notas como "sentado"), y forzar systólica/diastólica como enteros
+  /// perdería esa flexibilidad sin ganar nada que hoy se necesite calcular.
+  /// El IMC NO se guarda: se calcula en la UI a partir de peso/talla
+  /// cuando ambos están presentes, para no duplicar un valor derivado que
+  /// puede desincronizarse (mismo criterio que ya se usó para no guardar
+  /// "vs. ayer" en los KPIs de Hoy).
+  presionArterial    String?
+  frecuenciaCardiaca Int?
+  /// Grados Celsius.
+  temperatura        Decimal? @db.Decimal(4, 1)
+  /// % de saturación de oxígeno (SpO₂).
+  saturacionOxigeno  Int?
+  pesoKg             Decimal? @db.Decimal(5, 2)
+  tallaCm            Decimal? @db.Decimal(5, 1)
   estado         EstadoConsulta @default(EN_CURSO)
   fechaHora      DateTime       @default(now())
   createdAt      DateTime       @default(now())
@@ -226,13 +247,39 @@ model Documento {
 model Cobro {
   id              String           @id @default(cuid())
   organizacionId  String
+  /// Folio correlativo para el comprobante (ver changelog punto 13/48):
+  /// "COB-" + este número, con ceros a la izquierda. Es global, no por
+  /// organización — Prisma/Postgres no dan un autoincrement scoped sin
+  /// una secuencia manual, y un folio que salta entre organizaciones no
+  /// es un problema real (cada organización ve su propio folio, nunca
+  /// compara el número con el de otra).
+  numero          Int              @unique @default(autoincrement())
   consultaId      String?
   pacienteId      String
   medicoId        String
   concepto        String?
   monto           Decimal          @db.Decimal(10, 2)
+  /// Descuento/cortesía aplicado (ver changelog punto 13/48): `monto` ya
+  /// es el total neto cobrado (igual significado que antes, no cambia
+  /// nada de lo que ya depende de `monto` — arqueo, reportes). El
+  /// subtotal "de lista" para el comprobante se deriva como
+  /// `monto + descuentoMonto`, nunca al revés. `descuentoMotivo` es
+  /// obligatorio en código (no constraint de DB, mismo criterio que
+  /// `concepto` en cobro sin consulta) cuando `descuentoMonto > 0`.
+  descuentoMonto  Decimal          @default(0) @db.Decimal(10, 2)
+  descuentoMotivo String?
+  /// `moneda` y `esEfectivo` quedan denormalizados a partir de
+  /// `metodoPago` (ver changelog punto 11/46) — nunca se piden por
+  /// separado en el formulario, se derivan en registrarCobro() desde
+  /// `INFO_METODO_PAGO` para que no puedan contradecirse.
   moneda          String           @default("USD")
-  metodoPago      String?
+  esEfectivo      Boolean          @default(true)
+  /// Catálogo cerrado (antes texto libre) — ver changelog punto 11/46.
+  /// El `@default` es solo para que `db push` pueda rellenar filas de
+  /// prueba ya existentes sin pedir --force-reset; el código de la app
+  /// (registrarCobro()) siempre manda un valor explícito, nunca confía
+  /// en este default.
+  metodoPago      MetodoPago       @default(EFECTIVO_USD)
   estado          EstadoCobro      @default(PENDIENTE)
   fecha           DateTime         @default(now())
   createdAt       DateTime         @default(now())
@@ -252,16 +299,28 @@ model Cobro {
 /// persona contó físicamente (obligatorio para cerrar); diferencia = contado
 /// - esperado, se guarda siempre — si no cuadra, queda registrada y visible,
 /// nunca se oculta ajustando montoEsperado.
+/// Campos de arqueo DUPLICADOS por moneda (29-oct-2026 — ver changelog
+/// punto 46: el cálculo anterior sumaba USD y Bs entre sí, y contaba
+/// métodos no-efectivo como si fueran plata física. El arqueo de verdad
+/// solo le importa al EFECTIVO, y nunca hay que sumar monedas distintas
+/// — por eso dos columnas por concepto (`*Usd`/`*Bs`) en vez de una sola
+/// genérica. No es un catálogo de 6 métodos de pago (eso sigue pendiente,
+/// ver Caja 10-15 en el changelog de la demo) — es lo mínimo para que el
+/// arqueo de efectivo deje de estar mal.
 model Caja {
-  id             String           @id @default(cuid())
-  organizacionId String
-  abiertaPorId   String
-  fechaApertura  DateTime         @default(now())
-  fechaCierre    DateTime?
-  montoInicial   Decimal          @default(0) @db.Decimal(10, 2)
-  montoContado   Decimal?         @db.Decimal(10, 2)
-  montoEsperado  Decimal?         @db.Decimal(10, 2)
-  diferencia     Decimal?         @db.Decimal(10, 2)
+  id              String           @id @default(cuid())
+  organizacionId  String
+  abiertaPorId    String
+  fechaApertura   DateTime         @default(now())
+  fechaCierre     DateTime?
+  montoInicialUsd Decimal          @default(0) @db.Decimal(10, 2)
+  montoInicialBs  Decimal          @default(0) @db.Decimal(10, 2)
+  montoContadoUsd Decimal?         @db.Decimal(10, 2)
+  montoContadoBs  Decimal?         @db.Decimal(10, 2)
+  montoEsperadoUsd Decimal?        @db.Decimal(10, 2)
+  montoEsperadoBs Decimal?         @db.Decimal(10, 2)
+  diferenciaUsd   Decimal?         @db.Decimal(10, 2)
+  diferenciaBs    Decimal?         @db.Decimal(10, 2)
   estado         EstadoCaja       @default(ABIERTA)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -291,6 +350,16 @@ model MovimientoCaja {
   origen          OrigenMovimientoCaja @default(INGRESO_MANUAL)
   monto           Decimal              @db.Decimal(10, 2)
   moneda          String               @default("USD")
+  /// Copiado del Cobro/Gasto de origen al crear el movimiento (mismo
+  /// patrón que `moneda`, denormalizado para no tener que resolver el
+  /// join al calcular el arqueo). Ver changelog punto 46.
+  esEfectivo      Boolean              @default(true)
+  /// Copiado del Cobro/Gasto de origen (ver changelog punto 11/46) —
+  /// permite calcular "saldo en cuentas" por método agrupando solo
+  /// MovimientoCaja, sin tener que resolver el join hacia Cobro/Gasto.
+  /// `@default` solo para permitir el `db push` sobre filas de prueba
+  /// existentes — ver nota en `Cobro.metodoPago`.
+  metodoPago      MetodoPago           @default(EFECTIVO_USD)
   descripcion     String?
   registradoPorId String
   fecha           DateTime             @default(now())
@@ -316,7 +385,15 @@ model Gasto {
   cajaId          String
   categoria       CategoriaGasto
   monto           Decimal          @db.Decimal(10, 2)
+  /// `moneda` y `esEfectivo` quedan denormalizados a partir de
+  /// `metodoPago` (ver changelog punto 11/46), igual que en Cobro.
   moneda          String           @default("USD")
+  esEfectivo      Boolean          @default(true)
+  /// Catálogo cerrado — ver changelog punto 11/46. Antes no existía
+  /// ningún campo de método de pago en Gasto. `@default` solo para
+  /// permitir el `db push` sobre filas de prueba existentes — ver nota
+  /// en `Cobro.metodoPago`.
+  metodoPago      MetodoPago       @default(EFECTIVO_USD)
   nota            String?
   registradoPorId String
   fecha           DateTime         @default(now())
@@ -421,6 +498,20 @@ enum CategoriaGasto {
   PERSONAL
   SERVICIOS
   OTRO
+}
+
+/// Catálogo cerrado de métodos de pago (29-oct-2026 — ver changelog punto
+/// 11/46). Cada valor tiene moneda y "es efectivo" fijos — ver
+/// `INFO_METODO_PAGO` en modules/cobros-caja/metodosPago.ts — nunca se
+/// piden por separado en un formulario para que no puedan contradecirse
+/// (p.ej. un Zelle marcado como efectivo por error).
+enum MetodoPago {
+  EFECTIVO_USD
+  EFECTIVO_BS
+  PAGO_MOVIL
+  TRANSFERENCIA
+  TARJETA
+  ZELLE
 }
 
 enum TipoMovimientoCaja {

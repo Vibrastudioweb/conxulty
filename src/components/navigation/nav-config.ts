@@ -1,6 +1,13 @@
 import type { RolUsuario } from "@prisma/client";
 
-export type NavIconKey = "hoy" | "agenda" | "pacientes" | "caja" | "admin" | "staff";
+export type NavIconKey =
+  | "hoy"
+  | "agenda"
+  | "pacientes"
+  | "caja"
+  | "reportes"
+  | "admin"
+  | "staff";
 
 export interface NavItem {
   href: string;
@@ -29,11 +36,16 @@ const NAV_MEDICO: NavItem[] = [
   { href: "/agenda", label: "Agenda", iconKey: "agenda", primary: true },
   { href: "/pacientes", label: "Pacientes", iconKey: "pacientes", primary: true },
   { href: "/caja", label: "Caja", iconKey: "caja", primary: true },
+  // No es `primary`: no compite por uno de los 4 espacios del tab bar
+  // mobile — sigue disponible en el sidebar de escritorio, y en mobile
+  // tiene un enlace directo desde Caja. Ver changelog punto 17/44.
+  { href: "/reportes", label: "Reportes", iconKey: "reportes" },
 ];
 
 const NAV_ADMIN: NavItem[] = [
   { href: "/admin", label: "Admin", iconKey: "admin", primary: true },
   { href: "/caja", label: "Caja", iconKey: "caja", primary: true },
+  { href: "/reportes", label: "Reportes", iconKey: "reportes" },
 ];
 
 const NAV_SUPERADMIN: NavItem[] = [

@@ -11,6 +11,7 @@ import {
   ETIQUETAS_MODALIDAD,
 } from "@/components/citas/CitaCard";
 import { CitaAccionesEstado } from "@/components/citas/CitaAccionesEstado";
+import { ResumenEstadosCita } from "@/components/citas/ResumenEstadosCita";
 import { FiltrosAgenda } from "@/components/citas/FiltrosAgenda";
 import { SelectorVista, type VistaAgenda } from "@/components/citas/SelectorVista";
 import { VistaSemana } from "@/components/citas/VistaSemana";
@@ -214,6 +215,8 @@ async function VistaDia({
 
   return (
     <>
+      <ResumenEstadosCita citas={citas} />
+
       <div className="mt-6 flex items-center justify-between gap-2">
         <Link
           href={`/agenda?vista=dia&fecha=${anteriorISO}${sufijoNav}`}
@@ -297,6 +300,8 @@ async function VistaSemanaContainer({
 
   return (
     <>
+      <ResumenEstadosCita citas={citas} />
+
       <div className="mt-6 flex items-center justify-between gap-2">
         <Link
           href={`/agenda?vista=semana&fecha=${anteriorISO}`}
@@ -357,6 +362,8 @@ async function VistaMesContainer({
 
   return (
     <>
+      <ResumenEstadosCita citas={citas} />
+
       <div className="mt-6 flex items-center justify-between gap-2">
         <Link
           href={`/agenda?vista=mes&fecha=${formatearFechaISO(mesAnteriorRef)}`}
