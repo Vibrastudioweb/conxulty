@@ -259,7 +259,11 @@ model Cobro {
   moneda          String           @default("USD")
   esEfectivo      Boolean          @default(true)
   /// Catálogo cerrado (antes texto libre) — ver changelog punto 11/46.
-  metodoPago      MetodoPago
+  /// El `@default` es solo para que `db push` pueda rellenar filas de
+  /// prueba ya existentes sin pedir --force-reset; el código de la app
+  /// (registrarCobro()) siempre manda un valor explícito, nunca confía
+  /// en este default.
+  metodoPago      MetodoPago       @default(EFECTIVO_USD)
   estado          EstadoCobro      @default(PENDIENTE)
   fecha           DateTime         @default(now())
   createdAt       DateTime         @default(now())
@@ -337,7 +341,9 @@ model MovimientoCaja {
   /// Copiado del Cobro/Gasto de origen (ver changelog punto 11/46) —
   /// permite calcular "saldo en cuentas" por método agrupando solo
   /// MovimientoCaja, sin tener que resolver el join hacia Cobro/Gasto.
-  metodoPago      MetodoPago
+  /// `@default` solo para permitir el `db push` sobre filas de prueba
+  /// existentes — ver nota en `Cobro.metodoPago`.
+  metodoPago      MetodoPago           @default(EFECTIVO_USD)
   descripcion     String?
   registradoPorId String
   fecha           DateTime             @default(now())
@@ -368,8 +374,10 @@ model Gasto {
   moneda          String           @default("USD")
   esEfectivo      Boolean          @default(true)
   /// Catálogo cerrado — ver changelog punto 11/46. Antes no existía
-  /// ningún campo de método de pago en Gasto.
-  metodoPago      MetodoPago
+  /// ningún campo de método de pago en Gasto. `@default` solo para
+  /// permitir el `db push` sobre filas de prueba existentes — ver nota
+  /// en `Cobro.metodoPago`.
+  metodoPago      MetodoPago       @default(EFECTIVO_USD)
   nota            String?
   registradoPorId String
   fecha           DateTime         @default(now())
