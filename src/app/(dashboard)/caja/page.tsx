@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
 import {
   abrirCajaAction,
   cerrarCajaAction,
@@ -45,8 +46,15 @@ export default async function CajaPage({
   });
 
   return (
-    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6">
-      <PageHeader title="Caja" />
+    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 lg:max-w-4xl lg:px-10 lg:py-12">
+      <PageHeader
+        title="Caja"
+        description={
+          cajaAbierta
+            ? `Abierta desde ${cajaAbierta.fechaApertura.toLocaleString("es")} · Monto inicial ${cajaAbierta.montoInicial.toString()}`
+            : undefined
+        }
+      />
 
       {abierta && (
         <div className="mt-4">
@@ -81,17 +89,12 @@ export default async function CajaPage({
       )}
 
       {cajaAbierta ? (
-        <>
-          <p className="mt-6 text-sm text-text-secondary">
-            Caja abierta desde {cajaAbierta.fechaApertura.toLocaleString("es")} con
-            monto inicial {cajaAbierta.montoInicial.toString()}.
-          </p>
-
-          <section className="mt-8 space-y-3 border-t border-border pt-6">
+        <div className="mt-6 grid gap-5 lg:grid-cols-2">
+          <Card padding="compact" className="lg:col-span-2">
             <h2 className="text-sm font-semibold text-text-primary">
               Registrar cobro con consulta
             </h2>
-            <form action={registrarCobroConConsultaAction} className="space-y-3">
+            <form action={registrarCobroConConsultaAction} className="mt-3 space-y-3">
               <div>
                 <label htmlFor="consultaId" className="mb-1 block text-sm text-text-primary">
                   ID de la consulta (debe estar CERRADA)
@@ -120,13 +123,13 @@ export default async function CajaPage({
                 Registrar cobro
               </Button>
             </form>
-          </section>
+          </Card>
 
-          <section className="mt-8 space-y-3 border-t border-border pt-6">
+          <Card padding="compact">
             <h2 className="text-sm font-semibold text-text-primary">
               Cobro rápido (sin consulta)
             </h2>
-            <form action={registrarCobroRapidoAction} className="space-y-3">
+            <form action={registrarCobroRapidoAction} className="mt-3 space-y-3">
               <div>
                 <label htmlFor="pacienteId" className="mb-1 block text-sm text-text-primary">
                   ID del paciente
@@ -161,11 +164,11 @@ export default async function CajaPage({
                 Registrar cobro
               </Button>
             </form>
-          </section>
+          </Card>
 
-          <section className="mt-8 space-y-3 border-t border-border pt-6">
+          <Card padding="compact">
             <h2 className="text-sm font-semibold text-text-primary">Registrar gasto</h2>
-            <form action={registrarGastoAction} className="space-y-3">
+            <form action={registrarGastoAction} className="mt-3 space-y-3">
               <div>
                 <label htmlFor="categoria" className="mb-1 block text-sm text-text-primary">
                   Categoría
@@ -199,11 +202,14 @@ export default async function CajaPage({
                 Registrar gasto
               </Button>
             </form>
-          </section>
+          </Card>
 
-          <section className="mt-8 space-y-3 border-t border-border pt-6">
-            <h2 className="text-sm font-semibold text-text-primary">Cerrar caja</h2>
-            <form action={cerrarCajaAction} className="space-y-3">
+          <Card padding="compact" className="ring-1 ring-danger">
+            <h2 className="text-sm font-semibold text-danger-text">Cerrar caja</h2>
+            <p className="mt-1 text-caption text-text-faint">
+              Acción irreversible: cierra la caja del día y no puede reabrirse.
+            </p>
+            <form action={cerrarCajaAction} className="mt-3 space-y-3">
               <div>
                 <label htmlFor="montoContado" className="mb-1 block text-sm text-text-primary">
                   Monto contado (efectivo real)
@@ -221,8 +227,8 @@ export default async function CajaPage({
                 Cerrar caja
               </Button>
             </form>
-          </section>
-        </>
+          </Card>
+        </div>
       ) : (
         <form action={abrirCajaAction} className="mt-6 space-y-4">
           <div>
