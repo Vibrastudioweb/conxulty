@@ -1,9 +1,11 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 import { validarConsistenciaCobro } from "@/db/consistenciaOrganizacional";
 import { ConsultaNoEncontradaError } from "@/modules/core/consultas";
 import { obtenerCajaAbierta, CajaNoAbiertaError } from "@/modules/cobros-caja/caja";
 import { INFO_METODO_PAGO, type MetodoPagoId } from "@/modules/cobros-caja/metodosPago";
+import { formatearFolio } from "@/modules/cobros-caja/comprobantes";
 
 export class ConsultaNoCerradaError extends Error {
   constructor() {
@@ -19,6 +21,13 @@ export class ConceptoRequeridoError extends Error {
   }
 }
 
+export class DescuentoMotivoRequeridoError extends Error {
+  constructor() {
+    super("El motivo es obligatorio cuando el descuento o cortesía es mayor a 0.");
+    this.name = "DescuentoMotivoRequeridoError";
+  }
+}
+
 /**
  * Registra un cobro y su cobro efectivo (Cobro + MovimientoCaja de entrada,
  * en una sola transacción) — no hay flujo de PENDIENTE en esta ronda: el
@@ -31,6 +40,14 @@ export class ConceptoRequeridoError extends Error {
  *   criterio que `abrirOCrearConsulta`). La Consulta debe estar CERRADA.
  * - Sin `consultaId` ("cobro rápido"): pacienteId/medicoId deben venir
  *   informados, y `concepto` es obligatorio.
+ *
+ * `monto` es el SUBTOTAL/monto de lista (antes de descuento) — ver
+ * changelog punto 13/48. El neto que de verdad entra a caja
+ * (`monto - descuentoMonto`) es lo que se guarda en `Cobro.monto` y en
+ * `MovimientoCaja.monto`; `descuentoMonto`/`descuentoMotivo` quedan aparte
+ * solo para reconstruir el desglose en el comprobante. Si hay descuento
+ * (> 0), el motivo es obligatorio — mismo criterio que `concepto` en un
+ * cobro sin consulta.
  */
 export async function registrarCobro(input: {
   organizacionId: string;
@@ -42,8 +59,21 @@ export async function registrarCobro(input: {
   monto: number | string;
   /** Catálogo cerrado — ver changelog punto 11/46. */
   metodoPago: MetodoPagoId;
-}): Promise<{ cobroId: string }> {
+  descuentoMonto?: number | string;
+  descuentoMotivo?: string | null;
+}): Promise<{ cobroId: string; folio: string }> {
   const infoMetodo = INFO_METODO_PAGO[input.metodoPago];
+
+  const montoBase = new Prisma.Decimal(input.monto);
+  const descuentoMonto = new Prisma.Decimal(input.descuentoMonto ?? 0);
+  if (descuentoMonto.greaterThan(0) && !input.descuentoMotivo?.trim()) {
+    throw new DescuentoMotivoRequeridoError();
+  }
+  const montoNeto = montoBase.minus(descuentoMonto);
+  if (montoNeto.lessThan(0)) {
+    throw new Error("El descuento no puede ser mayor al monto.");
+  }
+
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: input.organizacionId,
   });
@@ -96,7 +126,9 @@ export async function registrarCobro(input: {
         pacienteId,
         medicoId,
         concepto: input.concepto?.trim() || null,
-        monto: input.monto,
+        monto: montoNeto,
+        descuentoMonto,
+        descuentoMotivo: descuentoMonto.greaterThan(0) ? input.descuentoMotivo!.trim() : null,
         metodoPago: input.metodoPago,
         moneda: infoMetodo.moneda,
         esEfectivo: infoMetodo.esEfectivo,
@@ -111,7 +143,7 @@ export async function registrarCobro(input: {
         cobroId: cobroCreado.id,
         tipo: "INGRESO",
         origen: "COBRO",
-        monto: input.monto,
+        monto: cobroCreado.monto,
         moneda: cobroCreado.moneda,
         esEfectivo: cobroCreado.esEfectivo,
         metodoPago: cobroCreado.metodoPago,
@@ -131,7 +163,7 @@ export async function registrarCobro(input: {
     pacienteId,
   });
 
-  return { cobroId: cobro.id };
+  return { cobroId: cobro.id, folio: formatearFolio(cobro.numero) };
 }
 
 /**

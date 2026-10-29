@@ -19,6 +19,7 @@ import {
   registrarCobro,
   ConsultaNoCerradaError,
   ConceptoRequeridoError,
+  DescuentoMotivoRequeridoError,
 } from "@/modules/cobros-caja/cobros";
 import { registrarGasto } from "@/modules/cobros-caja/gastos";
 import { ConsultaNoEncontradaError } from "@/modules/core/consultas";
@@ -26,6 +27,7 @@ import { METODOS_PAGO, type MetodoPagoId } from "@/modules/cobros-caja/metodosPa
 
 const montoInicialSchema = z.coerce.number().min(0);
 const montoCobroSchema = z.coerce.number().positive();
+const descuentoSchema = z.coerce.number().min(0);
 const CATEGORIAS_GASTO = ["ALQUILER", "INSUMOS", "PERSONAL", "SERVICIOS", "OTRO"] as const;
 const categoriaGastoSchema = z.enum(CATEGORIAS_GASTO);
 const metodoPagoSchema = z.enum(METODOS_PAGO);
@@ -35,6 +37,14 @@ function leerTexto(formData: FormData, campo: string): string | null {
   if (valor === null) return null;
   const texto = String(valor).trim();
   return texto === "" ? null : texto;
+}
+
+/** Campo vacío ("") se trata como 0 — el descuento es opcional en el formulario. */
+function leerDescuento(formData: FormData): number {
+  const raw = formData.get("descuentoMonto");
+  if (raw === null || String(raw).trim() === "") return 0;
+  const parseo = descuentoSchema.safeParse(raw);
+  return parseo.success ? parseo.data : 0;
 }
 
 export async function abrirCajaAction(formData: FormData) {
@@ -129,14 +139,17 @@ export async function registrarCobroConConsultaAction(formData: FormData) {
     redirect("/caja?error=monto_invalido");
   }
 
+  let resultado: { cobroId: string };
   try {
-    await registrarCobro({
+    resultado = await registrarCobro({
       organizacionId: session.user.organizacionId,
       actorId: session.user.id,
       consultaId,
       concepto: leerTexto(formData, "concepto"),
       monto: parseoMonto.data,
       metodoPago: parseoMetodo.data as MetodoPagoId,
+      descuentoMonto: leerDescuento(formData),
+      descuentoMotivo: leerTexto(formData, "descuentoMotivo"),
     });
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {
@@ -148,10 +161,13 @@ export async function registrarCobroConConsultaAction(formData: FormData) {
     if (err instanceof ConsultaNoCerradaError) {
       redirect("/caja?error=consulta_no_cerrada");
     }
+    if (err instanceof DescuentoMotivoRequeridoError) {
+      redirect("/caja?error=descuento_motivo_requerido");
+    }
     throw err;
   }
 
-  redirect("/caja?cobro=1");
+  redirect(`/caja/comprobante/${resultado.cobroId}`);
 }
 
 export async function registrarGastoAction(formData: FormData) {
@@ -216,8 +232,9 @@ export async function registrarCobroRapidoAction(formData: FormData) {
     throw err;
   }
 
+  let resultado: { cobroId: string };
   try {
-    await registrarCobro({
+    resultado = await registrarCobro({
       organizacionId: session.user.organizacionId,
       actorId: session.user.id,
       pacienteId,
@@ -225,6 +242,8 @@ export async function registrarCobroRapidoAction(formData: FormData) {
       concepto,
       monto: parseoMonto.data,
       metodoPago: parseoMetodo.data as MetodoPagoId,
+      descuentoMonto: leerDescuento(formData),
+      descuentoMotivo: leerTexto(formData, "descuentoMotivo"),
     });
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {
@@ -233,8 +252,11 @@ export async function registrarCobroRapidoAction(formData: FormData) {
     if (err instanceof ConceptoRequeridoError) {
       redirect("/caja?error=concepto_requerido");
     }
+    if (err instanceof DescuentoMotivoRequeridoError) {
+      redirect("/caja?error=descuento_motivo_requerido");
+    }
     throw err;
   }
 
-  redirect("/caja?cobro=1");
+  redirect(`/caja/comprobante/${resultado.cobroId}`);
 }

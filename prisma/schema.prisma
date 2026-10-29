@@ -247,11 +247,27 @@ model Documento {
 model Cobro {
   id              String           @id @default(cuid())
   organizacionId  String
+  /// Folio correlativo para el comprobante (ver changelog punto 13/48):
+  /// "COB-" + este número, con ceros a la izquierda. Es global, no por
+  /// organización — Prisma/Postgres no dan un autoincrement scoped sin
+  /// una secuencia manual, y un folio que salta entre organizaciones no
+  /// es un problema real (cada organización ve su propio folio, nunca
+  /// compara el número con el de otra).
+  numero          Int              @unique @default(autoincrement())
   consultaId      String?
   pacienteId      String
   medicoId        String
   concepto        String?
   monto           Decimal          @db.Decimal(10, 2)
+  /// Descuento/cortesía aplicado (ver changelog punto 13/48): `monto` ya
+  /// es el total neto cobrado (igual significado que antes, no cambia
+  /// nada de lo que ya depende de `monto` — arqueo, reportes). El
+  /// subtotal "de lista" para el comprobante se deriva como
+  /// `monto + descuentoMonto`, nunca al revés. `descuentoMotivo` es
+  /// obligatorio en código (no constraint de DB, mismo criterio que
+  /// `concepto` en cobro sin consulta) cuando `descuentoMonto > 0`.
+  descuentoMonto  Decimal          @default(0) @db.Decimal(10, 2)
+  descuentoMotivo String?
   /// `moneda` y `esEfectivo` quedan denormalizados a partir de
   /// `metodoPago` (ver changelog punto 11/46) — nunca se piden por
   /// separado en el formulario, se derivan en registrarCobro() desde

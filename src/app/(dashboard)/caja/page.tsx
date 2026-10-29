@@ -34,6 +34,48 @@ function SelectMetodoPago({ id, name }: { id: string; name: string }) {
   );
 }
 
+/**
+ * Descuento/cortesía (ver changelog punto 13/48): colapsado por defecto
+ * (`<details>`, sin JS de cliente, mismo patrón que NotificacionesBell) —
+ * la mayoría de los cobros no lo necesitan. El motivo es obligatorio en el
+ * servidor (`registrarCobro()`) cuando el monto es mayor a 0, no solo aquí.
+ */
+function CamposDescuento({ sufijo }: { sufijo: string }) {
+  return (
+    <details className="rounded-input border border-border px-3 py-2">
+      <summary className="cursor-pointer text-sm text-text-secondary">
+        + Agregar descuento o cortesía
+      </summary>
+      <div className="mt-3 space-y-3">
+        <div>
+          <label
+            htmlFor={`descuentoMonto${sufijo}`}
+            className="mb-1 block text-sm text-text-primary"
+          >
+            Monto del descuento
+          </label>
+          <Input
+            id={`descuentoMonto${sufijo}`}
+            name="descuentoMonto"
+            type="number"
+            step="0.01"
+            min="0"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor={`descuentoMotivo${sufijo}`}
+            className="mb-1 block text-sm text-text-primary"
+          >
+            Motivo (obligatorio si hay descuento)
+          </label>
+          <Input id={`descuentoMotivo${sufijo}`} name="descuentoMotivo" />
+        </div>
+      </div>
+    </details>
+  );
+}
+
 const MENSAJES_ERROR: Record<string, string> = {
   ya_abierta: "Ya hay una caja abierta para esta organización.",
   monto_invalido: "El monto no es válido.",
@@ -44,6 +86,7 @@ const MENSAJES_ERROR: Record<string, string> = {
   monto_contado_requerido: "El monto contado es obligatorio para cerrar la caja.",
   sin_medico:
     "Esta organización no tiene un médico registrado todavía: no se puede registrar el cobro.",
+  descuento_motivo_requerido: "El motivo es obligatorio cuando hay un descuento o cortesía.",
 };
 
 export default async function CajaPage({
@@ -52,7 +95,6 @@ export default async function CajaPage({
   searchParams: Promise<{
     error?: string;
     abierta?: string;
-    cobro?: string;
     gasto?: string;
     cierre?: string;
     esperadoUsd?: string;
@@ -62,7 +104,7 @@ export default async function CajaPage({
   }>;
 }) {
   const session = await requireSesion();
-  const { error, abierta, cobro, gasto, cierre, esperadoUsd, esperadoBs, diferenciaUsd, diferenciaBs } =
+  const { error, abierta, gasto, cierre, esperadoUsd, esperadoBs, diferenciaUsd, diferenciaBs } =
     await searchParams;
 
   const cajaAbierta = await obtenerCajaAbierta({
@@ -94,12 +136,6 @@ export default async function CajaPage({
       {abierta && (
         <div className="mt-4">
           <Alert tone="success">Caja abierta correctamente.</Alert>
-        </div>
-      )}
-
-      {cobro && (
-        <div className="mt-4">
-          <Alert tone="success">Cobro registrado correctamente.</Alert>
         </div>
       )}
 
@@ -139,7 +175,7 @@ export default async function CajaPage({
               </div>
               <div>
                 <label htmlFor="monto1" className="mb-1 block text-sm text-text-primary">
-                  Monto
+                  Monto (subtotal, antes de descuento)
                 </label>
                 <Input id="monto1" name="monto" type="number" step="0.01" min="0.01" required />
               </div>
@@ -155,6 +191,7 @@ export default async function CajaPage({
                 </label>
                 <Input id="concepto1" name="concepto" />
               </div>
+              <CamposDescuento sufijo="1" />
               <Button type="submit" fullWidth variant="secondary">
                 Registrar cobro
               </Button>
@@ -180,7 +217,7 @@ export default async function CajaPage({
               </div>
               <div>
                 <label htmlFor="monto2" className="mb-1 block text-sm text-text-primary">
-                  Monto
+                  Monto (subtotal, antes de descuento)
                 </label>
                 <Input id="monto2" name="monto" type="number" step="0.01" min="0.01" required />
               </div>
@@ -190,6 +227,7 @@ export default async function CajaPage({
                 </label>
                 <SelectMetodoPago id="metodoPago2" name="metodoPago" />
               </div>
+              <CamposDescuento sufijo="2" />
               <Button type="submit" fullWidth variant="secondary">
                 Registrar cobro
               </Button>
