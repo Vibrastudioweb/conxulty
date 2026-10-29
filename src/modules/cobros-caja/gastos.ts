@@ -20,6 +20,8 @@ export async function registrarGasto(input: {
   categoria: CategoriaGasto;
   monto: number | string;
   nota?: string | null;
+  /** Si se pagó en efectivo físico (ver changelog punto 46). Default `true`. */
+  esEfectivo?: boolean;
 }): Promise<{ gastoId: string }> {
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: input.organizacionId,
@@ -36,6 +38,7 @@ export async function registrarGasto(input: {
         categoria: input.categoria,
         monto: input.monto,
         nota: input.nota?.trim() || null,
+        esEfectivo: input.esEfectivo ?? true,
         registradoPorId: input.actorId,
       },
     });
@@ -49,6 +52,7 @@ export async function registrarGasto(input: {
         origen: "GASTO",
         monto: input.monto,
         moneda: gastoCreado.moneda,
+        esEfectivo: gastoCreado.esEfectivo,
         registradoPorId: input.actorId,
       },
     });

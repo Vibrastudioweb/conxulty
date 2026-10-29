@@ -254,6 +254,15 @@ model Cobro {
   monto           Decimal          @db.Decimal(10, 2)
   moneda          String           @default("USD")
   metodoPago      String?
+  /// Si este cobro fue en efectivo físico (29-oct-2026 — ver changelog
+  /// punto 46). `metodoPago` sigue siendo texto libre descriptivo
+  /// ("Zelle", "Pago móvil Banesco"); este booleano es lo único que el
+  /// arqueo de Caja necesita para saber si cuenta como plata en la
+  /// gaveta. Default `true` porque hoy la mayoría de los cobros de
+  /// prueba son efectivo — no implica que todo pago sea efectivo por
+  /// definición, solo evita que el formulario tenga que decidir por el
+  /// usuario en el caso más común.
+  esEfectivo      Boolean          @default(true)
   estado          EstadoCobro      @default(PENDIENTE)
   fecha           DateTime         @default(now())
   createdAt       DateTime         @default(now())
@@ -273,16 +282,28 @@ model Cobro {
 /// persona contó físicamente (obligatorio para cerrar); diferencia = contado
 /// - esperado, se guarda siempre — si no cuadra, queda registrada y visible,
 /// nunca se oculta ajustando montoEsperado.
+/// Campos de arqueo DUPLICADOS por moneda (29-oct-2026 — ver changelog
+/// punto 46: el cálculo anterior sumaba USD y Bs entre sí, y contaba
+/// métodos no-efectivo como si fueran plata física. El arqueo de verdad
+/// solo le importa al EFECTIVO, y nunca hay que sumar monedas distintas
+/// — por eso dos columnas por concepto (`*Usd`/`*Bs`) en vez de una sola
+/// genérica. No es un catálogo de 6 métodos de pago (eso sigue pendiente,
+/// ver Caja 10-15 en el changelog de la demo) — es lo mínimo para que el
+/// arqueo de efectivo deje de estar mal.
 model Caja {
-  id             String           @id @default(cuid())
-  organizacionId String
-  abiertaPorId   String
-  fechaApertura  DateTime         @default(now())
-  fechaCierre    DateTime?
-  montoInicial   Decimal          @default(0) @db.Decimal(10, 2)
-  montoContado   Decimal?         @db.Decimal(10, 2)
-  montoEsperado  Decimal?         @db.Decimal(10, 2)
-  diferencia     Decimal?         @db.Decimal(10, 2)
+  id              String           @id @default(cuid())
+  organizacionId  String
+  abiertaPorId    String
+  fechaApertura   DateTime         @default(now())
+  fechaCierre     DateTime?
+  montoInicialUsd Decimal          @default(0) @db.Decimal(10, 2)
+  montoInicialBs  Decimal          @default(0) @db.Decimal(10, 2)
+  montoContadoUsd Decimal?         @db.Decimal(10, 2)
+  montoContadoBs  Decimal?         @db.Decimal(10, 2)
+  montoEsperadoUsd Decimal?        @db.Decimal(10, 2)
+  montoEsperadoBs Decimal?         @db.Decimal(10, 2)
+  diferenciaUsd   Decimal?         @db.Decimal(10, 2)
+  diferenciaBs    Decimal?         @db.Decimal(10, 2)
   estado         EstadoCaja       @default(ABIERTA)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -312,6 +333,10 @@ model MovimientoCaja {
   origen          OrigenMovimientoCaja @default(INGRESO_MANUAL)
   monto           Decimal              @db.Decimal(10, 2)
   moneda          String               @default("USD")
+  /// Copiado del Cobro/Gasto de origen al crear el movimiento (mismo
+  /// patrón que `moneda`, denormalizado para no tener que resolver el
+  /// join al calcular el arqueo). Ver changelog punto 46.
+  esEfectivo      Boolean              @default(true)
   descripcion     String?
   registradoPorId String
   fecha           DateTime             @default(now())
@@ -338,6 +363,10 @@ model Gasto {
   categoria       CategoriaGasto
   monto           Decimal          @db.Decimal(10, 2)
   moneda          String           @default("USD")
+  /// Si este gasto se pagó en efectivo físico (29-oct-2026 — ver changelog
+  /// punto 46). Mismo rol que `Cobro.esEfectivo`: es lo único que el
+  /// arqueo de Caja necesita para saber si resta de la gaveta.
+  esEfectivo      Boolean          @default(true)
   nota            String?
   registradoPorId String
   fecha           DateTime         @default(now())

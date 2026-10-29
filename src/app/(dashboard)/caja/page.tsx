@@ -37,12 +37,15 @@ export default async function CajaPage({
     cobro?: string;
     gasto?: string;
     cierre?: string;
-    esperado?: string;
-    diferencia?: string;
+    esperadoUsd?: string;
+    esperadoBs?: string;
+    diferenciaUsd?: string;
+    diferenciaBs?: string;
   }>;
 }) {
   const session = await requireSesion();
-  const { error, abierta, cobro, gasto, cierre, esperado, diferencia } = await searchParams;
+  const { error, abierta, cobro, gasto, cierre, esperadoUsd, esperadoBs, diferenciaUsd, diferenciaBs } =
+    await searchParams;
 
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: session.user.organizacionId,
@@ -54,7 +57,7 @@ export default async function CajaPage({
         title="Caja"
         description={
           cajaAbierta
-            ? `Abierta desde ${cajaAbierta.fechaApertura.toLocaleString("es")} · Monto inicial ${cajaAbierta.montoInicial.toString()}`
+            ? `Abierta desde ${cajaAbierta.fechaApertura.toLocaleString("es")} · Monto inicial $${cajaAbierta.montoInicialUsd.toString()} / Bs ${cajaAbierta.montoInicialBs.toString()}`
             : undefined
         }
         secondaryActions={
@@ -88,7 +91,8 @@ export default async function CajaPage({
       {cierre && (
         <div className="mt-4">
           <Alert tone="success">
-            Caja cerrada. Esperado: {esperado} — Diferencia: {diferencia}
+            Caja cerrada. Esperado: ${esperadoUsd} / Bs {esperadoBs} — Diferencia: ${diferenciaUsd}{" "}
+            / Bs {diferenciaBs}
           </Alert>
         </div>
       )}
@@ -130,6 +134,18 @@ export default async function CajaPage({
                 </label>
                 <Input id="concepto1" name="concepto" />
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="esEfectivo1"
+                  name="esEfectivo"
+                  type="checkbox"
+                  defaultChecked
+                  className="h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+                />
+                <label htmlFor="esEfectivo1" className="text-sm text-text-primary">
+                  Es efectivo físico
+                </label>
+              </div>
               <Button type="submit" fullWidth variant="secondary">
                 Registrar cobro
               </Button>
@@ -164,6 +180,18 @@ export default async function CajaPage({
                   Método de pago (opcional)
                 </label>
                 <Input id="metodoPago2" name="metodoPago" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="esEfectivo2"
+                  name="esEfectivo"
+                  type="checkbox"
+                  defaultChecked
+                  className="h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+                />
+                <label htmlFor="esEfectivo2" className="text-sm text-text-primary">
+                  Es efectivo físico
+                </label>
               </div>
               <Button type="submit" fullWidth variant="secondary">
                 Registrar cobro
@@ -203,6 +231,18 @@ export default async function CajaPage({
                 </label>
                 <Input id="nota" name="nota" />
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="esEfectivo3"
+                  name="esEfectivo"
+                  type="checkbox"
+                  defaultChecked
+                  className="h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+                />
+                <label htmlFor="esEfectivo3" className="text-sm text-text-primary">
+                  Es efectivo físico
+                </label>
+              </div>
               <Button type="submit" fullWidth variant="secondary">
                 Registrar gasto
               </Button>
@@ -212,19 +252,42 @@ export default async function CajaPage({
           <Card padding="compact" className="ring-1 ring-danger">
             <h2 className="text-sm font-semibold text-danger-text">Cerrar caja</h2>
             <p className="mt-1 text-caption text-text-faint">
-              Acción irreversible: cierra la caja del día y no puede reabrirse.
+              Acción irreversible: cierra la caja del día y no puede reabrirse. El arqueo solo
+              cuenta efectivo físico — los cobros/gastos no efectivo no entran en el monto
+              esperado.
             </p>
             <form action={cerrarCajaAction} className="mt-3 space-y-3">
               <div>
-                <label htmlFor="montoContado" className="mb-1 block text-sm text-text-primary">
-                  Monto contado (efectivo real)
+                <label
+                  htmlFor="montoContadoUsd"
+                  className="mb-1 block text-sm text-text-primary"
+                >
+                  Monto contado en USD (efectivo real)
                 </label>
                 <Input
-                  id="montoContado"
-                  name="montoContado"
+                  id="montoContadoUsd"
+                  name="montoContadoUsd"
                   type="number"
                   step="0.01"
                   min="0"
+                  defaultValue="0"
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="montoContadoBs"
+                  className="mb-1 block text-sm text-text-primary"
+                >
+                  Monto contado en Bs (efectivo real)
+                </label>
+                <Input
+                  id="montoContadoBs"
+                  name="montoContadoBs"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue="0"
                   required
                 />
               </div>
@@ -238,14 +301,31 @@ export default async function CajaPage({
         <form action={abrirCajaAction} className="mt-6 space-y-4">
           <div>
             <label
-              htmlFor="montoInicial"
+              htmlFor="montoInicialUsd"
               className="mb-1 block text-sm font-medium text-text-primary"
             >
-              Monto inicial
+              Monto inicial en USD
             </label>
             <Input
-              id="montoInicial"
-              name="montoInicial"
+              id="montoInicialUsd"
+              name="montoInicialUsd"
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue="0"
+              required
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="montoInicialBs"
+              className="mb-1 block text-sm font-medium text-text-primary"
+            >
+              Monto inicial en Bs
+            </label>
+            <Input
+              id="montoInicialBs"
+              name="montoInicialBs"
               type="number"
               step="0.01"
               min="0"

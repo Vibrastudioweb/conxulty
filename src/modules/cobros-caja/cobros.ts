@@ -40,6 +40,8 @@ export async function registrarCobro(input: {
   concepto?: string | null;
   monto: number | string;
   metodoPago?: string | null;
+  /** Si es efectivo físico (ver changelog punto 46). Default `true`. */
+  esEfectivo?: boolean;
 }): Promise<{ cobroId: string }> {
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: input.organizacionId,
@@ -95,6 +97,7 @@ export async function registrarCobro(input: {
         concepto: input.concepto?.trim() || null,
         monto: input.monto,
         metodoPago: input.metodoPago ?? null,
+        esEfectivo: input.esEfectivo ?? true,
         estado: "PAGADO",
       },
     });
@@ -108,6 +111,7 @@ export async function registrarCobro(input: {
         origen: "COBRO",
         monto: input.monto,
         moneda: cobroCreado.moneda,
+        esEfectivo: cobroCreado.esEfectivo,
         registradoPorId: input.actorId,
       },
     });

@@ -35,11 +35,19 @@ function leerTexto(formData: FormData, campo: string): string | null {
   return texto === "" ? null : texto;
 }
 
+// Un checkbox ausente (desmarcado) no manda ningún par clave/valor en el
+// FormData — por eso "presente" ya significa "marcado", sin importar el
+// value. Ver changelog punto 46 (esEfectivo en Cobro/Gasto).
+function leerBooleano(formData: FormData, campo: string): boolean {
+  return formData.get(campo) !== null;
+}
+
 export async function abrirCajaAction(formData: FormData) {
   const session = await requireSesion();
 
-  const parseo = montoInicialSchema.safeParse(formData.get("montoInicial"));
-  if (!parseo.success) {
+  const parseoUsd = montoInicialSchema.safeParse(formData.get("montoInicialUsd"));
+  const parseoBs = montoInicialSchema.safeParse(formData.get("montoInicialBs"));
+  if (!parseoUsd.success || !parseoBs.success) {
     redirect("/caja?error=monto_invalido");
   }
 
@@ -47,7 +55,8 @@ export async function abrirCajaAction(formData: FormData) {
     await abrirCaja({
       organizacionId: session.user.organizacionId,
       actorId: session.user.id,
-      montoInicial: parseo.data,
+      montoInicialUsd: parseoUsd.data,
+      montoInicialBs: parseoBs.data,
     });
   } catch (err) {
     if (err instanceof CajaYaAbiertaError) {
@@ -65,22 +74,35 @@ export async function cerrarCajaAction(formData: FormData) {
   // Distingo "campo ausente/vacío" de "0 real": Number("") es 0 en JS, así
   // que si dejara que Zod coercionara directo, un campo vacío pasaría como
   // si fuera un monto contado de 0. Reviso la presencia del dato primero.
-  const rawMontoContado = formData.get("montoContado");
-  if (rawMontoContado === null || String(rawMontoContado).trim() === "") {
+  const rawMontoContadoUsd = formData.get("montoContadoUsd");
+  const rawMontoContadoBs = formData.get("montoContadoBs");
+  if (
+    rawMontoContadoUsd === null ||
+    String(rawMontoContadoUsd).trim() === "" ||
+    rawMontoContadoBs === null ||
+    String(rawMontoContadoBs).trim() === ""
+  ) {
     redirect("/caja?error=monto_contado_requerido");
   }
 
-  const parseo = z.coerce.number().min(0).safeParse(rawMontoContado);
-  if (!parseo.success) {
+  const parseoUsd = z.coerce.number().min(0).safeParse(rawMontoContadoUsd);
+  const parseoBs = z.coerce.number().min(0).safeParse(rawMontoContadoBs);
+  if (!parseoUsd.success || !parseoBs.success) {
     redirect("/caja?error=monto_invalido");
   }
 
-  let resultado: { montoEsperado: string; diferencia: string };
+  let resultado: {
+    montoEsperadoUsd: string;
+    montoEsperadoBs: string;
+    diferenciaUsd: string;
+    diferenciaBs: string;
+  };
   try {
     resultado = await cerrarCaja({
       organizacionId: session.user.organizacionId,
       actorId: session.user.id,
-      montoContado: parseo.data,
+      montoContadoUsd: parseoUsd.data,
+      montoContadoBs: parseoBs.data,
     });
   } catch (err) {
     if (err instanceof MontoContadoRequeridoError) {
@@ -94,8 +116,10 @@ export async function cerrarCajaAction(formData: FormData) {
 
   const params = new URLSearchParams({
     cierre: "1",
-    esperado: resultado.montoEsperado,
-    diferencia: resultado.diferencia,
+    esperadoUsd: resultado.montoEsperadoUsd,
+    esperadoBs: resultado.montoEsperadoBs,
+    diferenciaUsd: resultado.diferenciaUsd,
+    diferenciaBs: resultado.diferenciaBs,
   });
   redirect(`/caja?${params.toString()}`);
 }
@@ -117,6 +141,7 @@ export async function registrarCobroConConsultaAction(formData: FormData) {
       concepto: leerTexto(formData, "concepto"),
       monto: parseoMonto.data,
       metodoPago: leerTexto(formData, "metodoPago"),
+      esEfectivo: leerBooleano(formData, "esEfectivo"),
     });
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {
@@ -150,6 +175,7 @@ export async function registrarGastoAction(formData: FormData) {
       categoria: parseoCategoria.data as CategoriaGasto,
       monto: parseoMonto.data,
       nota: leerTexto(formData, "nota"),
+      esEfectivo: leerBooleano(formData, "esEfectivo"),
     });
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {
@@ -202,6 +228,7 @@ export async function registrarCobroRapidoAction(formData: FormData) {
       concepto,
       monto: parseoMonto.data,
       metodoPago: leerTexto(formData, "metodoPago"),
+      esEfectivo: leerBooleano(formData, "esEfectivo"),
     });
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {
