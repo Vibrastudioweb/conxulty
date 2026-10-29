@@ -8,11 +8,12 @@ import {
 } from "lucide-react";
 import { auth } from "@/auth";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
-import { listarCitasDelDia } from "@/modules/core/citas";
+import { listarCitasDelDia, listarCitasEnRango } from "@/modules/core/citas";
 import { obtenerTotalCobradoDelDia } from "@/modules/cobros-caja/cobros";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { QuickAction } from "@/components/ui/QuickAction";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { ActividadMensualChart } from "@/components/ui/ActividadMensualChart";
 import { CitaCard } from "@/components/citas/CitaCard";
 
 function primerNombre(nombreCompleto: string | null | undefined): string {
@@ -37,6 +38,33 @@ function formatearCobrosDelDia(
     value: formateados[0],
     hint: formateados.length > 1 ? formateados.slice(1).join(" · ") : undefined,
   };
+}
+
+/**
+ * Agrupa citas por día del mes para el gráfico "Actividad del mes" —
+ * incluye TODOS los días del mes (incluso sin citas, en 0), para que las
+ * barras queden alineadas por día y no haya que inferir huecos en la UI.
+ */
+function agruparCitasPorDiaDelMes(
+  citas: Array<{ fechaHora: Date }>,
+  inicioMes: Date,
+  diaHoy: number,
+): Array<{ dia: number; total: number; esHoy: boolean }> {
+  const diasEnMes = new Date(
+    inicioMes.getFullYear(),
+    inicioMes.getMonth() + 1,
+    0,
+  ).getDate();
+
+  const totalesPorDia = new Array(diasEnMes + 1).fill(0) as number[];
+  for (const cita of citas) {
+    totalesPorDia[cita.fechaHora.getDate()] += 1;
+  }
+
+  return Array.from({ length: diasEnMes }, (_, i) => {
+    const dia = i + 1;
+    return { dia, total: totalesPorDia[dia], esHoy: dia === diaHoy };
+  });
 }
 
 function formatearFechaLarga(fecha: Date): string {
@@ -76,7 +104,14 @@ export default async function HoyPage() {
   }
 
   const ahora = new Date();
-  const [citas, cobrosDelDia] = await Promise.all([
+  const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+  const inicioMesSiguiente = new Date(
+    ahora.getFullYear(),
+    ahora.getMonth() + 1,
+    1,
+  );
+
+  const [citas, cobrosDelDia, citasDelMes] = await Promise.all([
     listarCitasDelDia({
       organizacionId: session.user.organizacionId,
       medicoId: medico.id,
@@ -87,7 +122,19 @@ export default async function HoyPage() {
       medicoId: medico.id,
       fecha: ahora,
     }),
+    listarCitasEnRango({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      inicio: inicioMes,
+      fin: inicioMesSiguiente,
+    }),
   ]);
+
+  const actividadDelMes = agruparCitasPorDiaDelMes(
+    citasDelMes,
+    inicioMes,
+    ahora.getDate(),
+  );
 
   const proxima = citas.find(
     (cita) => cita.estado === "PENDIENTE" || cita.estado === "CONFIRMADA",
@@ -146,6 +193,17 @@ export default async function HoyPage() {
           label="Por confirmar"
           value={String(pendientesConfirmar)}
         />
+      </section>
+
+      <section className="mt-8 rounded-card border border-border bg-surface px-5 py-4 lg:mt-10">
+        <SectionLabel>Actividad del mes</SectionLabel>
+        <p className="mt-0.5 text-body-secondary text-text-faint">
+          {citasDelMes.length} {citasDelMes.length === 1 ? "cita" : "citas"}{" "}
+          en {ahora.toLocaleDateString("es", { month: "long" })}
+        </p>
+        <div className="mt-3">
+          <ActividadMensualChart datos={actividadDelMes} />
+        </div>
       </section>
 
       {!hayCitas ? (
