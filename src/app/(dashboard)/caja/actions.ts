@@ -5,6 +5,10 @@ import { z } from "zod";
 import type { CategoriaGasto } from "@prisma/client";
 import { requireSesion } from "@/modules/core/autorizacion";
 import {
+  obtenerMedicoDeOrganizacion,
+  MedicoNoEncontradoError,
+} from "@/modules/core/sesionMedica";
+import {
   abrirCaja,
   cerrarCaja,
   CajaYaAbiertaError,
@@ -161,15 +165,32 @@ export async function registrarCobroRapidoAction(formData: FormData) {
   const session = await requireSesion();
 
   const pacienteId = leerTexto(formData, "pacienteId");
-  const medicoId = leerTexto(formData, "medicoId");
   const concepto = leerTexto(formData, "concepto");
   const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));
 
-  if (!pacienteId || !medicoId || !parseoMonto.success) {
+  if (!pacienteId || !parseoMonto.success) {
     redirect("/caja?error=monto_invalido");
   }
   if (!concepto) {
     redirect("/caja?error=concepto_requerido");
+  }
+
+  // 29-oct-2026: CONXULTY es de un médico por organización (HECHO
+  // confirmado por el usuario) — el médico ya no se escribe a mano, se
+  // deriva siempre de la organización, igual que ya ocurre cuando el
+  // cobro viene con consultaId (ver registrarCobroConConsultaAction).
+  let medicoId: string;
+  try {
+    medicoId = (
+      await obtenerMedicoDeOrganizacion({
+        organizacionId: session.user.organizacionId,
+      })
+    ).id;
+  } catch (err) {
+    if (err instanceof MedicoNoEncontradoError) {
+      redirect("/caja?error=sin_medico");
+    }
+    throw err;
   }
 
   try {

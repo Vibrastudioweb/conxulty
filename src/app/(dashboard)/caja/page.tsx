@@ -23,6 +23,8 @@ const MENSAJES_ERROR: Record<string, string> = {
   consulta_no_cerrada: "Solo se puede cobrar una consulta que está cerrada.",
   concepto_requerido: "El concepto es obligatorio cuando el cobro no tiene consulta.",
   monto_contado_requerido: "El monto contado es obligatorio para cerrar la caja.",
+  sin_medico:
+    "Esta organización no tiene un médico registrado todavía: no se puede registrar el cobro.",
 };
 
 export default async function CajaPage({
@@ -135,12 +137,6 @@ export default async function CajaPage({
                   ID del paciente
                 </label>
                 <Input id="pacienteId" name="pacienteId" required />
-              </div>
-              <div>
-                <label htmlFor="medicoId" className="mb-1 block text-sm text-text-primary">
-                  ID del médico
-                </label>
-                <Input id="medicoId" name="medicoId" required />
               </div>
               <div>
                 <label htmlFor="concepto2" className="mb-1 block text-sm text-text-primary">
