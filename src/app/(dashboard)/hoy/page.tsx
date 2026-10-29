@@ -1,11 +1,43 @@
 import { redirect } from "next/navigation";
-import { CalendarDays, UserPlus } from "lucide-react";
+import {
+  CalendarDays,
+  CalendarCheck2,
+  CircleDollarSign,
+  UserCheck,
+  UserPlus,
+} from "lucide-react";
 import { auth } from "@/auth";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
 import { listarCitasDelDia } from "@/modules/core/citas";
+import { obtenerTotalCobradoDelDia } from "@/modules/cobros-caja/cobros";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { QuickAction } from "@/components/ui/QuickAction";
+import { KpiCard } from "@/components/ui/KpiCard";
 import { CitaCard } from "@/components/citas/CitaCard";
+
+function primerNombre(nombreCompleto: string | null | undefined): string {
+  if (!nombreCompleto) return "";
+  return nombreCompleto.trim().split(/\s+/)[0] ?? "";
+}
+
+function formatearCobrosDelDia(
+  totales: Array<{ moneda: string; total: number }>,
+): { value: string; hint?: string } {
+  if (totales.length === 0) {
+    return { value: "$0" };
+  }
+  const formateados = totales.map(
+    (t) =>
+      `${t.moneda === "USD" ? "$" : t.moneda + " "}${t.total.toLocaleString("es", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      })}`,
+  );
+  return {
+    value: formateados[0],
+    hint: formateados.length > 1 ? formateados.slice(1).join(" · ") : undefined,
+  };
+}
 
 function formatearFechaLarga(fecha: Date): string {
   const texto = fecha.toLocaleDateString("es", {
@@ -44,17 +76,28 @@ export default async function HoyPage() {
   }
 
   const ahora = new Date();
-  const citas = await listarCitasDelDia({
-    organizacionId: session.user.organizacionId,
-    medicoId: medico.id,
-    fecha: ahora,
-  });
+  const [citas, cobrosDelDia] = await Promise.all([
+    listarCitasDelDia({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      fecha: ahora,
+    }),
+    obtenerTotalCobradoDelDia({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      fecha: ahora,
+    }),
+  ]);
 
   const proxima = citas.find(
     (cita) => cita.estado === "PENDIENTE" || cita.estado === "CONFIRMADA",
   );
   const atendidas = citas.filter((cita) => cita.estado === "ATENDIDA").length;
+  const pendientesConfirmar = citas.filter(
+    (cita) => cita.estado === "PENDIENTE",
+  ).length;
   const hayCitas = citas.length > 0;
+  const cobrosHoy = formatearCobrosDelDia(cobrosDelDia);
 
   const accionesRapidas = (
     <>
@@ -72,12 +115,38 @@ export default async function HoyPage() {
     <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 lg:max-w-4xl lg:px-10 lg:py-12">
       <header>
         <h1 className="font-display text-page-title font-semibold tracking-tight text-text-primary lg:text-display">
-          Hoy
+          {session.user.name
+            ? `Hola, ${primerNombre(session.user.name)}`
+            : "Hoy"}
         </h1>
         <p className="mt-1 text-body-secondary font-medium text-text-secondary lg:text-body">
           {formatearFechaLarga(ahora)}
         </p>
       </header>
+
+      <section className="mt-6 grid grid-cols-2 gap-3 lg:mt-8 lg:grid-cols-4">
+        <KpiCard
+          icon={CalendarDays}
+          label="Citas de hoy"
+          value={String(citas.length)}
+        />
+        <KpiCard
+          icon={UserCheck}
+          label="Pacientes atendidos"
+          value={String(atendidas)}
+        />
+        <KpiCard
+          icon={CircleDollarSign}
+          label="Cobros del día"
+          value={cobrosHoy.value}
+          hint={cobrosHoy.hint}
+        />
+        <KpiCard
+          icon={CalendarCheck2}
+          label="Por confirmar"
+          value={String(pendientesConfirmar)}
+        />
+      </section>
 
       {!hayCitas ? (
         <section className="mt-8 rounded-card bg-brand-primary-soft px-6 py-10 text-center lg:mt-10 lg:py-12">

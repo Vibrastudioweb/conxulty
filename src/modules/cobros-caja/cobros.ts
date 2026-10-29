@@ -126,3 +126,39 @@ export async function registrarCobro(input: {
 
   return { cobroId: cobro.id };
 }
+
+/**
+ * Total cobrado por un médico en el rango de un día calendario, agrupado
+ * por moneda (un cobro en USD y uno en Bs no se suman entre sí — ver
+ * changelog de la demo, punto 11). Usado por el dashboard de "Hoy" para el
+ * KPI "Cobros del día"; no incluye cobros `ANULADO` (sí incluye
+ * PENDIENTE/PARCIAL/PAGADO, porque "cobrado" aquí significa "registrado
+ * hoy", no necesariamente ya saldado — ver punto 15c del changelog sobre el
+ * flujo de cobranzas que todavía no existe).
+ */
+export async function obtenerTotalCobradoDelDia(input: {
+  organizacionId: string;
+  medicoId: string;
+  fecha: Date;
+}): Promise<Array<{ moneda: string; total: number }>> {
+  const inicio = new Date(input.fecha);
+  inicio.setHours(0, 0, 0, 0);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+
+  const agrupado = await prisma.cobro.groupBy({
+    by: ["moneda"],
+    where: {
+      organizacionId: input.organizacionId,
+      medicoId: input.medicoId,
+      estado: { not: "ANULADO" },
+      fecha: { gte: inicio, lt: fin },
+    },
+    _sum: { monto: true },
+  });
+
+  return agrupado.map((fila) => ({
+    moneda: fila.moneda,
+    total: Number(fila._sum.monto ?? 0),
+  }));
+}
