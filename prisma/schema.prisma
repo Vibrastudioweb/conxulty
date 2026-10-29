@@ -8,10 +8,11 @@ datasource db {
 
 /// Tenant raíz: consultorio o clínica.
 model Organizacion {
-  id                    String                 @id @default(cuid())
+  id                    String                   @id @default(cuid())
   nombre                String
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  accesosExternos       AccesoExternoHistorial[]
   antecedentesMedicos   AntecedenteMedico[]
   cajas                 Caja[]
   citas                 Cita[]
@@ -28,6 +29,69 @@ model Organizacion {
   @@map("organizaciones")
 }
 
+/// Identidad de paciente que existe UNA SOLA VEZ, fuera de cualquier
+/// organización — base del "historial que sigue al paciente" (28/29-oct-2026,
+/// DECISIÓN: "el paciente va tener una ficha con login... su historia medica
+/// se va ir nutriendo con cada consulta que haga dentro de la red de
+/// consultorios de conxulty"). A diferencia de Paciente.documentoIdentidad
+/// (único solo POR organización, por diseño — ver el modelo Paciente), aquí
+/// la cédula es única globalmente: es justo la pieza que hoy NO existe y que
+/// resuelve el problema de "cada consultorio tiene su propio registro
+/// aislado del mismo paciente, sin relación entre sí".
+///
+/// PRIMERA PIEZA de una construcción por fases — todavía NO incluye: login
+/// real (OTP por WhatsApp/SMS, pendiente de decidir el proveedor), emisión/
+/// rotación del código QR, ni la pantalla del paciente. Esto es solo la
+/// identidad y el enlace a los registros por-organización existentes, para
+/// no bloquear el resto del trabajo en una sola migración gigante.
+model PacienteRed {
+  id                 String                   @id @default(cuid())
+  /// Cédula/DNI/pasaporte — única globalmente (a propósito, a diferencia de
+  /// Paciente.documentoIdentidad).
+  documentoIdentidad String                   @unique
+  nombre             String
+  apellido           String
+  /// Canal de login más realista en Venezuela — OTP por WhatsApp/SMS, no
+  /// contraseña (ver changelog de la demo, punto 42). Email queda como
+  /// alternativa, no como requisito.
+  telefono           String?
+  email              String?
+  activo             Boolean                  @default(true)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  accesosExternos    AccesoExternoHistorial[]
+  /// Los registros Paciente de cada organización que ya se enlazaron a esta
+  /// identidad. Un Paciente sin pacienteRedId todavía no fue enlazado — la
+  /// migración de datos existentes es un paso aparte, no automático.
+  pacientes          Paciente[]
+
+  @@map("pacientes_red")
+}
+
+/// Auditoría de cada vez que un médico de una organización DISTINTA a la
+/// dueña del registro accedió al historial de un paciente vía su código
+/// (28/29-oct-2026, respuesta a "quién otorga el permiso": el paciente, al
+/// dejar escanear su código — este registro es la contraparte de esa
+/// autorización, para que quede trazado quién vio qué y cuándo). No se
+/// registra el acceso del médico dueño de la organización original — ese ya
+/// tiene su propio registro en RegistroTrazabilidad.
+model AccesoExternoHistorial {
+  id             String       @id @default(cuid())
+  pacienteRedId  String
+  /// La organización EXTERNA que accedió — nunca la dueña del Paciente
+  /// original.
+  organizacionId String
+  usuarioId      String
+  autorizadoEn   DateTime     @default(now())
+  pacienteRed    PacienteRed  @relation(fields: [pacienteRedId], references: [id])
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
+
+  @@index([pacienteRedId])
+  @@index([organizacionId])
+  @@map("accesos_externos_historial")
+}
+
 /// Cuenta con la que se inicia sesión. Puede tener un perfil Medico asociado.
 model Usuario {
   id                     String                 @id @default(cuid())
@@ -36,15 +100,16 @@ model Usuario {
   email                  String                 @unique
   passwordHash           String
   rol                    RolUsuario             @default(MEDICO)
-  activo                 Boolean                @default(true)
-  createdAt              DateTime               @default(now())
-  updatedAt              DateTime               @updatedAt
-  cajasAbiertas          Caja[]                 @relation("CajaAbiertaPor")
-  gastosRegistrados      Gasto[]                @relation("GastoRegistradoPor")
-  medico                 Medico?
-  movimientosRegistrados MovimientoCaja[]       @relation("MovimientoRegistradoPor")
-  registrosTrazabilidad  RegistroTrazabilidad[] @relation("TrazabilidadActor")
-  organizacion           Organizacion           @relation(fields: [organizacionId], references: [id])
+  activo                    Boolean                  @default(true)
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  accesosExternosRealizados AccesoExternoHistorial[]
+  cajasAbiertas             Caja[]                   @relation("CajaAbiertaPor")
+  gastosRegistrados         Gasto[]                  @relation("GastoRegistradoPor")
+  medico                    Medico?
+  movimientosRegistrados    MovimientoCaja[]         @relation("MovimientoRegistradoPor")
+  registrosTrazabilidad     RegistroTrazabilidad[]   @relation("TrazabilidadActor")
+  organizacion              Organizacion             @relation(fields: [organizacionId], references: [id])
 
   @@index([organizacionId])
   @@map("usuarios")
@@ -92,15 +157,23 @@ model Paciente {
   activo                     Boolean             @default(true)
   createdAt                  DateTime            @default(now())
   updatedAt                  DateTime            @updatedAt
+  /// Enlace a la identidad global del paciente (28/29-oct-2026, ver
+  /// PacienteRed). Opcional a propósito: los registros existentes antes de
+  /// este cambio no quedan enlazados automáticamente — requiere una
+  /// migración de datos aparte (por cédula, con resolución manual de
+  /// discrepancias), no asumida aquí.
+  pacienteRedId              String?
   antecedentesMedicos        AntecedenteMedico[]
   citas                      Cita[]
   cobros                     Cobro[]
   consultas                  Consulta[]
   organizacion               Organizacion        @relation(fields: [organizacionId], references: [id])
+  pacienteRed                PacienteRed?        @relation(fields: [pacienteRedId], references: [id])
 
   @@unique([organizacionId, documentoIdentidad])
   @@index([organizacionId])
   @@index([organizacionId, activo])
+  @@index([pacienteRedId])
   @@map("pacientes")
 }
 
