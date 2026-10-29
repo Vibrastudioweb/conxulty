@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSesion } from "@/modules/core/autorizacion";
 import { obtenerCajaAbierta } from "@/modules/cobros-caja/caja";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -55,6 +56,14 @@ export default async function CajaPage({
           cajaAbierta
             ? `Abierta desde ${cajaAbierta.fechaApertura.toLocaleString("es")} · Monto inicial ${cajaAbierta.montoInicial.toString()}`
             : undefined
+        }
+        secondaryActions={
+          <Link
+            href="/reportes"
+            className="rounded-button border border-border px-3 py-1.5 text-caption font-semibold text-text-secondary hover:border-brand-primary hover:text-brand-primary"
+          >
+            Ver reportes
+          </Link>
         }
       />
 
