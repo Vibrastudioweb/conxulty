@@ -3,6 +3,7 @@ import { registrarEvento } from "@/modules/trazabilidad";
 import { validarConsistenciaCobro } from "@/db/consistenciaOrganizacional";
 import { ConsultaNoEncontradaError } from "@/modules/core/consultas";
 import { obtenerCajaAbierta, CajaNoAbiertaError } from "@/modules/cobros-caja/caja";
+import { INFO_METODO_PAGO, type MetodoPagoId } from "@/modules/cobros-caja/metodosPago";
 
 export class ConsultaNoCerradaError extends Error {
   constructor() {
@@ -39,10 +40,10 @@ export async function registrarCobro(input: {
   medicoId?: string;
   concepto?: string | null;
   monto: number | string;
-  metodoPago?: string | null;
-  /** Si es efectivo físico (ver changelog punto 46). Default `true`. */
-  esEfectivo?: boolean;
+  /** Catálogo cerrado — ver changelog punto 11/46. */
+  metodoPago: MetodoPagoId;
 }): Promise<{ cobroId: string }> {
+  const infoMetodo = INFO_METODO_PAGO[input.metodoPago];
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: input.organizacionId,
   });
@@ -96,8 +97,9 @@ export async function registrarCobro(input: {
         medicoId,
         concepto: input.concepto?.trim() || null,
         monto: input.monto,
-        metodoPago: input.metodoPago ?? null,
-        esEfectivo: input.esEfectivo ?? true,
+        metodoPago: input.metodoPago,
+        moneda: infoMetodo.moneda,
+        esEfectivo: infoMetodo.esEfectivo,
         estado: "PAGADO",
       },
     });
@@ -112,6 +114,7 @@ export async function registrarCobro(input: {
         monto: input.monto,
         moneda: cobroCreado.moneda,
         esEfectivo: cobroCreado.esEfectivo,
+        metodoPago: cobroCreado.metodoPago,
         registradoPorId: input.actorId,
       },
     });

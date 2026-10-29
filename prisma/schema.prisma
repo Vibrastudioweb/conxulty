@@ -252,17 +252,14 @@ model Cobro {
   medicoId        String
   concepto        String?
   monto           Decimal          @db.Decimal(10, 2)
+  /// `moneda` y `esEfectivo` quedan denormalizados a partir de
+  /// `metodoPago` (ver changelog punto 11/46) — nunca se piden por
+  /// separado en el formulario, se derivan en registrarCobro() desde
+  /// `INFO_METODO_PAGO` para que no puedan contradecirse.
   moneda          String           @default("USD")
-  metodoPago      String?
-  /// Si este cobro fue en efectivo físico (29-oct-2026 — ver changelog
-  /// punto 46). `metodoPago` sigue siendo texto libre descriptivo
-  /// ("Zelle", "Pago móvil Banesco"); este booleano es lo único que el
-  /// arqueo de Caja necesita para saber si cuenta como plata en la
-  /// gaveta. Default `true` porque hoy la mayoría de los cobros de
-  /// prueba son efectivo — no implica que todo pago sea efectivo por
-  /// definición, solo evita que el formulario tenga que decidir por el
-  /// usuario en el caso más común.
   esEfectivo      Boolean          @default(true)
+  /// Catálogo cerrado (antes texto libre) — ver changelog punto 11/46.
+  metodoPago      MetodoPago
   estado          EstadoCobro      @default(PENDIENTE)
   fecha           DateTime         @default(now())
   createdAt       DateTime         @default(now())
@@ -337,6 +334,10 @@ model MovimientoCaja {
   /// patrón que `moneda`, denormalizado para no tener que resolver el
   /// join al calcular el arqueo). Ver changelog punto 46.
   esEfectivo      Boolean              @default(true)
+  /// Copiado del Cobro/Gasto de origen (ver changelog punto 11/46) —
+  /// permite calcular "saldo en cuentas" por método agrupando solo
+  /// MovimientoCaja, sin tener que resolver el join hacia Cobro/Gasto.
+  metodoPago      MetodoPago
   descripcion     String?
   registradoPorId String
   fecha           DateTime             @default(now())
@@ -362,11 +363,13 @@ model Gasto {
   cajaId          String
   categoria       CategoriaGasto
   monto           Decimal          @db.Decimal(10, 2)
+  /// `moneda` y `esEfectivo` quedan denormalizados a partir de
+  /// `metodoPago` (ver changelog punto 11/46), igual que en Cobro.
   moneda          String           @default("USD")
-  /// Si este gasto se pagó en efectivo físico (29-oct-2026 — ver changelog
-  /// punto 46). Mismo rol que `Cobro.esEfectivo`: es lo único que el
-  /// arqueo de Caja necesita para saber si resta de la gaveta.
   esEfectivo      Boolean          @default(true)
+  /// Catálogo cerrado — ver changelog punto 11/46. Antes no existía
+  /// ningún campo de método de pago en Gasto.
+  metodoPago      MetodoPago
   nota            String?
   registradoPorId String
   fecha           DateTime         @default(now())
@@ -471,6 +474,20 @@ enum CategoriaGasto {
   PERSONAL
   SERVICIOS
   OTRO
+}
+
+/// Catálogo cerrado de métodos de pago (29-oct-2026 — ver changelog punto
+/// 11/46). Cada valor tiene moneda y "es efectivo" fijos — ver
+/// `INFO_METODO_PAGO` en modules/cobros-caja/metodosPago.ts — nunca se
+/// piden por separado en un formulario para que no puedan contradecirse
+/// (p.ej. un Zelle marcado como efectivo por error).
+enum MetodoPago {
+  EFECTIVO_USD
+  EFECTIVO_BS
+  PAGO_MOVIL
+  TRANSFERENCIA
+  TARJETA
+  ZELLE
 }
 
 enum TipoMovimientoCaja {

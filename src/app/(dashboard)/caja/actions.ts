@@ -22,24 +22,19 @@ import {
 } from "@/modules/cobros-caja/cobros";
 import { registrarGasto } from "@/modules/cobros-caja/gastos";
 import { ConsultaNoEncontradaError } from "@/modules/core/consultas";
+import { METODOS_PAGO, type MetodoPagoId } from "@/modules/cobros-caja/metodosPago";
 
 const montoInicialSchema = z.coerce.number().min(0);
 const montoCobroSchema = z.coerce.number().positive();
 const CATEGORIAS_GASTO = ["ALQUILER", "INSUMOS", "PERSONAL", "SERVICIOS", "OTRO"] as const;
 const categoriaGastoSchema = z.enum(CATEGORIAS_GASTO);
+const metodoPagoSchema = z.enum(METODOS_PAGO);
 
 function leerTexto(formData: FormData, campo: string): string | null {
   const valor = formData.get(campo);
   if (valor === null) return null;
   const texto = String(valor).trim();
   return texto === "" ? null : texto;
-}
-
-// Un checkbox ausente (desmarcado) no manda ningún par clave/valor en el
-// FormData — por eso "presente" ya significa "marcado", sin importar el
-// value. Ver changelog punto 46 (esEfectivo en Cobro/Gasto).
-function leerBooleano(formData: FormData, campo: string): boolean {
-  return formData.get(campo) !== null;
 }
 
 export async function abrirCajaAction(formData: FormData) {
@@ -129,7 +124,8 @@ export async function registrarCobroConConsultaAction(formData: FormData) {
 
   const consultaId = leerTexto(formData, "consultaId");
   const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));
-  if (!consultaId || !parseoMonto.success) {
+  const parseoMetodo = metodoPagoSchema.safeParse(formData.get("metodoPago"));
+  if (!consultaId || !parseoMonto.success || !parseoMetodo.success) {
     redirect("/caja?error=monto_invalido");
   }
 
@@ -140,8 +136,7 @@ export async function registrarCobroConConsultaAction(formData: FormData) {
       consultaId,
       concepto: leerTexto(formData, "concepto"),
       monto: parseoMonto.data,
-      metodoPago: leerTexto(formData, "metodoPago"),
-      esEfectivo: leerBooleano(formData, "esEfectivo"),
+      metodoPago: parseoMetodo.data as MetodoPagoId,
     });
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {
@@ -164,7 +159,8 @@ export async function registrarGastoAction(formData: FormData) {
 
   const parseoCategoria = categoriaGastoSchema.safeParse(formData.get("categoria"));
   const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));
-  if (!parseoCategoria.success || !parseoMonto.success) {
+  const parseoMetodo = metodoPagoSchema.safeParse(formData.get("metodoPago"));
+  if (!parseoCategoria.success || !parseoMonto.success || !parseoMetodo.success) {
     redirect("/caja?error=monto_invalido");
   }
 
@@ -175,7 +171,7 @@ export async function registrarGastoAction(formData: FormData) {
       categoria: parseoCategoria.data as CategoriaGasto,
       monto: parseoMonto.data,
       nota: leerTexto(formData, "nota"),
-      esEfectivo: leerBooleano(formData, "esEfectivo"),
+      metodoPago: parseoMetodo.data as MetodoPagoId,
     });
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {
@@ -193,8 +189,9 @@ export async function registrarCobroRapidoAction(formData: FormData) {
   const pacienteId = leerTexto(formData, "pacienteId");
   const concepto = leerTexto(formData, "concepto");
   const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));
+  const parseoMetodo = metodoPagoSchema.safeParse(formData.get("metodoPago"));
 
-  if (!pacienteId || !parseoMonto.success) {
+  if (!pacienteId || !parseoMonto.success || !parseoMetodo.success) {
     redirect("/caja?error=monto_invalido");
   }
   if (!concepto) {
@@ -227,8 +224,7 @@ export async function registrarCobroRapidoAction(formData: FormData) {
       medicoId,
       concepto,
       monto: parseoMonto.data,
-      metodoPago: leerTexto(formData, "metodoPago"),
-      esEfectivo: leerBooleano(formData, "esEfectivo"),
+      metodoPago: parseoMetodo.data as MetodoPagoId,
     });
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {

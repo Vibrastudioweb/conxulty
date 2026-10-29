@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
+import { METODOS_PAGO, INFO_METODO_PAGO, type MetodoPagoId } from "@/modules/cobros-caja/metodosPago";
 
 export class CajaYaAbiertaError extends Error {
   constructor() {
@@ -233,4 +234,70 @@ export async function cerrarCaja(input: {
     diferenciaUsd: diferenciaUsd.toString(),
     diferenciaBs: diferenciaBs.toString(),
   };
+}
+
+export interface SaldoCuenta {
+  metodoPago: MetodoPagoId;
+  label: string;
+  moneda: "USD" | "Bs";
+  esEfectivo: boolean;
+  saldo: string;
+}
+
+/**
+ * Saldo del día por cada método de pago (ver changelog punto 11/46): monto
+ * inicial (solo aplica a los dos métodos de efectivo — los métodos
+ * digitales no tienen "apertura", arrancan en 0 cada caja) + ingresos −
+ * egresos de ESE método dentro de la caja abierta actual. No es un
+ * acumulado histórico entre cierres — cada caja nueva reinicia el saldo de
+ * cada cuenta, igual que ya se decidió para el arqueo de efectivo.
+ *
+ * Devuelve `null` si no hay caja abierta (no hay nada que mostrar).
+ */
+export async function obtenerSaldoPorCuenta(input: {
+  organizacionId: string;
+}): Promise<SaldoCuenta[] | null> {
+  const cajaAbierta = await obtenerCajaAbierta({
+    organizacionId: input.organizacionId,
+  });
+  if (!cajaAbierta) {
+    return null;
+  }
+
+  const [ingresos, egresos] = await Promise.all([
+    prisma.movimientoCaja.groupBy({
+      by: ["metodoPago"],
+      where: { cajaId: cajaAbierta.id, tipo: "INGRESO" },
+      _sum: { monto: true },
+    }),
+    prisma.movimientoCaja.groupBy({
+      by: ["metodoPago"],
+      where: { cajaId: cajaAbierta.id, tipo: "EGRESO" },
+      _sum: { monto: true },
+    }),
+  ]);
+
+  const buscar = (
+    filas: Array<{ metodoPago: MetodoPagoId; _sum: { monto: Prisma.Decimal | null } }>,
+    metodo: MetodoPagoId,
+  ) => filas.find((f) => f.metodoPago === metodo)?._sum.monto ?? new Prisma.Decimal(0);
+
+  return METODOS_PAGO.map((metodo) => {
+    const info = INFO_METODO_PAGO[metodo];
+    const inicial =
+      metodo === "EFECTIVO_USD"
+        ? cajaAbierta.montoInicialUsd
+        : metodo === "EFECTIVO_BS"
+          ? cajaAbierta.montoInicialBs
+          : new Prisma.Decimal(0);
+    const saldo = inicial.plus(buscar(ingresos, metodo)).minus(buscar(egresos, metodo));
+
+    return {
+      metodoPago: metodo,
+      label: info.label,
+      moneda: info.moneda,
+      esEfectivo: info.esEfectivo,
+      saldo: saldo.toString(),
+    };
+  });
 }

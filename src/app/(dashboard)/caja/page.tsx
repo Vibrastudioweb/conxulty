@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireSesion } from "@/modules/core/autorizacion";
-import { obtenerCajaAbierta } from "@/modules/cobros-caja/caja";
+import { obtenerCajaAbierta, obtenerSaldoPorCuenta } from "@/modules/cobros-caja/caja";
+import { METODOS_PAGO, INFO_METODO_PAGO } from "@/modules/cobros-caja/metodosPago";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
@@ -15,6 +16,23 @@ import {
 } from "./actions";
 
 const CATEGORIAS_GASTO = ["ALQUILER", "INSUMOS", "PERSONAL", "SERVICIOS", "OTRO"] as const;
+
+function SelectMetodoPago({ id, name }: { id: string; name: string }) {
+  return (
+    <select
+      id={id}
+      name={name}
+      required
+      className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+    >
+      {METODOS_PAGO.map((metodo) => (
+        <option key={metodo} value={metodo}>
+          {INFO_METODO_PAGO[metodo].label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 const MENSAJES_ERROR: Record<string, string> = {
   ya_abierta: "Ya hay una caja abierta para esta organización.",
@@ -48,6 +66,9 @@ export default async function CajaPage({
     await searchParams;
 
   const cajaAbierta = await obtenerCajaAbierta({
+    organizacionId: session.user.organizacionId,
+  });
+  const saldoPorCuenta = await obtenerSaldoPorCuenta({
     organizacionId: session.user.organizacionId,
   });
 
@@ -124,27 +145,15 @@ export default async function CajaPage({
               </div>
               <div>
                 <label htmlFor="metodoPago1" className="mb-1 block text-sm text-text-primary">
-                  Método de pago (opcional)
+                  Método de pago
                 </label>
-                <Input id="metodoPago1" name="metodoPago" />
+                <SelectMetodoPago id="metodoPago1" name="metodoPago" />
               </div>
               <div>
                 <label htmlFor="concepto1" className="mb-1 block text-sm text-text-primary">
                   Concepto (opcional)
                 </label>
                 <Input id="concepto1" name="concepto" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="esEfectivo1"
-                  name="esEfectivo"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
-                />
-                <label htmlFor="esEfectivo1" className="text-sm text-text-primary">
-                  Es efectivo físico
-                </label>
               </div>
               <Button type="submit" fullWidth variant="secondary">
                 Registrar cobro
@@ -177,21 +186,9 @@ export default async function CajaPage({
               </div>
               <div>
                 <label htmlFor="metodoPago2" className="mb-1 block text-sm text-text-primary">
-                  Método de pago (opcional)
+                  Método de pago
                 </label>
-                <Input id="metodoPago2" name="metodoPago" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="esEfectivo2"
-                  name="esEfectivo"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
-                />
-                <label htmlFor="esEfectivo2" className="text-sm text-text-primary">
-                  Es efectivo físico
-                </label>
+                <SelectMetodoPago id="metodoPago2" name="metodoPago" />
               </div>
               <Button type="submit" fullWidth variant="secondary">
                 Registrar cobro
@@ -226,22 +223,16 @@ export default async function CajaPage({
                 <Input id="monto3" name="monto" type="number" step="0.01" min="0.01" required />
               </div>
               <div>
+                <label htmlFor="metodoPago3" className="mb-1 block text-sm text-text-primary">
+                  Pagado con
+                </label>
+                <SelectMetodoPago id="metodoPago3" name="metodoPago" />
+              </div>
+              <div>
                 <label htmlFor="nota" className="mb-1 block text-sm text-text-primary">
                   Nota (opcional)
                 </label>
                 <Input id="nota" name="nota" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="esEfectivo3"
-                  name="esEfectivo"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
-                />
-                <label htmlFor="esEfectivo3" className="text-sm text-text-primary">
-                  Es efectivo físico
-                </label>
               </div>
               <Button type="submit" fullWidth variant="secondary">
                 Registrar gasto
@@ -295,6 +286,31 @@ export default async function CajaPage({
                 Cerrar caja
               </Button>
             </form>
+          </Card>
+
+          <Card padding="compact" className="lg:col-span-2">
+            <h2 className="text-sm font-semibold text-text-primary">Saldo en cuentas</h2>
+            <p className="mt-1 text-caption text-text-faint">
+              Monto inicial (solo efectivo) + cobros − gastos de hoy, por método. No es un
+              acumulado histórico: cada caja nueva reinicia estos saldos.
+            </p>
+            <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {saldoPorCuenta?.map((cuenta) => (
+                <div
+                  key={cuenta.metodoPago}
+                  className="rounded-card border border-border bg-surface-muted p-3"
+                >
+                  <dt className="text-caption text-text-faint">{cuenta.label}</dt>
+                  <dd className="mt-1 text-sm font-semibold text-text-primary">
+                    {cuenta.moneda === "USD" ? "$" : "Bs "}
+                    {Number(cuenta.saldo).toLocaleString("es", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </Card>
         </div>
       ) : (

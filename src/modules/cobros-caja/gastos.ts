@@ -2,6 +2,7 @@ import type { CategoriaGasto } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 import { obtenerCajaAbierta, CajaNoAbiertaError } from "@/modules/cobros-caja/caja";
+import { INFO_METODO_PAGO, type MetodoPagoId } from "@/modules/cobros-caja/metodosPago";
 
 export { CajaNoAbiertaError };
 
@@ -20,8 +21,8 @@ export async function registrarGasto(input: {
   categoria: CategoriaGasto;
   monto: number | string;
   nota?: string | null;
-  /** Si se pagó en efectivo físico (ver changelog punto 46). Default `true`. */
-  esEfectivo?: boolean;
+  /** Catálogo cerrado — ver changelog punto 11/46. */
+  metodoPago: MetodoPagoId;
 }): Promise<{ gastoId: string }> {
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: input.organizacionId,
@@ -29,6 +30,8 @@ export async function registrarGasto(input: {
   if (!cajaAbierta) {
     throw new CajaNoAbiertaError();
   }
+
+  const infoMetodo = INFO_METODO_PAGO[input.metodoPago];
 
   const gasto = await prisma.$transaction(async (tx) => {
     const gastoCreado = await tx.gasto.create({
@@ -38,7 +41,9 @@ export async function registrarGasto(input: {
         categoria: input.categoria,
         monto: input.monto,
         nota: input.nota?.trim() || null,
-        esEfectivo: input.esEfectivo ?? true,
+        metodoPago: input.metodoPago,
+        moneda: infoMetodo.moneda,
+        esEfectivo: infoMetodo.esEfectivo,
         registradoPorId: input.actorId,
       },
     });
@@ -53,6 +58,7 @@ export async function registrarGasto(input: {
         monto: input.monto,
         moneda: gastoCreado.moneda,
         esEfectivo: gastoCreado.esEfectivo,
+        metodoPago: gastoCreado.metodoPago,
         registradoPorId: input.actorId,
       },
     });
