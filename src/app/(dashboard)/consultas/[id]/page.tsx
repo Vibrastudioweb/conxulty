@@ -5,6 +5,7 @@ import { obtenerConsulta } from "@/modules/core/consultas";
 import { listarDocumentosDeConsulta } from "@/modules/documentos/documentos";
 import { guardarConsultaAction, cerrarConsultaAction } from "./actions";
 import { Textarea } from "@/components/ui/Textarea";
+import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -122,6 +123,77 @@ export default async function ConsultaPage({
             disabled={soloLectura}
             rows={3}
           />
+        </section>
+
+        <section>
+          <h2 className="font-display text-sm font-semibold text-text-primary">
+            Signos vitales
+          </h2>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            <label className="block text-xs text-text-secondary">
+              Presión arterial
+              <Input
+                name="presionArterial"
+                defaultValue={consulta.presionArterial ?? ""}
+                disabled={soloLectura}
+                placeholder="120/80 mmHg"
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs text-text-secondary">
+              Frecuencia cardíaca (lpm)
+              <Input
+                type="number"
+                name="frecuenciaCardiaca"
+                defaultValue={consulta.frecuenciaCardiaca ?? ""}
+                disabled={soloLectura}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs text-text-secondary">
+              Temperatura (°C)
+              <Input
+                type="number"
+                step="0.1"
+                name="temperatura"
+                defaultValue={consulta.temperatura?.toString() ?? ""}
+                disabled={soloLectura}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs text-text-secondary">
+              Saturación de O₂ (%)
+              <Input
+                type="number"
+                name="saturacionOxigeno"
+                defaultValue={consulta.saturacionOxigeno ?? ""}
+                disabled={soloLectura}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs text-text-secondary">
+              Peso (kg)
+              <Input
+                type="number"
+                step="0.1"
+                name="pesoKg"
+                defaultValue={consulta.pesoKg?.toString() ?? ""}
+                disabled={soloLectura}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs text-text-secondary">
+              Talla (cm)
+              <Input
+                type="number"
+                step="0.1"
+                name="tallaCm"
+                defaultValue={consulta.tallaCm?.toString() ?? ""}
+                disabled={soloLectura}
+                className="mt-1"
+              />
+            </label>
+          </div>
         </section>
 
         <section>

@@ -171,6 +171,27 @@ model Consulta {
   evaluacion     String?
   diagnostico    String?
   tratamiento    String?
+  /// Signos vitales de ESTA consulta (29-oct-2026 — ver changelog de la
+  /// demo, punto 6, y la DECISIÓN del usuario de llevarlos al esquema real
+  /// en vez de dejarlos como UI sin dato). Van en Consulta, no en Paciente:
+  /// son una medición puntual del momento de la visita, no un atributo fijo
+  /// del paciente. `presionArterial` queda como texto libre
+  /// ("120/80 mmHg") en vez de dos enteros separados — distintos
+  /// consultorios anotan presión con formatos distintos (con/sin unidad,
+  /// con notas como "sentado"), y forzar systólica/diastólica como enteros
+  /// perdería esa flexibilidad sin ganar nada que hoy se necesite calcular.
+  /// El IMC NO se guarda: se calcula en la UI a partir de peso/talla
+  /// cuando ambos están presentes, para no duplicar un valor derivado que
+  /// puede desincronizarse (mismo criterio que ya se usó para no guardar
+  /// "vs. ayer" en los KPIs de Hoy).
+  presionArterial    String?
+  frecuenciaCardiaca Int?
+  /// Grados Celsius.
+  temperatura        Decimal? @db.Decimal(4, 1)
+  /// % de saturación de oxígeno (SpO₂).
+  saturacionOxigeno  Int?
+  pesoKg             Decimal? @db.Decimal(5, 2)
+  tallaCm            Decimal? @db.Decimal(5, 1)
   estado         EstadoConsulta @default(EN_CURSO)
   fechaHora      DateTime       @default(now())
   createdAt      DateTime       @default(now())

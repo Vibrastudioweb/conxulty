@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { ConsultaHistorialCard } from "@/components/consultas/ConsultaHistorialCard";
@@ -28,6 +29,26 @@ import { AntecedentesSeccion } from "@/components/pacientes/AntecedentesSeccion"
 import { CitasPacienteSeccion } from "@/components/pacientes/CitasPacienteSeccion";
 import { DocumentosPacienteSeccion } from "@/components/pacientes/DocumentosPacienteSeccion";
 import { TrazabilidadPacienteSeccion } from "@/components/pacientes/TrazabilidadPacienteSeccion";
+import { SignosVitalesCard } from "@/components/pacientes/SignosVitalesCard";
+import { TratamientosPacienteSeccion } from "@/components/pacientes/TratamientosPacienteSeccion";
+import { TabsFicha, type TabFicha } from "@/components/pacientes/TabsFicha";
+
+/** Primera cita futura (PENDIENTE o CONFIRMADA), o null si no hay ninguna.
+ *  `listarCitasDelPaciente` ya viene ordenada desc, así que se filtra y se
+ *  reordena asc en vez de asumir alguna posición fija. */
+function proximaCita<T extends { fechaHora: Date; estado: string }>(
+  citas: T[],
+): T | null {
+  const ahora = new Date();
+  const futuras = citas
+    .filter(
+      (c) =>
+        c.fechaHora >= ahora &&
+        (c.estado === "PENDIENTE" || c.estado === "CONFIRMADA"),
+    )
+    .sort((a, b) => a.fechaHora.getTime() - b.fechaHora.getTime());
+  return futuras[0] ?? null;
+}
 
 function calcularEdad(fechaNacimiento: Date): number {
   const hoy = new Date();
@@ -58,8 +79,21 @@ export default async function PacientePage({
   const session = await requireMedico();
 
   const { id } = await params;
-  const { cita: citaId, error, ...resto } = await searchParams;
+  const { cita: citaId, error, tab: tabParam, ...resto } = await searchParams;
   const mensajeExito = Object.keys(MENSAJES_EXITO).find((clave) => clave in resto);
+  const TABS_VALIDAS: TabFicha[] = [
+    "resumen",
+    "datos",
+    "antecedentes",
+    "historial",
+    "tratamientos",
+    "citas",
+    "documentos",
+    "ia",
+  ];
+  const tab: TabFicha = TABS_VALIDAS.includes(tabParam as TabFicha)
+    ? (tabParam as TabFicha)
+    : "resumen";
 
   const paciente = await obtenerPaciente({
     organizacionId: session.user.organizacionId,
@@ -212,19 +246,105 @@ export default async function PacientePage({
         </div>
       )}
 
-      <AntecedentesSeccion
-        pacienteId={paciente.id}
-        antecedentes={antecedentes}
-        crearAction={crearAntecedenteAction}
-        editarAction={editarAntecedenteAction}
-        desactivarAction={desactivarAntecedenteAction}
-      />
+      <TabsFicha tabActual={tab} pacienteId={paciente.id} />
 
-      <CitasPacienteSeccion citas={citas} />
+      {tab === "resumen" && (
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <section>
+              <SectionLabel>Consultas recientes</SectionLabel>
+              <div className="mt-2">
+                {consultasPrevias.length === 0 ? (
+                  <EmptyState compact message="Sin consultas anteriores." />
+                ) : (
+                  <ul className="space-y-2">
+                    {consultasPrevias.slice(0, 3).map((consulta) => (
+                      <li key={consulta.id}>
+                        <ConsultaHistorialCard consulta={consulta} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
 
-      <section className="mt-8">
-        <SectionLabel>Historia clínica</SectionLabel>
+            {(() => {
+              const proxima = proximaCita(citas);
+              return (
+                <section>
+                  <SectionLabel>Próxima cita</SectionLabel>
+                  <div className="mt-2">
+                    {proxima ? (
+                      <Card padding="cozy">
+                        <span className="text-text-secondary">
+                          {proxima.fechaHora.toLocaleDateString("es", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "short",
+                          })}{" "}
+                          · {proxima.estado}
+                        </span>
+                      </Card>
+                    ) : (
+                      <EmptyState compact message="Sin citas programadas." />
+                    )}
+                  </div>
+                </section>
+              );
+            })()}
+          </div>
+
+          <div className="space-y-6">
+            <section>
+              <SectionLabel>Signos vitales</SectionLabel>
+              <div className="mt-2">
+                <SignosVitalesCard consultas={consultasPrevias} />
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
+
+      {tab === "datos" && (
+        <div className="mt-6 space-y-8">
+          <section>
+            <SectionLabel>Datos de contacto</SectionLabel>
+            <dl className="mt-2 space-y-1 text-body-secondary text-text-secondary">
+              {paciente.telefono && <div>Tel: {paciente.telefono}</div>}
+              {paciente.email && <div>Email: {paciente.email}</div>}
+              {paciente.direccion && <div>Dirección: {paciente.direccion}</div>}
+              {paciente.contactoEmergenciaNombre && (
+                <div>
+                  Emergencia: {paciente.contactoEmergenciaNombre}
+                  {paciente.contactoEmergenciaTelefono &&
+                    ` — ${paciente.contactoEmergenciaTelefono}`}
+                </div>
+              )}
+              {!paciente.telefono &&
+                !paciente.email &&
+                !paciente.direccion &&
+                !paciente.contactoEmergenciaNombre && <div>Sin datos adicionales.</div>}
+            </dl>
+          </section>
+
+          <TrazabilidadPacienteSeccion eventos={eventos} />
+        </div>
+      )}
+
+      {tab === "antecedentes" && (
         <div className="mt-2">
+          <AntecedentesSeccion
+            pacienteId={paciente.id}
+            antecedentes={antecedentes}
+            crearAction={crearAntecedenteAction}
+            editarAction={editarAntecedenteAction}
+            desactivarAction={desactivarAntecedenteAction}
+          />
+        </div>
+      )}
+
+      {tab === "historial" && (
+        <section className="mt-6">
           {consultasPrevias.length === 0 ? (
             <EmptyState compact message="Sin consultas anteriores." />
           ) : (
@@ -236,31 +356,44 @@ export default async function PacientePage({
               ))}
             </ul>
           )}
+        </section>
+      )}
+
+      {tab === "tratamientos" && (
+        <section className="mt-6">
+          <TratamientosPacienteSeccion consultas={consultasPrevias} />
+        </section>
+      )}
+
+      {tab === "citas" && (
+        <div className="mt-2">
+          <CitasPacienteSeccion citas={citas} />
         </div>
-      </section>
+      )}
 
-      <DocumentosPacienteSeccion documentos={documentos} />
+      {tab === "documentos" && (
+        <div className="mt-2">
+          <DocumentosPacienteSeccion documentos={documentos} />
+        </div>
+      )}
 
-      <section className="mt-8 border-t border-border pt-4">
-        <SectionLabel>Datos de contacto</SectionLabel>
-        <dl className="mt-2 space-y-1 text-body-secondary text-text-secondary">
-          {paciente.telefono && <div>Tel: {paciente.telefono}</div>}
-          {paciente.email && <div>Email: {paciente.email}</div>}
-          {paciente.direccion && <div>Dirección: {paciente.direccion}</div>}
-          {paciente.contactoEmergenciaNombre && (
-            <div>
-              Emergencia: {paciente.contactoEmergenciaNombre}
-              {paciente.contactoEmergenciaTelefono && ` — ${paciente.contactoEmergenciaTelefono}`}
-            </div>
-          )}
-          {!paciente.telefono &&
-            !paciente.email &&
-            !paciente.direccion &&
-            !paciente.contactoEmergenciaNombre && <div>Sin datos adicionales.</div>}
-        </dl>
-      </section>
-
-      <TrazabilidadPacienteSeccion eventos={eventos} />
+      {tab === "ia" && (
+        <section className="mt-6">
+          <Card padding="spacious" className="text-center">
+            <Badge tone="info">Próximamente</Badge>
+            <p className="mt-3 text-section-title font-semibold text-text-primary">
+              Resumen del expediente con IA
+            </p>
+            <p className="mx-auto mt-1 max-w-sm text-body-secondary text-text-secondary">
+              Todavía no existe el módulo de IA del producto — antes de
+              construir esto hay que decidir su alcance (qué resume, con
+              qué fuente, y que el médico apruebe cualquier contenido antes
+              de que entre al expediente). No es un botón decorativo
+              escondido: es una pieza que falta a propósito.
+            </p>
+          </Card>
+        </section>
+      )}
     </main>
   );
 }
