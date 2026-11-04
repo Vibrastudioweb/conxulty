@@ -10,6 +10,10 @@ datasource db {
 model Organizacion {
   id                    String                 @id @default(cuid())
   nombre                String
+  /// Catálogo cerrado — ver changelog punto 23 (paywall) y punto 49 (registro
+  /// real). Se fija FICHA por defecto; PRO solo si la profesión del médico
+  /// está en el catálogo elegible (ver `PROFESIONES_ELEGIBLES_PRO`).
+  plan                  PlanOrganizacion       @default(FICHA)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   antecedentesMedicos   AntecedenteMedico[]
@@ -23,6 +27,7 @@ model Organizacion {
   movimientosCaja       MovimientoCaja[]
   pacientes             Paciente[]
   registrosTrazabilidad RegistroTrazabilidad[]
+  sedes                 Sede[]
   usuarios              Usuario[]
 
   @@map("organizaciones")
@@ -51,24 +56,69 @@ model Usuario {
 }
 
 /// Perfil profesional del médico: lo que lo identifica en agenda, consulta y documentos.
+/// Campos de registro (profesion, cedula, numeroMpps, especialidadesSecundarias,
+/// modalidades, zonasCobertura) vienen del onboarding real — ver changelog
+/// punto 49 (Bloque 3). `especialidad` sigue siendo la principal (texto libre,
+/// sin catálogo cerrado — eso es solo para Plantillas de Consulta, punto 37).
 model Medico {
-  id                  String              @id @default(cuid())
-  usuarioId           String              @unique
-  organizacionId      String
-  especialidad        String?
-  numeroColegiado     String?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  antecedentesMedicos AntecedenteMedico[]
-  citas               Cita[]
-  cobros              Cobro[]
-  consultas           Consulta[]
-  documentos          Documento[]
-  organizacion        Organizacion        @relation(fields: [organizacionId], references: [id])
-  usuario             Usuario             @relation(fields: [usuarioId], references: [id])
+  id                      String                 @id @default(cuid())
+  usuarioId               String                 @unique
+  organizacionId          String
+  especialidad            String?
+  numeroColegiado         String?
+  /// Catálogo cerrado — ver changelog punto 49. Determina si se ofrece Plan Pro.
+  profesion               Profesion              @default(MEDICO)
+  /// Solo informado cuando `profesion` = OTRA.
+  profesionOtraTexto      String?
+  cedula                  String?
+  /// Solo aplica si `profesion` = MEDICO (ver changelog punto 29).
+  numeroMpps              String?
+  especialidadesSecundarias String[]             @default([])
+  /// Catálogo cerrado, multi-select — ver changelog punto 30 (addendum).
+  modalidades             ModalidadAtencion[]    @default([])
+  /// Municipios de Trujillo (catálogo cerrado) — solo relevante si
+  /// `modalidades` incluye DOMICILIO. Ver changelog puntos 26/32.
+  zonasCobertura          String[]               @default([])
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  antecedentesMedicos     AntecedenteMedico[]
+  citas                   Cita[]
+  cobros                  Cobro[]
+  consultas               Consulta[]
+  documentos              Documento[]
+  sedes                   Sede[]
+  organizacion            Organizacion           @relation(fields: [organizacionId], references: [id])
+  usuario                 Usuario                @relation(fields: [usuarioId], references: [id])
 
   @@index([organizacionId])
   @@map("medicos")
+}
+
+/// Lugar físico donde atiende un médico (solo aplica si sus `modalidades`
+/// incluyen PRESENCIAL) — ver changelog puntos 25/27/33. Un médico puede
+/// tener varias; relación 1:N desde Medico, no N:N (resuelve la pregunta
+/// abierta del punto 22/25: en este producto una sede es de un solo médico).
+model Sede {
+  id             String       @id @default(cuid())
+  medicoId       String
+  organizacionId String
+  /// Catálogo cerrado de municipios de Trujillo — ver changelog puntos 26/32.
+  municipio      String
+  direccion      String
+  referencia     String?
+  telefono       String?
+  /// Array de 7 entradas { dia, atiende, horaInicio, horaFin } — ver
+  /// changelog punto 33. Se guarda como JSON (no una tabla aparte) porque
+  /// el choque de horario entre sedes se calcula en la app, no con un query.
+  horario        Json         @default("[]")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  medico         Medico       @relation(fields: [medicoId], references: [id])
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+
+  @@index([medicoId])
+  @@index([organizacionId])
+  @@map("sedes")
 }
 
 model Paciente {
@@ -512,6 +562,28 @@ enum MetodoPago {
   TRANSFERENCIA
   TARJETA
   ZELLE
+}
+
+/// Catálogo cerrado — ver changelog punto 29 (Bloque 3). "OTRA" habilita
+/// `Medico.profesionOtraTexto`.
+enum Profesion {
+  MEDICO
+  ODONTOLOGO
+  PSICOLOGO
+  OTRA
+}
+
+/// Catálogo cerrado, multi-select — ver changelog punto 30 (addendum, Bloque 3).
+enum ModalidadAtencion {
+  PRESENCIAL
+  DOMICILIO
+  ONLINE
+}
+
+/// Ver changelog punto 23 (paywall Plan Pro).
+enum PlanOrganizacion {
+  FICHA
+  PRO
 }
 
 enum TipoMovimientoCaja {
