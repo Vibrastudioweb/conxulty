@@ -304,7 +304,7 @@ export default async function HoyPage({
         </p>
       </header>
 
-      <div className="mt-6 grid grid-cols-1 gap-8 lg:mt-8 lg:grid-cols-[2.15fr_1fr] lg:items-start">
+      <div className="mt-5 grid grid-cols-1 gap-6 lg:mt-5 lg:grid-cols-[2.15fr_1fr] lg:items-start">
         {/* Columna principal: panorama del día (KPIs, actividad del mes,
             resumen de jornada/CTA, acciones rápidas). */}
         <div>
@@ -342,21 +342,21 @@ export default async function HoyPage({
 
           {/* Fila gráfico + CTA/resumen lado a lado (ver changelog punto 54,
               proporción equivalente a `.chart-row` de la demo). */}
-          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
-            <section className="rounded-card border border-border bg-surface px-5 py-4">
+          <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+            <section className="rounded-card border border-border bg-surface px-4 py-3">
               <SectionLabel>Actividad del mes</SectionLabel>
               <p className="mt-0.5 text-body-secondary text-text-faint">
                 {citasDelMes.length}{" "}
                 {citasDelMes.length === 1 ? "cita" : "citas"} en{" "}
                 {ahora.toLocaleDateString("es", { month: "long" })}
               </p>
-              <div className="mt-3">
+              <div className="mt-2">
                 <ActividadMensualChart datos={actividadDelMes} />
               </div>
             </section>
 
             {!hayCitas ? (
-              <section className="flex h-full flex-col items-center justify-center rounded-card bg-brand-primary-soft px-6 py-10 text-center">
+              <section className="flex h-full flex-col items-center justify-center rounded-card bg-brand-primary-soft px-6 py-6 text-center">
                 <p className="text-section-title font-semibold text-text-primary">
                   Tu agenda está despejada
                 </p>
@@ -365,7 +365,7 @@ export default async function HoyPage({
                 </p>
               </section>
             ) : (
-              <section className="rounded-card bg-brand-primary-soft px-5 py-4">
+              <section className="rounded-card bg-brand-primary-soft px-4 py-3">
                 <p className="text-section-title font-semibold text-text-primary">
                   Tu jornada de hoy
                 </p>
@@ -380,15 +380,15 @@ export default async function HoyPage({
             )}
           </div>
 
-          <section className="mt-10">
+          <section className="mt-6">
             <SectionLabel>Acciones rápidas</SectionLabel>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
               {accionesRapidas}
             </div>
           </section>
 
           {proximasCitas.length > 0 && (
-            <section className="mt-10">
+            <section className="mt-6">
               <div className="flex items-baseline justify-between">
                 <SectionLabel>Próximas citas</SectionLabel>
                 <Link
@@ -401,7 +401,7 @@ export default async function HoyPage({
               <ListaCitasSeleccionable
                 citas={proximasCitas}
                 variant="card"
-                className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
               />
             </section>
           )}
@@ -410,8 +410,15 @@ export default async function HoyPage({
         {/* Panel lateral "Hoy" (ver changelog punto 53): tira de la semana +
             próxima consulta + agenda del día. Sticky solo en desktop — en
             mobile ya es la última sección de una sola columna. */}
-        <aside className="lg:sticky lg:top-8">
-          <section className="rounded-card border border-border bg-surface px-4 py-4">
+        {/* `lg:max-h-[calc(100vh-...)]` + `lg:flex lg:flex-col`: en vez de
+            apostar a que TODO quepa sin scroll (imposible de garantizar con
+            un número de citas que varía día a día — un día con 15 citas no
+            entra en una pantalla sin truncar algo), solo "Agenda de hoy"
+            (la sección de alto variable) scrollea internamente cuando hace
+            falta; el resto del panel (semana, próxima consulta) siempre
+            queda fijo y visible, sin scroll de página en desktop. */}
+        <aside className="lg:sticky lg:top-8 lg:flex lg:max-h-[calc(100vh-4rem)] lg:flex-col">
+          <section className="shrink-0 rounded-card border border-border bg-surface px-4 py-3">
             <SectionLabel>Esta semana</SectionLabel>
             <div className="mt-2">
               <TiraDiasSemana
@@ -424,7 +431,7 @@ export default async function HoyPage({
           </section>
 
           {proxima && (
-            <section className="mt-6">
+            <section className="mt-4 shrink-0">
               <SectionLabel>Próxima consulta</SectionLabel>
               <div className="mt-2">
                 <CitaCard cita={proxima} destacada />
@@ -432,8 +439,8 @@ export default async function HoyPage({
             </section>
           )}
 
-          <section className="mt-6">
-            <div className="flex items-baseline justify-between">
+          <section className="mt-4 flex min-h-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-baseline justify-between">
               <SectionLabel>Agenda de hoy</SectionLabel>
               <span className="text-caption text-text-faint">
                 {citas.length} {citas.length === 1 ? "cita" : "citas"}
@@ -443,7 +450,7 @@ export default async function HoyPage({
               <ListaCitasSeleccionable
                 citas={citas}
                 variant="row"
-                className="mt-2 divide-y divide-border rounded-card border border-border bg-surface px-3"
+                className="mt-2 divide-y divide-border overflow-y-auto rounded-card border border-border bg-surface px-3 lg:min-h-0 lg:flex-1"
               />
             ) : (
               <p className="mt-2 text-body-secondary text-text-faint">
