@@ -9,6 +9,7 @@ import {
   type CamposClinicos,
   type CamposVitales,
 } from "@/modules/core/consultas";
+import { resolverPlantilla } from "@/modules/consultas/plantillasEspecialidad";
 
 function leerCampo(formData: FormData, campo: string): string | null | undefined {
   const valor = formData.get(campo);
@@ -68,6 +69,22 @@ export async function guardarConsultaAction(formData: FormData) {
     tallaCm: leerCampoNumerico(formData, "tallaCm"),
   };
 
+  // Plantilla por especialidad (ver changelog punto 49) — se resuelve por
+  // la profesión/especialidad del médico DUEÑO de la consulta (ya
+  // confirmado arriba que es el mismo que la sesión actual), nunca por lo
+  // que venga del formulario, igual criterio que el resto de esta acción.
+  const plantilla = resolverPlantilla({
+    profesion: consultaExistente.medico.profesion,
+    especialidad: consultaExistente.medico.especialidad,
+  });
+  const camposEspecialidad: Record<string, string> = {};
+  if (plantilla) {
+    for (const campo of plantilla) {
+      const valor = leerCampo(formData, `especialidad_${campo.id}`);
+      if (valor) camposEspecialidad[campo.id] = valor;
+    }
+  }
+
   try {
     await guardarConsulta({
       organizacionId: session.user.organizacionId,
@@ -75,6 +92,7 @@ export async function guardarConsultaAction(formData: FormData) {
       consultaId,
       campos,
       vitales,
+      camposEspecialidad,
     });
   } catch {
     redirect(`/consultas/${consultaId}?error=1`);

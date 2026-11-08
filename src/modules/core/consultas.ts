@@ -81,6 +81,10 @@ export async function obtenerConsulta(input: {
     where: { id: input.consultaId, organizacionId: input.organizacionId },
     include: {
       paciente: { select: { nombre: true, apellido: true } },
+      // Necesario para resolver la Plantilla por especialidad (puntos
+      // 37-40/49) — se resuelve por profesión/especialidad del médico DUEÑO
+      // de la consulta, no del médico que la está viendo.
+      medico: { select: { profesion: true, especialidad: true } },
     },
   });
 }
@@ -218,6 +222,9 @@ export async function guardarConsulta(input: {
   consultaId: string;
   campos: CamposClinicos;
   vitales?: CamposVitales;
+  /** Campos de la Plantilla por especialidad — ver changelog punto 49. Un
+   * objeto vacío se guarda como `null` (nada que mostrar), no como `{}`. */
+  camposEspecialidad?: Record<string, string> | null;
 }): Promise<void> {
   const consulta = await prisma.consulta.findFirst({
     where: { id: input.consultaId, organizacionId: input.organizacionId },
@@ -231,6 +238,7 @@ export async function guardarConsulta(input: {
       evaluacion: true,
       diagnostico: true,
       tratamiento: true,
+      camposEspecialidad: true,
     },
   });
 
@@ -249,7 +257,9 @@ export async function guardarConsulta(input: {
   });
 
   const data: Partial<Record<CampoClinico, string | null>> &
-    Partial<Record<CampoVital, string | number | null>> = {};
+    Partial<Record<CampoVital, string | number | null>> & {
+      camposEspecialidad?: Record<string, string> | null;
+    } = {};
   for (const campo of camposModificados) {
     data[campo] = input.campos[campo] ?? null;
   }
@@ -264,7 +274,23 @@ export async function guardarConsulta(input: {
     }
   }
 
-  if (camposModificados.length === 0 && vitalesModificados.length === 0) {
+  let camposEspecialidadModificado = false;
+  if (input.camposEspecialidad !== undefined) {
+    const nuevo =
+      input.camposEspecialidad && Object.keys(input.camposEspecialidad).length > 0
+        ? input.camposEspecialidad
+        : null;
+    if (JSON.stringify(nuevo) !== JSON.stringify(consulta.camposEspecialidad ?? null)) {
+      data.camposEspecialidad = nuevo;
+      camposEspecialidadModificado = true;
+    }
+  }
+
+  if (
+    camposModificados.length === 0 &&
+    vitalesModificados.length === 0 &&
+    !camposEspecialidadModificado
+  ) {
     return;
   }
 
@@ -290,7 +316,13 @@ export async function guardarConsulta(input: {
     entidadTipo: "Consulta",
     entidadId: input.consultaId,
     pacienteId: consulta.pacienteId,
-    cambios: { camposModificados: [...camposModificados, ...vitalesModificados] },
+    cambios: {
+      camposModificados: [
+        ...camposModificados,
+        ...vitalesModificados,
+        ...(camposEspecialidadModificado ? ["camposEspecialidad"] : []),
+      ],
+    },
   });
 }
 

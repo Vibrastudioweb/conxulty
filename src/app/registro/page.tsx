@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { registrarMedicoAction } from "@/app/registro/actions";
 import { PROFESIONES, LABEL_PROFESION } from "@/modules/onboarding/profesiones";
+import { ESPECIALIDADES_MEDICAS } from "@/modules/consultas/plantillasEspecialidad";
 import { MODALIDADES_ATENCION, LABEL_MODALIDAD } from "@/modules/onboarding/modalidades";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import { DIAS_SEMANA } from "@/modules/onboarding/horarioSede";
@@ -176,17 +177,35 @@ export default async function RegistroPage({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label htmlFor="especialidad" className="mb-1 block text-sm text-text-primary">
-                  Especialidad principal
+                <label htmlFor="especialidadMedico" className="mb-1 block text-sm text-text-primary">
+                  Especialidad (si eres Médico)
                 </label>
-                <Input id="especialidad" name="especialidad" />
+                <select
+                  id="especialidadMedico"
+                  name="especialidadMedico"
+                  defaultValue=""
+                  className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                >
+                  <option value="">— Selecciona —</option>
+                  {ESPECIALIDADES_MEDICAS.map((e) => (
+                    <option key={e} value={e}>
+                      {e}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label htmlFor="especialidadSecundaria1" className="mb-1 block text-sm text-text-primary">
-                  Especialidad secundaria (opcional)
+                <label htmlFor="especialidadOtra" className="mb-1 block text-sm text-text-primary">
+                  Especialidad (si eres Odontólogo, Psicólogo u Otra)
                 </label>
-                <Input id="especialidadSecundaria1" name="especialidadSecundaria1" />
+                <Input id="especialidadOtra" name="especialidadOtra" placeholder="Ej.: Ortodoncia" />
               </div>
+            </div>
+            <div>
+              <label htmlFor="especialidadSecundaria1" className="mb-1 block text-sm text-text-primary">
+                Especialidad secundaria (opcional)
+              </label>
+              <Input id="especialidadSecundaria1" name="especialidadSecundaria1" />
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div>

@@ -242,6 +242,12 @@ model Consulta {
   saturacionOxigeno  Int?
   pesoKg             Decimal? @db.Decimal(5, 2)
   tallaCm            Decimal? @db.Decimal(5, 1)
+  /// Campos adicionales de la "Plantilla por especialidad" — ver changelog
+  /// puntos 37-40/49. Mapa { campoId: valorTexto }, resuelto en la app por
+  /// `resolverPlantilla()` según la profesión/especialidad del médico, no
+  /// una tabla con columnas fijas (el catálogo puede crecer sin migración).
+  /// Nullable, opcional — nunca requerido para guardar/cerrar una consulta.
+  camposEspecialidad Json?
   estado         EstadoConsulta @default(EN_CURSO)
   fechaHora      DateTime       @default(now())
   createdAt      DateTime       @default(now())

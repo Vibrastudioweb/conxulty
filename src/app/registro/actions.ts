@@ -87,6 +87,13 @@ export async function registrarMedicoAction(formData: FormData) {
     leerTexto(formData, "especialidadSecundaria2"),
   ].filter((v): v is string => !!v);
 
+  // Catálogo cerrado solo para MEDICO (punto 37); las demás profesiones
+  // siguen en texto libre (punto 38) — nunca se mezclan los dos campos.
+  const especialidad =
+    parseo.data.profesion === "MEDICO"
+      ? leerTexto(formData, "especialidadMedico")
+      : leerTexto(formData, "especialidadOtra");
+
   try {
     await registrarMedico({
       nombre: parseo.data.nombre,
@@ -97,7 +104,7 @@ export async function registrarMedicoAction(formData: FormData) {
       cedula: leerTexto(formData, "cedula"),
       numeroColegiado: leerTexto(formData, "numeroColegiado"),
       numeroMpps: leerTexto(formData, "numeroMpps"),
-      especialidad: leerTexto(formData, "especialidad"),
+      especialidad,
       especialidadesSecundarias,
       modalidades,
       zonasCobertura,

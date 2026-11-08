@@ -15,6 +15,8 @@ import {
   TONO_ESTADO_CONSULTA,
 } from "@/components/consultas/estadoConsulta";
 import { DocumentoResumenCard } from "@/components/documentos/DocumentoResumenCard";
+import { resolverPlantilla } from "@/modules/consultas/plantillasEspecialidad";
+import { LABEL_PROFESION, type ProfesionId } from "@/modules/onboarding/profesiones";
 
 export default async function ConsultaPage({
   params,
@@ -55,6 +57,20 @@ export default async function ConsultaPage({
     organizacionId: session.user.organizacionId,
     consultaId: consulta.id,
   });
+
+  // Plantilla por especialidad (ver changelog punto 49) — por la
+  // profesión/especialidad del médico DUEÑO de la consulta, no de quien la
+  // está viendo (un médico distinto solo la ve de solo lectura, nunca la
+  // plantilla de su propia especialidad en una consulta ajena).
+  const plantilla = resolverPlantilla({
+    profesion: consulta.medico.profesion,
+    especialidad: consulta.medico.especialidad,
+  });
+  const valoresEspecialidad = (consulta.camposEspecialidad as Record<string, string> | null) ?? {};
+  const tituloPlantilla =
+    consulta.medico.profesion === "MEDICO"
+      ? consulta.medico.especialidad ?? "la especialidad"
+      : LABEL_PROFESION[consulta.medico.profesion as ProfesionId];
 
   return (
     <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 pb-24">
@@ -219,6 +235,29 @@ export default async function ConsultaPage({
             rows={3}
           />
         </section>
+
+        {plantilla && (
+          <section>
+            <h2 className="font-display text-sm font-semibold text-text-primary">
+              Campos de {tituloPlantilla}
+            </h2>
+            <div className="mt-2 space-y-2">
+              {plantilla.map((campo) => (
+                <div key={campo.id}>
+                  <label className="block text-xs text-text-secondary">
+                    {campo.label}
+                  </label>
+                  <Input
+                    name={`especialidad_${campo.id}`}
+                    defaultValue={valoresEspecialidad[campo.id] ?? ""}
+                    disabled={soloLectura}
+                    className="mt-1"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section>
           <h2 className="font-display text-sm font-semibold text-text-primary">
