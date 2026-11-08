@@ -409,16 +409,15 @@ export default async function HoyPage({
 
         {/* Panel lateral "Hoy" (ver changelog punto 53): tira de la semana +
             próxima consulta + agenda del día. Sticky solo en desktop — en
-            mobile ya es la última sección de una sola columna. */}
-        {/* `lg:max-h-[calc(100vh-...)]` + `lg:flex lg:flex-col`: en vez de
-            apostar a que TODO quepa sin scroll (imposible de garantizar con
-            un número de citas que varía día a día — un día con 15 citas no
-            entra en una pantalla sin truncar algo), solo "Agenda de hoy"
-            (la sección de alto variable) scrollea internamente cuando hace
-            falta; el resto del panel (semana, próxima consulta) siempre
-            queda fijo y visible, sin scroll de página en desktop. */}
-        <aside className="lg:sticky lg:top-8 lg:flex lg:max-h-[calc(100vh-4rem)] lg:flex-col">
-          <section className="shrink-0 rounded-card border border-border bg-surface px-4 py-3">
+            mobile ya es la última sección de una sola columna.
+            "Agenda de hoy" se corta en 5 + "Ver todas →" a /agenda (vista
+            día, hoy por defecto) en vez de scroll interno (punto 66,
+            revertido: el usuario prefirió el tope + enlace) — así el resto
+            del panel (semana, próxima consulta) siempre es visible sin
+            necesidad de que el usuario sepa que hay un scroll escondido
+            adentro de una tarjeta. */}
+        <aside className="lg:sticky lg:top-8">
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
             <SectionLabel>Esta semana</SectionLabel>
             <div className="mt-2">
               <TiraDiasSemana
@@ -431,7 +430,7 @@ export default async function HoyPage({
           </section>
 
           {proxima && (
-            <section className="mt-4 shrink-0">
+            <section className="mt-4">
               <SectionLabel>Próxima consulta</SectionLabel>
               <div className="mt-2">
                 <CitaCard cita={proxima} destacada />
@@ -439,19 +438,29 @@ export default async function HoyPage({
             </section>
           )}
 
-          <section className="mt-4 flex min-h-0 flex-1 flex-col">
-            <div className="flex shrink-0 items-baseline justify-between">
+          <section className="mt-4">
+            <div className="flex items-baseline justify-between">
               <SectionLabel>Agenda de hoy</SectionLabel>
               <span className="text-caption text-text-faint">
                 {citas.length} {citas.length === 1 ? "cita" : "citas"}
               </span>
             </div>
             {hayCitas ? (
-              <ListaCitasSeleccionable
-                citas={citas}
-                variant="row"
-                className="mt-2 divide-y divide-border overflow-y-auto rounded-card border border-border bg-surface px-3 lg:min-h-0 lg:flex-1"
-              />
+              <>
+                <ListaCitasSeleccionable
+                  citas={citas.slice(0, 5)}
+                  variant="row"
+                  className="mt-2 divide-y divide-border rounded-card border border-border bg-surface px-3"
+                />
+                {citas.length > 5 && (
+                  <Link
+                    href="/agenda"
+                    className="mt-2 block rounded-button border border-border px-3 py-2 text-center text-caption font-semibold text-brand-primary transition hover:border-brand-primary hover:bg-brand-primary-soft"
+                  >
+                    Ver todas ({citas.length}) →
+                  </Link>
+                )}
+              </>
             ) : (
               <p className="mt-2 text-body-secondary text-text-faint">
                 Sin consultas programadas para hoy.
