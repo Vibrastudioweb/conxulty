@@ -71,7 +71,15 @@ export function DetalleCitaPanel({
     .join(" · ");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-4"
+      // En mobile el panel ya no queda pegado al borde inferior de la
+      // pantalla (reporte del usuario, 08-nov-2026): el `p-3` de arriba le
+      // da un margen parejo a los 4 lados, y este padding-bottom extra
+      // crece con `env(safe-area-inset-bottom)` en teléfonos con barra/
+      // gesto inferior, mismo criterio que ya usa `BottomNav.tsx`.
+      style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+    >
       {/* Backdrop: cerrar al tocar fuera del panel. */}
       <button
         type="button"
@@ -80,7 +88,7 @@ export function DetalleCitaPanel({
         className="absolute inset-0 cursor-default"
       />
 
-      <div className="relative z-10 flex max-h-[85vh] w-full flex-col overflow-y-auto rounded-t-card bg-surface p-5 shadow-card sm:max-w-md sm:rounded-card">
+      <div className="relative z-10 flex max-h-[85vh] w-full flex-col overflow-y-auto rounded-card bg-surface p-5 shadow-card sm:max-w-md">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-body-secondary font-medium text-text-secondary">
