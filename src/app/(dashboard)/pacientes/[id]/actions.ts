@@ -297,12 +297,15 @@ export async function actualizarOdontogramaAction(formData: FormData) {
     }
   }
 
+  const notasOdontograma = leerTexto(formData, "notasOdontograma");
+
   try {
     await actualizarOdontograma({
       organizacionId: session.user.organizacionId,
       actorId: session.user.id,
       pacienteId,
       odontograma,
+      notasOdontograma,
     });
   } catch (err) {
     if (err instanceof PacienteNoEncontradoError) {

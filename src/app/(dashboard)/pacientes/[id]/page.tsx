@@ -380,6 +380,7 @@ export default async function PacientePage({
           <OdontogramaSeccion
             pacienteId={paciente.id}
             odontograma={(paciente.odontograma as Odontograma | null) ?? {}}
+            notasOdontograma={paciente.notasOdontograma}
             action={actualizarOdontogramaAction}
           />
         </div>

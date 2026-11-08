@@ -350,17 +350,23 @@ export async function reactivarPaciente(input: {
  * app — SANO es la ausencia de entrada, no un valor que haya que
  * persistir). No exige que el paciente exista activo: un paciente
  * archivado igual conserva su odontograma, solo no puede iniciar
- * consultas/citas nuevas (esa regla no cambia aquí).
+ * consultas/citas nuevas (esa regla no cambia aquí). `notasOdontograma` es
+ * una nota general de texto libre (una sola, no por diente, ver changelog
+ * punto 51b) que se guarda en el mismo paso.
  */
 export async function actualizarOdontograma(input: {
   organizacionId: string;
   actorId: string;
   pacienteId: string;
   odontograma: Record<string, string>;
+  notasOdontograma?: string | null;
 }): Promise<void> {
   const resultado = await prisma.paciente.updateMany({
     where: { id: input.pacienteId, organizacionId: input.organizacionId },
-    data: { odontograma: input.odontograma },
+    data: {
+      odontograma: input.odontograma,
+      notasOdontograma: input.notasOdontograma ?? null,
+    },
   });
 
   if (resultado.count !== 1) {

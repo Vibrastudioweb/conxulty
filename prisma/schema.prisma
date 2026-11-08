@@ -149,6 +149,11 @@ model Paciente {
   /// esquema — cualquier Paciente puede tenerlo si alguna vez cambia de
   /// consultorio).
   odontograma                Json?
+  /// Nota general del odontograma (ver changelog punto 51b) — texto libre,
+  /// una sola nota por paciente, no por diente (no se pidió detalle por
+  /// pieza y hubiera complicado el diagrama). Se guarda y edita junto con
+  /// el mapa de dientes, en el mismo formulario y la misma acción.
+  notasOdontograma           String?
   createdAt                  DateTime            @default(now())
   updatedAt                  DateTime            @updatedAt
   antecedentesMedicos        AntecedenteMedico[]

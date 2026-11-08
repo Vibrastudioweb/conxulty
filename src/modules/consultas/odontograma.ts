@@ -51,3 +51,19 @@ export type Odontograma = Partial<Record<string, EstadoDiente>>;
 export function esEstadoDiente(valor: string): valor is EstadoDiente {
   return (ESTADOS_DIENTE as readonly string[]).includes(valor);
 }
+
+/**
+ * Color de relleno por estado, para el diagrama clickeable (ver changelog
+ * punto 51b). Paleta elegida por legibilidad/contraste y convención clínica
+ * básica (caries en rojo, corona en dorado), no es parte del Design System
+ * de marca — son colores de estado sobre un diagrama, igual de categoría
+ * que los iconos de un semáforo, no decoración de marca.
+ */
+export const COLOR_ESTADO_DIENTE: Record<EstadoDiente, string> = {
+  SANO: "#ffffff",
+  CARIES: "#c94a4a",
+  OBTURADO: "#8a9699",
+  AUSENTE: "#d9dede",
+  CORONA: "#c78316",
+  ENDODONCIA: "#6d4aa8",
+};
