@@ -6,6 +6,7 @@ export type TabFicha =
   | "antecedentes"
   | "historial"
   | "tratamientos"
+  | "odontograma"
   | "citas"
   | "documentos"
   | "ia";
@@ -21,6 +22,13 @@ const OPCIONES: { valor: TabFicha; etiqueta: string }[] = [
   { valor: "ia", etiqueta: "IA" },
 ];
 
+/** Odontograma (ver changelog punto 51) solo aplica a Odontólogo — no es
+ * una de las 8 tabs fijas, se inserta aparte para no mostrarla a todos. */
+const OPCION_ODONTOGRAMA: { valor: TabFicha; etiqueta: string } = {
+  valor: "odontograma",
+  etiqueta: "Odontograma",
+};
+
 /**
  * Las 8 tabs de la ficha, llevadas de la demo (29-oct-2026, ver changelog
  * punto 6) — mismo patrón que `SelectorVista` en Agenda: enlaces reales a
@@ -31,13 +39,23 @@ const OPCIONES: { valor: TabFicha; etiqueta: string }[] = [
 export function TabsFicha({
   tabActual,
   pacienteId,
+  mostrarOdontograma,
 }: {
   tabActual: TabFicha;
   pacienteId: string;
+  /** Solo true cuando el médico logueado tiene profesión ODONTOLOGO. */
+  mostrarOdontograma?: boolean;
 }) {
+  // Se inserta después de "Antecedentes" (misma posición temática que la
+  // demo le da a datos clínicos de examen) — índice 3, antes de
+  // "Historial clínico".
+  const opciones = mostrarOdontograma
+    ? [...OPCIONES.slice(0, 3), OPCION_ODONTOGRAMA, ...OPCIONES.slice(3)]
+    : OPCIONES;
+
   return (
     <div className="mt-4 flex gap-1 overflow-x-auto border-b border-border pb-px">
-      {OPCIONES.map((opcion) => {
+      {opciones.map((opcion) => {
         const activa = opcion.valor === tabActual;
         return (
           <Link

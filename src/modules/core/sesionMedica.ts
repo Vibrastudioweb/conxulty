@@ -22,7 +22,10 @@ export async function resolverMedicoAutenticado(input: {
       usuarioId: input.usuarioId,
       organizacionId: input.organizacionId,
     },
-    select: { id: true, organizacionId: true },
+    // `profesion` se agregó (08-nov-2026, ver changelog punto 51) para que
+    // las páginas puedan decidir si mostrar algo exclusivo de una profesión
+    // (ej. el Odontograma, solo ODONTOLOGO) sin otra consulta aparte.
+    select: { id: true, organizacionId: true, profesion: true },
   });
 
   if (!medico) {

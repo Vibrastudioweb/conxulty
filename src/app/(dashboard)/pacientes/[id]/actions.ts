@@ -12,10 +12,12 @@ import {
   actualizarPaciente,
   archivarPaciente,
   reactivarPaciente,
+  actualizarOdontograma,
   DocumentoIdentidadDuplicadoError,
   PacienteNoEncontradoError,
   PacienteArchivadoError,
 } from "@/modules/core/pacientes";
+import { DIENTES_FDI, esEstadoDiente } from "@/modules/consultas/odontograma";
 import {
   crearAntecedente,
   editarAntecedente,
@@ -267,4 +269,47 @@ export async function desactivarAntecedenteAction(formData: FormData) {
   }
 
   redirect(`/pacientes/${pacienteId}?antecedente_desactivado=1`);
+}
+
+/**
+ * Odontograma (ver changelog punto 51) — la pantalla siempre envía los 32
+ * selects, uno por diente FDI; solo se guardan los que NO están en "SANO"
+ * (ver doc en actualizarOdontograma: SANO es la ausencia de entrada). Un
+ * valor fuera del enum (manipulación del form) se descarta en silencio en
+ * vez de romper el guardado completo — mismo criterio de tolerancia que el
+ * resto de los formularios sin validación de esquema con zod.
+ */
+export async function actualizarOdontogramaAction(formData: FormData) {
+  const { session } = await requireMedicoSesion();
+
+  const pacienteId = String(formData.get("pacienteId") ?? "");
+  if (!pacienteId) {
+    throw new Error("Falta el paciente.");
+  }
+
+  const odontograma: Record<string, string> = {};
+  for (const numero of DIENTES_FDI) {
+    const valor = formData.get(`diente_${numero}`);
+    if (typeof valor !== "string") continue;
+    if (valor === "SANO") continue;
+    if (esEstadoDiente(valor)) {
+      odontograma[numero] = valor;
+    }
+  }
+
+  try {
+    await actualizarOdontograma({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      pacienteId,
+      odontograma,
+    });
+  } catch (err) {
+    if (err instanceof PacienteNoEncontradoError) {
+      redirect("/pacientes");
+    }
+    throw err;
+  }
+
+  redirect(`/pacientes/${pacienteId}?tab=odontograma&odontograma_actualizado=1`);
 }

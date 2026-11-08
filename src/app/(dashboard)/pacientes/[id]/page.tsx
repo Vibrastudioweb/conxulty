@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireMedico } from "@/modules/core/autorizacion";
+import { requireMedicoSesion } from "@/modules/core/autorizacion";
 import { obtenerPaciente } from "@/modules/core/pacientes";
 import { obtenerCita, listarCitasDelPaciente } from "@/modules/core/citas";
 import { listarConsultasDelPaciente } from "@/modules/core/consultas";
@@ -15,7 +15,10 @@ import {
   crearAntecedenteAction,
   editarAntecedenteAction,
   desactivarAntecedenteAction,
+  actualizarOdontogramaAction,
 } from "./actions";
+import type { Odontograma } from "@/modules/consultas/odontograma";
+import { OdontogramaSeccion } from "@/components/pacientes/OdontogramaSeccion";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -67,6 +70,7 @@ const MENSAJES_EXITO: Record<string, string> = {
   antecedente_creado: "Antecedente registrado.",
   antecedente_editado: "Antecedente actualizado.",
   antecedente_desactivado: "Antecedente desactivado.",
+  odontograma_actualizado: "Odontograma actualizado.",
 };
 
 export default async function PacientePage({
@@ -76,7 +80,8 @@ export default async function PacientePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const session = await requireMedico();
+  const { session, medico } = await requireMedicoSesion();
+  const mostrarOdontograma = medico.profesion === "ODONTOLOGO";
 
   const { id } = await params;
   const { cita: citaId, error, tab: tabParam, ...resto } = await searchParams;
@@ -90,6 +95,7 @@ export default async function PacientePage({
     "citas",
     "documentos",
     "ia",
+    ...(mostrarOdontograma ? (["odontograma"] as TabFicha[]) : []),
   ];
   const tab: TabFicha = TABS_VALIDAS.includes(tabParam as TabFicha)
     ? (tabParam as TabFicha)
@@ -246,7 +252,11 @@ export default async function PacientePage({
         </div>
       )}
 
-      <TabsFicha tabActual={tab} pacienteId={paciente.id} />
+      <TabsFicha
+        tabActual={tab}
+        pacienteId={paciente.id}
+        mostrarOdontograma={mostrarOdontograma}
+      />
 
       {tab === "resumen" && (
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -363,6 +373,16 @@ export default async function PacientePage({
         <section className="mt-6">
           <TratamientosPacienteSeccion consultas={consultasPrevias} />
         </section>
+      )}
+
+      {tab === "odontograma" && mostrarOdontograma && (
+        <div className="mt-2">
+          <OdontogramaSeccion
+            pacienteId={paciente.id}
+            odontograma={(paciente.odontograma as Odontograma | null) ?? {}}
+            action={actualizarOdontogramaAction}
+          />
+        </div>
       )}
 
       {tab === "citas" && (

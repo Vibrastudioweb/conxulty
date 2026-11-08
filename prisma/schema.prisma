@@ -140,6 +140,15 @@ model Paciente {
   /// Archivado lógico: un paciente nunca se borra, se desactiva. Las citas,
   /// consultas y cobros ya existentes se conservan intactos.
   activo                     Boolean             @default(true)
+  /// Odontograma — ver changelog punto 51. Mapa { "11": "CARIES", ... },
+  /// FDI de 2 dígitos como clave; un diente ausente del mapa es SANO
+  /// implícito (no se guarda el estado por defecto). Vive en Paciente, no
+  /// en Consulta: es el estado ACTUAL de la boca, no una foto de una
+  /// visita — se actualiza, no se acumula visita a visita. Solo lo usa/ve
+  /// un médico con profesión ODONTOLOGO (gating en la app, no en el
+  /// esquema — cualquier Paciente puede tenerlo si alguna vez cambia de
+  /// consultorio).
+  odontograma                Json?
   createdAt                  DateTime            @default(now())
   updatedAt                  DateTime            @updatedAt
   antecedentesMedicos        AntecedenteMedico[]

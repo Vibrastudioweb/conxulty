@@ -341,3 +341,38 @@ export async function reactivarPaciente(input: {
 }): Promise<void> {
   await cambiarActivoPaciente({ ...input, activo: true });
 }
+
+/**
+ * Odontograma — ver changelog punto 51. Reemplaza el mapa completo (no
+ * hace merge parcial): la pantalla siempre envía los 32 dientes, así que
+ * un diente que vuelve a SANO se borra del mapa en vez de guardarse
+ * explícito (mismo criterio que "campo vacío = null" en el resto de la
+ * app — SANO es la ausencia de entrada, no un valor que haya que
+ * persistir). No exige que el paciente exista activo: un paciente
+ * archivado igual conserva su odontograma, solo no puede iniciar
+ * consultas/citas nuevas (esa regla no cambia aquí).
+ */
+export async function actualizarOdontograma(input: {
+  organizacionId: string;
+  actorId: string;
+  pacienteId: string;
+  odontograma: Record<string, string>;
+}): Promise<void> {
+  const resultado = await prisma.paciente.updateMany({
+    where: { id: input.pacienteId, organizacionId: input.organizacionId },
+    data: { odontograma: input.odontograma },
+  });
+
+  if (resultado.count !== 1) {
+    throw new PacienteNoEncontradoError();
+  }
+
+  await registrarEvento({
+    organizacionId: input.organizacionId,
+    actorId: input.actorId,
+    accion: "actualizar_odontograma",
+    entidadTipo: "Paciente",
+    entidadId: input.pacienteId,
+    pacienteId: input.pacienteId,
+  });
+}
