@@ -7,6 +7,7 @@ import {
   BarChart3,
   CalendarDays,
   ClipboardList,
+  IdCard,
   ShieldCheck,
   Sun,
   Users,
@@ -22,6 +23,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   reportes: BarChart3,
   admin: ShieldCheck,
   staff: ClipboardList,
+  fichaPublica: IdCard,
 };
 
 /**

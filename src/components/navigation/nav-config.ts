@@ -7,7 +7,8 @@ export type NavIconKey =
   | "caja"
   | "reportes"
   | "admin"
-  | "staff";
+  | "staff"
+  | "fichaPublica";
 
 export interface NavItem {
   href: string;
@@ -40,6 +41,11 @@ const NAV_MEDICO: NavItem[] = [
   // mobile — sigue disponible en el sidebar de escritorio, y en mobile
   // tiene un enlace directo desde Caja. Ver changelog punto 17/44.
   { href: "/reportes", label: "Reportes", iconKey: "reportes" },
+  // Editor de la ficha pública en el Directorio (conxulty.com) — único
+  // lugar para editarla ahora que el login propio del Directorio se
+  // retiró (changelog punto 75/76). Solo médicos: Admin/Staff no tienen
+  // ficha pública propia.
+  { href: "/ficha-publica", label: "Mi ficha pública", iconKey: "fichaPublica" },
 ];
 
 const NAV_ADMIN: NavItem[] = [

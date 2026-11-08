@@ -14,6 +14,20 @@ model Organizacion {
   /// real). Se fija FICHA por defecto; PRO solo si la profesión del médico
   /// está en el catálogo elegible (ver `PROFESIONES_ELEGIBLES_PRO`).
   plan                  PlanOrganizacion         @default(FICHA)
+  /// Vínculo con la ficha pública en el Directorio (conxulty.com,
+  /// repo `vitalud`, tabla `profesionales`) — ver changelog punto 75.
+  /// Null = todavía no sincronizada nunca (registro falló o es anterior
+  /// a esta integración). Se llena con el `id` que devuelve el endpoint
+  /// `POST /api/sincronizar-profesional` del Directorio.
+  fichaDirectorioId          String?  @unique
+  /// Slug público de la ficha en el Directorio (conxulty.com/medico/<slug>),
+  /// cacheado acá para no depender de una llamada extra solo para armar el
+  /// link "Ver mi ficha pública" en el sidebar.
+  fichaDirectorioSlug        String?
+  /// true solo después de una sincronización exitosa — si el registro creó
+  /// la Organizacion pero la llamada al Directorio falló (ver registro.ts),
+  /// queda en false y "Mi ficha pública" ofrece reintentar.
+  fichaDirectorioSincronizada Boolean @default(false)
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
   accesosExternos       AccesoExternoHistorial[]

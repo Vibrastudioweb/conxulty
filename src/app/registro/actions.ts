@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { z } from "zod";
 import { signIn } from "@/auth";
+import { prisma } from "@/db/client";
 import {
   registrarMedico,
   ProfesionOtraTextoRequeridoError,
@@ -16,6 +17,11 @@ import { PROFESIONES } from "@/modules/onboarding/profesiones";
 import { MODALIDADES_ATENCION } from "@/modules/onboarding/modalidades";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import { leerHorarioSedeDeFormData, type HorarioDia } from "@/modules/onboarding/horarioSede";
+import {
+  sincronizarFichaDirectorio,
+  mapearModalidadDirectorio,
+  ModalidadNoMapeableError,
+} from "@/modules/directorio/sincronizacion";
 
 const registroSchema = z.object({
   nombre: z.string().trim().min(2).max(120),
@@ -94,8 +100,9 @@ export async function registrarMedicoAction(formData: FormData) {
       ? leerTexto(formData, "especialidadMedico")
       : leerTexto(formData, "especialidadOtra");
 
+  let organizacionId: string;
   try {
-    await registrarMedico({
+    const resultado = await registrarMedico({
       nombre: parseo.data.nombre,
       email: parseo.data.email,
       password: parseo.data.password,
@@ -111,6 +118,7 @@ export async function registrarMedicoAction(formData: FormData) {
       sedes: leerSedes(formData),
       planElegido: parseo.data.planElegido,
     });
+    organizacionId = resultado.organizacionId;
   } catch (err) {
     if (err instanceof EmailYaRegistradoError) {
       redirect("/registro?error=email_registrado");
@@ -134,6 +142,45 @@ export async function registrarMedicoAction(formData: FormData) {
   // en una pantalla propia tras el registro — requeriría que /hoy acepte
   // searchParams, que hoy no toca. El choque queda guardado en `Sede.horario`
   // igual, solo no se avisa todavía justo después de crear la cuenta.
+
+  // Sincronización con el Directorio (changelog punto 75/76) — BEST EFFORT:
+  // si el Directorio está caído o no configurado, el registro NO se
+  // bloquea ni se revierte (la cuenta y la Organizacion ya existen). Queda
+  // `fichaDirectorioSincronizada = false` y "Mi ficha pública" ofrece
+  // reintentar manualmente. Sin sedes todavía (el registro no pide ciudad
+  // del Directorio, ver sincronizacion.ts) — se completan ahí mismo.
+  try {
+    const modalidadDirectorio = mapearModalidadDirectorio(modalidades);
+    const resultadoSync = await sincronizarFichaDirectorio({
+      nombre: parseo.data.nombre,
+      profesion: parseo.data.profesion,
+      numeroMpps: leerTexto(formData, "numeroMpps"),
+      numeroColegiado: leerTexto(formData, "numeroColegiado"),
+      modalidad: modalidadDirectorio,
+      zonasCobertura,
+      sedes: [],
+    });
+    if (resultadoSync.ok) {
+      await prisma.organizacion.update({
+        where: { id: organizacionId },
+        data: {
+          fichaDirectorioId: resultadoSync.id,
+          fichaDirectorioSlug: resultadoSync.slug,
+          fichaDirectorioSincronizada: true,
+        },
+      });
+    }
+    // Si falló (incluida profesión "OTRA", que el Directorio rechaza a
+    // propósito): no se registra el error en ningún lado todavía — queda
+    // simplemente sincronizada=false. NOT NOW: loguear esto en
+    // RegistroTrazabilidad para poder auditar fallos silenciosos.
+  } catch (err) {
+    // mapearModalidadDirectorio puede lanzar ModalidadNoMapeableError (solo
+    // ONLINE, sin sede ni domicilio) — mismo criterio: no bloquea el
+    // registro, la ficha del Directorio queda pendiente de completar.
+    if (!(err instanceof ModalidadNoMapeableError)) throw err;
+  }
+
   try {
     await signIn("credentials", {
       email: parseo.data.email,
