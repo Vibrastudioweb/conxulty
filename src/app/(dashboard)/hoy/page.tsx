@@ -256,6 +256,10 @@ export default async function HoyPage({
     pendientesConfirmarAyer,
   );
 
+  // "Nueva consulta sin cita" va directo a /pacientes/nuevo, no a
+  // /pacientes (punto 57): el usuario pidió un acceso DIRECTO desde /hoy,
+  // y aterrizar en la lista de pacientes todavía exigía un clic más
+  // ("+ Nuevo paciente") para llegar a donde la tile dice que lleva.
   const accionesRapidas = (
     <>
       <QuickActionTile
@@ -266,7 +270,7 @@ export default async function HoyPage({
         accent="indigo"
       />
       <QuickActionTile
-        href="/pacientes"
+        href="/pacientes/nuevo"
         icon={UserPlus}
         title="Nueva consulta sin cita"
         subtitle="Registra un paciente ahora"
