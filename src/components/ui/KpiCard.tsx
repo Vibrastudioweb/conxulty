@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 
 /**
@@ -50,6 +51,7 @@ export function KpiCard({
   hint,
   accent = "indigo",
   delta,
+  href,
 }: {
   icon: LucideIcon;
   label: string;
@@ -57,9 +59,12 @@ export function KpiCard({
   hint?: string;
   accent?: KpiAccent;
   delta?: KpiDelta;
+  /** Si se pasa, toda la tarjeta es clickeable (ver changelog: el usuario
+   *  pidió que ninguna tarjeta del panel quede sin llevar a algún lado). */
+  href?: string;
 }) {
-  return (
-    <div className="rounded-card border border-border bg-surface px-4 py-3.5">
+  const contenido = (
+    <>
       <span
         className={`inline-flex h-8 w-8 items-center justify-center rounded-input ${ACCENT_BG[accent]} ${ACCENT_TEXT[accent]}`}
       >
@@ -76,6 +81,23 @@ export function KpiCard({
       ) : (
         hint && <p className="mt-1.5 text-caption text-text-faint">{hint}</p>
       )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-card border border-border bg-surface px-4 py-3.5 transition hover:border-brand-primary"
+      >
+        {contenido}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="rounded-card border border-border bg-surface px-4 py-3.5">
+      {contenido}
     </div>
   );
 }

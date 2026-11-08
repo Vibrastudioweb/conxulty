@@ -315,6 +315,7 @@ export default async function HoyPage({
               value={String(citas.length)}
               accent="indigo"
               delta={deltaCitas}
+              href="/agenda"
             />
             <KpiCard
               icon={UserCheck}
@@ -322,6 +323,7 @@ export default async function HoyPage({
               value={String(atendidas)}
               accent="green"
               delta={deltaAtendidas}
+              href="/agenda?estado=ATENDIDA"
             />
             <KpiCard
               icon={CircleDollarSign}
@@ -330,6 +332,7 @@ export default async function HoyPage({
               hint={cobrosHoy.hint}
               accent="amber"
               delta={deltaCobros}
+              href="/caja"
             />
             <KpiCard
               icon={CalendarCheck2}
@@ -337,6 +340,7 @@ export default async function HoyPage({
               value={String(pendientesConfirmar)}
               accent="sky"
               delta={deltaPendientes}
+              href="/agenda?estado=PENDIENTE"
             />
           </section>
 

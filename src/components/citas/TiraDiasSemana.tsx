@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { formatearFechaISO } from "@/components/citas/fecha";
+
 const DIAS_UNA_LETRA = ["L", "M", "X", "J", "V", "S", "D"];
 const NOMBRES_DIA = [
   "Lunes",
@@ -26,9 +29,12 @@ function inicioDeSemana(fecha: Date): Date {
  * es cualquier fecha de la semana que se quiere mostrar — permite navegar
  * a otra semana sin cambiar cuál es "hoy" para el resaltado. Las flechas
  * de navegación, si se pasan, solo cambian QUÉ SEMANA se dibuja aquí; no
- * afectan la agenda del día mostrada debajo (deliberado, "sin
- * complicarlo" — filtrar la agenda por un día elegido en la tira es una
- * pieza aparte, no construida).
+ * afectan la agenda del día mostrada debajo — "filtrar" la agenda por un
+ * día elegido en la tira sería otra pieza, no construida. Lo que SÍ se
+ * construyó (08-nov-2026, "todas las tarjetas de el panel deben llevarme
+ * a algun lugar"): cada día es un enlace a `/agenda?vista=dia&fecha=...`,
+ * la vista de agenda de ESE día — no cambia nada de esta tira, solo deja
+ * de ser un elemento muerto.
  */
 export function TiraDiasSemana({
   hoy,
@@ -76,12 +82,13 @@ export function TiraDiasSemana({
         {dias.map((dia, i) => {
           const esHoy = dia.toDateString() === hoy.toDateString();
           return (
-            <div
+            <Link
               key={i}
+              href={`/agenda?vista=dia&fecha=${formatearFechaISO(dia)}`}
               title={NOMBRES_DIA[i]}
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-input py-1.5 text-caption ${
+              className={`flex flex-1 flex-col items-center gap-0.5 rounded-input py-1.5 text-caption transition hover:bg-surface-muted ${
                 esHoy
-                  ? "bg-brand-primary-soft font-semibold text-brand-primary"
+                  ? "bg-brand-primary-soft font-semibold text-brand-primary hover:bg-brand-primary-soft"
                   : "text-text-faint"
               }`}
             >
@@ -92,7 +99,7 @@ export function TiraDiasSemana({
               >
                 {dia.getDate()}
               </span>
-            </div>
+            </Link>
           );
         })}
       </div>
