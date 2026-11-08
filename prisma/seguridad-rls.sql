@@ -59,6 +59,12 @@ ALTER TABLE public.gastos                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.registros_trazabilidad  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.solicitudes_acceso      ENABLE ROW LEVEL SECURITY;
 
+-- No es una tabla del modelo de datos de la app — es la tabla interna que
+-- usa Prisma para su propio historial de migraciones (sin datos
+-- sensibles), pero el Advisor de Supabase también la marca ("RLS Disabled
+-- in Public"). Se cierra igual por prolijidad, mismo rol dueño de antes.
+ALTER TABLE public._prisma_migrations      ENABLE ROW LEVEL SECURITY;
+
 -- Deliberadamente SIN políticas (CREATE POLICY): la app no necesita
 -- ninguna porque no consulta estas tablas como `anon`/`authenticated` de
 -- Supabase, solo como el rol dueño. Cero políticas = cero acceso para
