@@ -33,8 +33,10 @@ const OPCION_ODONTOGRAMA: { valor: TabFicha; etiqueta: string } = {
  * Las 8 tabs de la ficha, llevadas de la demo (29-oct-2026, ver changelog
  * punto 6) — mismo patrón que `SelectorVista` en Agenda: enlaces reales a
  * `?tab=...`, sin JavaScript de cliente, nada que romper al recargar o
- * compartir el enlace. Scroll horizontal en mobile (8 tabs no caben en un
- * viewport angosto) en vez de envolver o truncar etiquetas.
+ * compartir el enlace. Las tabs envuelven a una segunda línea cuando no
+ * caben (8 tabs no entran en un viewport angosto) en vez de scroll
+ * horizontal — antes usaba `overflow-x-auto`, pero el usuario reportó que
+ * ese scroll se sentía mal (08-nov-2026).
  */
 export function TabsFicha({
   tabActual,
@@ -54,7 +56,7 @@ export function TabsFicha({
     : OPCIONES;
 
   return (
-    <div className="mt-4 flex gap-1 overflow-x-auto border-b border-border pb-px">
+    <div className="mt-4 flex flex-wrap gap-1 border-b border-border pb-px">
       {opciones.map((opcion) => {
         const activa = opcion.valor === tabActual;
         return (
