@@ -66,12 +66,15 @@ export function SidebarFrame({
     >
       {children}
 
+      {/* z-30: el botón sobresale del borde derecho del aside (-right-3) y
+          cae sobre el área del Topbar, cuyo <header> es z-20 (sticky, con
+          fondo propio) — sin un z-index mayor acá, el Topbar lo tapaba. */}
       <button
         type="button"
         onClick={alternar}
         aria-label={colapsado ? "Expandir menú" : "Retraer menú"}
         title={colapsado ? "Expandir menú" : "Retraer menú"}
-        className="absolute -right-3 top-9 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface text-text-faint shadow-sm transition hover:border-brand-primary hover:text-brand-primary"
+        className="absolute -right-3 top-9 z-30 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface text-text-faint shadow-sm transition hover:border-brand-primary hover:text-brand-primary"
       >
         {colapsado ? (
           <PanelLeftOpen size={14} aria-hidden="true" />
