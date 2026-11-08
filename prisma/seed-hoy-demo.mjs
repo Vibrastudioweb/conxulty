@@ -273,6 +273,156 @@ async function main() {
     });
   }
 
+  // --- Ficha completa de ejemplo: Pedro Araujo (ver changelog punto 61) --
+  // El usuario pidió llenar la ficha de UN paciente para ver cómo se ve
+  // llena, no los 10 — por eso este bloque es específico de
+  // paciente-demo-odonto-07, no un cambio general a PACIENTES.
+  const pedro = pacientes.find((p) => p.id === "paciente-demo-odonto-07");
+  if (pedro) {
+    await prisma.paciente.update({
+      where: { id: pedro.id },
+      data: {
+        fechaNacimiento: new Date(1990, 4, 12), // 12-may-1990
+        sexo: "Masculino",
+        email: "pedro.araujo@correodemo.ve",
+        documentoIdentidad: "V-18345219",
+        direccion: "Av. Bolívar, Trujillo, Venezuela",
+        contactoEmergenciaNombre: "Luisa Araujo (esposa)",
+        contactoEmergenciaTelefono: "0424-5551234",
+        // Odontograma (ver modules/consultas/odontograma.ts): mapa FDI,
+        // un diente ausente del mapa es SANO implícito.
+        odontograma: {
+          16: "OBTURADO",
+          26: "CARIES",
+          36: "ENDODONCIA",
+          46: "AUSENTE",
+          11: "CORONA",
+        },
+        notasOdontograma:
+          "Bruxismo leve, usa férula nocturna. Control de endodoncia en 46 cada 6 meses.",
+      },
+    });
+
+    // Antecedentes médicos — mismo filtro que ya usa AlertaAlergias/
+    // listarAntecedentesDelPaciente (tipo ALERGIA + activo) para que el
+    // banner de alergias y el panel de "Detalle de la cita" (punto 60)
+    // tengan algo real que mostrar.
+    const antecedentesPedro = [
+      {
+        id: "antecedente-demo-pedro-1",
+        tipo: "ALERGIA",
+        descripcion: "Penicilina — reacción cutánea",
+      },
+      {
+        id: "antecedente-demo-pedro-2",
+        tipo: "ENFERMEDAD_CRONICA",
+        descripcion: "Hipertensión controlada con tratamiento",
+      },
+      {
+        id: "antecedente-demo-pedro-3",
+        tipo: "HABITO",
+        descripcion: "Fumador — 5 cigarrillos/día",
+      },
+    ];
+    for (const a of antecedentesPedro) {
+      await prisma.antecedenteMedico.upsert({
+        where: { id: a.id },
+        update: { tipo: a.tipo, descripcion: a.descripcion, activo: true },
+        create: {
+          id: a.id,
+          organizacionId: organizacion.id,
+          pacienteId: pedro.id,
+          medicoId: medico.id,
+          tipo: a.tipo,
+          descripcion: a.descripcion,
+        },
+      });
+    }
+
+    // Dos consultas cerradas (fechas distintas, pesoKg distinto) para que
+    // el historial y el gráfico de evolución de peso (punto 56) tengan
+    // más de un punto que graficar.
+    const consultasPedroDef = [
+      {
+        id: "consulta-demo-pedro-1",
+        diasAtras: 60,
+        pesoKg: 78.4,
+        motivoConsulta: "Dolor en molar inferior derecho",
+        diagnostico: "Caries profunda en pieza 46",
+        tratamiento: "Endodoncia en pieza 46, control en 2 semanas",
+      },
+      {
+        id: "consulta-demo-pedro-2",
+        diasAtras: 14,
+        pesoKg: 79.1,
+        motivoConsulta: "Control de endodoncia y limpieza",
+        diagnostico: "Evolución favorable de endodoncia en 46",
+        tratamiento: "Profilaxis dental, continuar control cada 6 meses",
+      },
+    ];
+    for (const c of consultasPedroDef) {
+      const fecha = new Date(hoy);
+      fecha.setDate(fecha.getDate() - c.diasAtras);
+      await prisma.consulta.upsert({
+        where: { id: c.id },
+        update: {
+          fechaHora: fecha,
+          pesoKg: c.pesoKg,
+          motivoConsulta: c.motivoConsulta,
+          diagnostico: c.diagnostico,
+          tratamiento: c.tratamiento,
+        },
+        create: {
+          id: c.id,
+          organizacionId: organizacion.id,
+          pacienteId: pedro.id,
+          medicoId: medico.id,
+          estado: "CERRADA",
+          fechaHora: fecha,
+          motivoConsulta: c.motivoConsulta,
+          anamnesis: "Paciente refiere molestia al masticar del lado afectado.",
+          examenFisico: "Inflamación leve de encía adyacente a la pieza.",
+          evaluacion: c.diagnostico,
+          diagnostico: c.diagnostico,
+          tratamiento: c.tratamiento,
+          presionArterial: "120/80 mmHg",
+          frecuenciaCardiaca: 72,
+          temperatura: 36.6,
+          saturacionOxigeno: 98,
+          pesoKg: c.pesoKg,
+          tallaCm: 175,
+          camposEspecialidad: {
+            piezasDentales: "46",
+            diagnosticoOdontologico: c.diagnostico,
+            procedimientoRealizado: c.tratamiento,
+            proximoControl: "6 meses",
+          },
+        },
+      });
+    }
+
+    // Un documento (receta) sobre la consulta más reciente, para que la
+    // pestaña "Documentos" deje de mostrar "Sin documentos emitidos".
+    await prisma.documento.upsert({
+      where: { id: "documento-demo-pedro-1" },
+      update: {},
+      create: {
+        id: "documento-demo-pedro-1",
+        organizacionId: organizacion.id,
+        consultaId: "consulta-demo-pedro-2",
+        medicoId: medico.id,
+        tipo: "RECETA",
+        contenido: {
+          medicamentos: [
+            { nombre: "Ibuprofeno 400mg", indicaciones: "1 tableta cada 8 horas por 5 días, con alimentos" },
+            { nombre: "Amoxicilina 500mg", indicaciones: "1 cápsula cada 8 horas por 7 días" },
+          ],
+          indicacionesGenerales: "Evitar alimentos duros o muy fríos/calientes por 48 horas. Volver si persiste el dolor.",
+        },
+      },
+    });
+  }
+
   console.log("\nSeed de /hoy (demo odontólogo) completado.");
   console.log(`Entra en http://localhost:3000/login con:`);
   console.log(`  Correo: ${EMAIL}`);
