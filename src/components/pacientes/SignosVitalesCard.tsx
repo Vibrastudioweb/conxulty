@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/Card";
 import type { ConsultaHistorial } from "@/components/consultas/ConsultaHistorialCard";
+import { PesoEvolucionChart } from "./PesoEvolucionChart";
 
 /**
  * Signos vitales de la consulta más reciente que tenga al menos uno
@@ -8,6 +9,15 @@ import type { ConsultaHistorial } from "@/components/consultas/ConsultaHistorial
  * y el formulario de /consultas/[id]). El IMC se calcula aquí, no se
  * guarda: depende de peso Y talla de la MISMA consulta, para no mezclar un
  * peso reciente con una talla antigua.
+ *
+ * Evolución de peso (08-nov-2026, punto 56): a diferencia de las demás
+ * filas (que muestran solo la consulta más reciente), el peso SÍ se mira
+ * a través de varias consultas — es el único signo vital de los seis para
+ * el que tiene sentido clínico ver tendencia, y era el gap real que
+ * quedó pendiente de la demo. `consultas` ya viene ordenada desc por
+ * `listarConsultasDelPaciente`; aquí se invierte a asc solo para el
+ * gráfico (izquierda = más antiguo), sin tocar el orden que usa el resto
+ * de la pantalla.
  */
 export function SignosVitalesCard({
   consultas,
@@ -54,6 +64,11 @@ export function SignosVitalesCard({
   if (talla != null) filas.push({ label: "Talla", value: `${talla} cm` });
   if (imc != null) filas.push({ label: "IMC", value: imc.toFixed(1) });
 
+  const pesoHistorial = consultas
+    .filter((c) => c.pesoKg != null)
+    .map((c) => ({ fecha: c.fechaHora, pesoKg: Number(c.pesoKg) }))
+    .reverse(); // de desc (más reciente primero) a asc (más antiguo primero)
+
   return (
     <Card padding="cozy">
       <p className="text-caption text-text-faint">
@@ -73,6 +88,14 @@ export function SignosVitalesCard({
           </div>
         ))}
       </dl>
+      {pesoHistorial.length >= 2 && (
+        <div className="mt-3 border-t border-border pt-3">
+          <p className="text-caption text-text-faint">Evolución de peso</p>
+          <div className="mt-1">
+            <PesoEvolucionChart puntos={pesoHistorial} />
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

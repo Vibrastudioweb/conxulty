@@ -1,4 +1,5 @@
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { Search, Settings } from "lucide-react";
 import type { AlertaTopbar } from "@/modules/core/notificaciones";
 import { NotificacionesBell } from "./NotificacionesBell";
 
@@ -8,12 +9,16 @@ import { NotificacionesBell } from "./NotificacionesBell";
  * datos y comportamiento reales en vez de decorativos; ver changelog,
  * puntos 2/12/43).
  *
- * Dos piezas, ambas reales:
+ * Piezas reales:
  * - Búsqueda de pacientes: un <form method="get"> normal hacia
  *   /pacientes?q=..., el mismo mecanismo que ya usa
  *   `(dashboard)/pacientes/page.tsx` — no hay un buscador "global" nuevo
  *   que inventar, solo exponer el que ya existe desde aquí.
  * - Notificaciones: `NotificacionesBell`, compartida con `MobileHeader`.
+ * - Ajustes (08-nov-2026, ver changelog punto 56): el icono de engranaje
+ *   de la demo SÍ tiene destino real ahora (`/ajustes`) — a diferencia del
+ *   icono de cuadrícula de la demo, que se descartó por no tener ninguna
+ *   función real detrás (hubiera sido decorativo).
  *
  * Deliberadamente NO hay un chip de usuario/avatar aquí: `Sidebar` ya
  * muestra nombre, correo y cerrar sesión al pie — duplicarlo en el Topbar
@@ -50,8 +55,15 @@ export function Topbar({
         </div>
       </form>
 
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-1">
         <NotificacionesBell alertas={alertas} />
+        <Link
+          href="/ajustes"
+          aria-label="Ajustes"
+          className="rounded-input p-2 text-text-faint transition hover:bg-surface-muted hover:text-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+        >
+          <Settings size={18} aria-hidden="true" />
+        </Link>
       </div>
     </header>
   );

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Settings } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import type { AlertaTopbar } from "@/modules/core/notificaciones";
@@ -14,6 +15,10 @@ import { NotificacionesBell } from "./NotificacionesBell";
  * buscador de pacientes en este header compacto (sigue disponible entrando
  * a Pacientes), pero las notificaciones no tienen por qué faltar solo por
  * el viewport.
+ *
+ * Ajustes (08-nov-2026, punto 56): mismo destino que el engranaje del
+ * Topbar de escritorio — sin este ícono, /ajustes quedaría inalcanzable
+ * en mobile, que es justo lo que se pidió evitar.
  */
 export function MobileHeader({
   alertas,
@@ -31,6 +36,13 @@ export function MobileHeader({
       </Link>
       <div className="flex items-center gap-1">
         <NotificacionesBell alertas={alertas} />
+        <Link
+          href="/ajustes"
+          aria-label="Ajustes"
+          className="rounded-input p-2 text-text-faint transition hover:bg-surface-muted hover:text-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+        >
+          <Settings size={18} aria-hidden="true" />
+        </Link>
         <LogoutButton />
       </div>
     </header>

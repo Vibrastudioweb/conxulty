@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import {
   CalendarDays,
   CalendarCheck2,
@@ -221,6 +222,18 @@ export default async function HoyPage({
   const proxima = citas.find(
     (cita) => cita.estado === "PENDIENTE" || cita.estado === "CONFIRMADA",
   );
+  // "Próximas citas" (ver changelog punto 56): preview de ancho completo
+  // de lo que viene, no un duplicado de "Agenda de hoy" del panel lateral
+  // — ahí se ve TODO el día (incluidas las ya atendidas/canceladas); aquí
+  // solo lo que falta por pasar, limitado a 3, pensado para escanear
+  // rápido. `citas` ya viene ordenada asc por hora.
+  const proximasCitas = citas
+    .filter(
+      (cita) =>
+        (cita.estado === "PENDIENTE" || cita.estado === "CONFIRMADA") &&
+        cita.fechaHora > ahora,
+    )
+    .slice(0, 3);
   const atendidas = citas.filter((cita) => cita.estado === "ATENDIDA").length;
   const pendientesConfirmar = citas.filter(
     (cita) => cita.estado === "PENDIENTE",
@@ -364,6 +377,25 @@ export default async function HoyPage({
               {accionesRapidas}
             </div>
           </section>
+
+          {proximasCitas.length > 0 && (
+            <section className="mt-10">
+              <div className="flex items-baseline justify-between">
+                <SectionLabel>Próximas citas</SectionLabel>
+                <Link
+                  href="/agenda"
+                  className="text-caption font-semibold text-brand-primary hover:underline"
+                >
+                  Ver todas
+                </Link>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {proximasCitas.map((cita) => (
+                  <CitaCard key={cita.id} cita={cita} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Panel lateral "Hoy" (ver changelog punto 53): tira de la semana +
