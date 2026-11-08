@@ -101,11 +101,24 @@ export default async function CajaPage({
     esperadoBs?: string;
     diferenciaUsd?: string;
     diferenciaBs?: string;
+    /** Prellena "Cobro rápido" desde el acceso "Cobrar" de la ficha del
+     *  paciente (ver changelog punto 62) — no cambia el flujo, solo evita
+     *  que el médico tenga que copiar/pegar el ID a mano. */
+    pacienteId?: string;
   }>;
 }) {
   const session = await requireSesion();
-  const { error, abierta, gasto, cierre, esperadoUsd, esperadoBs, diferenciaUsd, diferenciaBs } =
-    await searchParams;
+  const {
+    error,
+    abierta,
+    gasto,
+    cierre,
+    esperadoUsd,
+    esperadoBs,
+    diferenciaUsd,
+    diferenciaBs,
+    pacienteId,
+  } = await searchParams;
 
   const cajaAbierta = await obtenerCajaAbierta({
     organizacionId: session.user.organizacionId,
@@ -207,7 +220,12 @@ export default async function CajaPage({
                 <label htmlFor="pacienteId" className="mb-1 block text-sm text-text-primary">
                   ID del paciente
                 </label>
-                <Input id="pacienteId" name="pacienteId" required />
+                <Input
+                  id="pacienteId"
+                  name="pacienteId"
+                  defaultValue={pacienteId}
+                  required
+                />
               </div>
               <div>
                 <label htmlFor="concepto2" className="mb-1 block text-sm text-text-primary">

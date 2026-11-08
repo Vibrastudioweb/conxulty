@@ -10,6 +10,7 @@ import { listarEventosDelPaciente } from "@/modules/trazabilidad";
 import { formatearFechaISO } from "@/components/citas/fecha";
 import {
   iniciarConsultaAction,
+  recetarAction,
   archivarPacienteAction,
   reactivarPacienteAction,
   crearAntecedenteAction,
@@ -243,6 +244,21 @@ export default async function PacientePage({
           >
             + Nueva cita
           </Link>
+          {/* "Recetar" directo desde la ficha (ver changelog punto 62: el
+              usuario pidió poder "entrar al paciente e ir a recetas" sin
+              que dependa de una consulta EN_CURSO ya abierta). Reutiliza
+              recetarAction, que abre/continúa la consulta y aterriza
+              directo en el formulario de la receta — misma regla de
+              citaNoDisponible que ya aplica a "Iniciar consulta". */}
+          {!citaNoDisponible && (
+            <form action={recetarAction}>
+              <input type="hidden" name="pacienteId" value={paciente.id} />
+              {citaId && <input type="hidden" name="citaId" value={citaId} />}
+              <Button type="submit" variant="secondary">
+                Recetar
+              </Button>
+            </form>
+          )}
           <form action={archivarPacienteAction} className="ml-auto">
             <input type="hidden" name="pacienteId" value={paciente.id} />
             <Button type="submit" variant="ghost" size="sm">
