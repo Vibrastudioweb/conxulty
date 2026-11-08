@@ -4,6 +4,7 @@ import {
   formatearHora,
   ETIQUETAS_ESTADO_CITA,
   TONO_ESTADO_CITA,
+  BORDE_IZQUIERDO_TONO,
 } from "@/components/citas/CitaCard";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -94,7 +95,7 @@ export function VistaSemana({
                     <Link
                       key={cita.id}
                       href={href}
-                      className="flex flex-col gap-1 rounded-input border border-border bg-surface px-2 py-1.5 transition hover:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                      className={`flex flex-col gap-1 rounded-input border border-border border-l-4 bg-surface px-2 py-1.5 transition hover:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary ${BORDE_IZQUIERDO_TONO[tono]}`}
                     >
                       <span className="text-caption font-semibold tabular-nums text-text-primary">
                         {formatearHora(cita.fechaHora)}

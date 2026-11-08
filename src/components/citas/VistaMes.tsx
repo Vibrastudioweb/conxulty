@@ -1,14 +1,29 @@
 import Link from "next/link";
-import type { CitaDelDia } from "@/components/citas/CitaCard";
+import { type CitaDelDia, TONO_ESTADO_CITA } from "@/components/citas/CitaCard";
 import { formatearFechaISO, inicioSemana, sumarDias } from "@/components/citas/fecha";
 
 const ETIQUETA_DIA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const SEMANAS_EN_GRILLA = 6;
 
+/** Color sólido del punto por estado (08-nov-2026, ver changelog punto
+ *  59: sistema de color de la demo, llevado a los puntos del mes) —
+ *  mismos 5 tonos que `TONO_ESTADO_CITA`/`Badge`, no un color nuevo. Los
+ *  tonos "soft" de Badge quedan demasiado pálidos para un punto de
+ *  1.5px, por eso aquí se usa el color base (`bg-success`, no
+ *  `bg-success-soft`). */
+const COLOR_PUNTO_TONO: Record<string, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
+  info: "bg-info",
+  neutral: "bg-text-faint",
+};
+
 /**
  * Vista de mes: navegación rápida, no detalle. Cada celda es el número del
  * día más un punto por cada cita (hasta 3, para no convertir la grilla en
- * una segunda vista de día) y lleva a la vista Día de esa fecha.
+ * una segunda vista de día), coloreado por estado, y lleva a la vista Día
+ * de esa fecha.
  */
 export function VistaMes({
   mesReferencia,
@@ -68,7 +83,9 @@ export function VistaMes({
                   {citasDelDia.slice(0, 3).map((cita) => (
                     <span
                       key={cita.id}
-                      className="h-1.5 w-1.5 rounded-full bg-brand-primary"
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        COLOR_PUNTO_TONO[TONO_ESTADO_CITA[cita.estado] ?? "neutral"]
+                      }`}
                     />
                   ))}
                 </span>

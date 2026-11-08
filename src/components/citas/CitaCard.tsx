@@ -30,6 +30,19 @@ export const TONO_ESTADO_CITA: Record<string, BadgeTone> = {
   NO_ASISTIO: "danger",
 };
 
+/** Borde izquierdo de color por tono — refuerzo visual del mismo estado
+ *  que ya muestra el Badge (08-nov-2026, ver changelog punto 59: sistema
+ *  de la demo que el usuario pidió llevar al real). Mismos 5 colores que
+ *  TONO_ESTADO_CITA, nunca un color nuevo que inventar. Exportado para
+ *  que VistaSemana/VistaMes lo reutilicen en vez de duplicar el mapa. */
+export const BORDE_IZQUIERDO_TONO: Record<BadgeTone, string> = {
+  success: "border-l-success",
+  warning: "border-l-warning",
+  danger: "border-l-danger",
+  info: "border-l-info",
+  neutral: "border-l-border",
+};
+
 export const ETIQUETAS_MODALIDAD: Record<string, string> = {
   PRESENCIAL: "Presencial",
   VIDEOCONSULTA: "Videoconsulta",
@@ -124,7 +137,7 @@ export function CitaCard({
     return (
       <Link
         href={rowHref}
-        className="-mx-3 flex items-center gap-4 rounded-input px-3 py-3 transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+        className={`-mx-3 flex items-center gap-4 rounded-input border-l-4 px-3 py-3 transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-primary ${BORDE_IZQUIERDO_TONO[tone]}`}
       >
         <span className="w-14 shrink-0 tabular-nums text-body-secondary font-medium text-text-secondary">
           {formatearHora(cita.fechaHora)}
@@ -146,14 +159,19 @@ export function CitaCard({
     );
   }
 
+  const tonoDefault = TONO_ESTADO_CITA[cita.estado] ?? "neutral";
+
   return (
-    <Card href={href}>
+    <Card
+      href={href}
+      className={`border-l-4 ${BORDE_IZQUIERDO_TONO[tonoDefault]}`}
+    >
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-text-primary">
           {formatearRangoHora(cita.fechaHora, cita.duracionMinutos)} —{" "}
           {cita.paciente.nombre} {cita.paciente.apellido}
         </span>
-        <Badge tone={TONO_ESTADO_CITA[cita.estado] ?? "neutral"}>
+        <Badge tone={tonoDefault}>
           {ETIQUETAS_ESTADO_CITA[cita.estado] ?? cita.estado}
         </Badge>
       </div>
