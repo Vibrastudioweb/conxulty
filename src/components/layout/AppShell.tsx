@@ -4,6 +4,7 @@ import { navForRol } from "@/components/navigation/nav-config";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { obtenerAlertasTopbar } from "@/modules/core/notificaciones";
 import { Sidebar } from "./Sidebar";
+import { SidebarFrame } from "./SidebarFrame";
 import { MobileHeader } from "./MobileHeader";
 import { Topbar } from "./Topbar";
 
@@ -40,7 +41,9 @@ export async function AppShell({
 
   return (
     <div className="min-h-screen bg-background lg:flex">
-      <Sidebar items={items} user={user} className="hidden lg:flex" />
+      <SidebarFrame className="hidden lg:flex">
+        <Sidebar items={items} user={user} />
+      </SidebarFrame>
 
       <div className="flex min-h-screen flex-1 flex-col">
         <MobileHeader alertas={alertas} className="lg:hidden" />

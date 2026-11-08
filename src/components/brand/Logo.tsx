@@ -24,14 +24,19 @@ const WORDMARK_TEXT_CLASSES: Record<LogoSize, string> = {
 export function Logo({
   size = "md",
   className = "",
+  wordmarkClassName = "",
 }: {
   size?: LogoSize;
   className?: string;
+  /** Clases extra para el wordmark — p. ej. para ocultarlo con un selector
+   *  `group-data-[...]:hidden` cuando el contenedor (sidebar) está
+   *  colapsado, sin tener que convertir `Logo` en Client Component. */
+  wordmarkClassName?: string;
 }) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <BrandMark size={MARK_SIZE[size]} />
-      <Wordmark className={WORDMARK_TEXT_CLASSES[size]} />
+      <Wordmark className={`${WORDMARK_TEXT_CLASSES[size]} ${wordmarkClassName}`} />
     </span>
   );
 }
