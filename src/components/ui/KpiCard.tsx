@@ -2,40 +2,79 @@ import type { LucideIcon } from "lucide-react";
 
 /**
  * Tarjeta de métrica del dashboard de "Hoy" (29-oct-2026, rediseño llevado
- * de la demo — ver changelog del proyecto, punto 2 y 43).
+ * de la demo — ver changelog del proyecto, punto 2 y 43; chip de color +
+ * delta "vs. ayer" agregados 08-nov-2026, punto 54).
  *
- * A diferencia de la demo, que mostraba 4 KPIs con deltas "vs. ayer" de
- * relleno: aquí solo se muestran métricas que de verdad se calculan contra
- * datos reales (ver hoy/page.tsx). No hay "Pendientes clínicos" — ese
- * concepto no existe en el modelo real y no se inventó uno — y no hay
- * comparación "vs. ayer" porque no hay ningún histórico agregado por día
- * todavía (mismo HECHO ya anotado en el changelog, punto 17, sobre
- * Reportes).
+ * A diferencia de la demo original, que mostraba deltas de relleno: el
+ * delta de aquí SÍ se calcula contra datos reales de ayer (ver
+ * hoy/page.tsx) — no es decorativo. Sigue sin existir "Pendientes
+ * clínicos" (no hay ese concepto en el modelo real, ver punto 2).
  */
+export type KpiAccent = "indigo" | "green" | "amber" | "sky";
+
+const ACCENT_BG: Record<KpiAccent, string> = {
+  indigo: "bg-brand-primary-soft",
+  green: "bg-success-soft",
+  amber: "bg-warning-soft",
+  sky: "bg-info-soft",
+};
+
+const ACCENT_TEXT: Record<KpiAccent, string> = {
+  indigo: "text-brand-primary",
+  green: "text-success-text",
+  amber: "text-warning-text",
+  sky: "text-info-text",
+};
+
+export interface KpiDelta {
+  direccion: "up" | "down" | "flat";
+  texto: string;
+}
+
+const DELTA_TEXT: Record<KpiDelta["direccion"], string> = {
+  up: "text-success-text",
+  down: "text-danger-text",
+  flat: "text-text-faint",
+};
+
+const DELTA_PREFIJO: Record<KpiDelta["direccion"], string> = {
+  up: "↑",
+  down: "↓",
+  flat: "",
+};
+
 export function KpiCard({
   icon: Icon,
   label,
   value,
   hint,
+  accent = "indigo",
+  delta,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   hint?: string;
+  accent?: KpiAccent;
+  delta?: KpiDelta;
 }) {
   return (
     <div className="rounded-card border border-border bg-surface px-4 py-3.5">
-      <div className="flex items-center gap-2 text-text-faint">
-        <Icon size={15} aria-hidden="true" />
-        <span className="text-eyebrow font-semibold uppercase tracking-wide">
-          {label}
-        </span>
-      </div>
-      <p className="mt-2 font-display text-page-title font-semibold text-text-primary">
+      <span
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-input ${ACCENT_BG[accent]} ${ACCENT_TEXT[accent]}`}
+      >
+        <Icon size={16} aria-hidden="true" />
+      </span>
+      <p className="mt-3 font-display text-page-title font-semibold text-text-primary">
         {value}
       </p>
-      {hint && (
-        <p className="mt-0.5 text-caption text-text-faint">{hint}</p>
+      <p className="mt-0.5 text-caption text-text-faint">{label}</p>
+      {delta ? (
+        <p className={`mt-1.5 text-caption font-medium ${DELTA_TEXT[delta.direccion]}`}>
+          {DELTA_PREFIJO[delta.direccion]} {delta.texto}
+        </p>
+      ) : (
+        hint && <p className="mt-1.5 text-caption text-text-faint">{hint}</p>
       )}
     </div>
   );

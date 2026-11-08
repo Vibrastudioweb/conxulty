@@ -12,8 +12,8 @@ import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
 import { listarCitasDelDia, listarCitasEnRango } from "@/modules/core/citas";
 import { obtenerTotalCobradoDelDia } from "@/modules/cobros-caja/cobros";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { QuickAction } from "@/components/ui/QuickAction";
-import { KpiCard } from "@/components/ui/KpiCard";
+import { KpiCard, type KpiDelta } from "@/components/ui/KpiCard";
+import { QuickActionTile } from "@/components/ui/QuickActionTile";
 import { ActividadMensualChart } from "@/components/ui/ActividadMensualChart";
 import { CitaCard } from "@/components/citas/CitaCard";
 import { TiraDiasSemana } from "@/components/citas/TiraDiasSemana";
@@ -91,7 +91,51 @@ function formatearFechaLarga(fecha: Date): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
-export default async function HoyPage() {
+/** Delta simple de conteo (citas, pacientes, pendientes) contra el mismo
+ *  dato de ayer — ver changelog punto 54. A diferencia de la demo, que
+ *  mostraba deltas de relleno, este SÍ se calcula contra datos reales. */
+function calcularDelta(actual: number, anterior: number): KpiDelta {
+  const diferencia = actual - anterior;
+  if (diferencia === 0) return { direccion: "flat", texto: "Igual que ayer" };
+  const signo = diferencia > 0 ? "+" : "";
+  return {
+    direccion: diferencia > 0 ? "up" : "down",
+    texto: `${signo}${diferencia} vs. ayer`,
+  };
+}
+
+/** Delta de cobros contra ayer — usa únicamente la PRIMERA moneda que
+ *  aparezca (hoy, o si hoy no cobró nada, la de ayer), para no mezclar
+ *  monedas en una sola cifra ni inventar matemática multi-moneda (ver
+ *  nota de `formatearCobrosDelDia` / punto 54: simplificación deliberada,
+ *  "sin complicarlo"). Si ninguno de los dos días tiene cobros, no hay
+ *  moneda de referencia y el delta queda "Igual que ayer". */
+function calcularDeltaCobros(
+  totalesHoy: Array<{ moneda: string; total: number }>,
+  totalesAyer: Array<{ moneda: string; total: number }>,
+): KpiDelta {
+  const monedaRef = totalesHoy[0]?.moneda ?? totalesAyer[0]?.moneda;
+  if (!monedaRef) return { direccion: "flat", texto: "Igual que ayer" };
+  const totalHoy = totalesHoy.find((t) => t.moneda === monedaRef)?.total ?? 0;
+  const totalAyer = totalesAyer.find((t) => t.moneda === monedaRef)?.total ?? 0;
+  const diferencia = totalHoy - totalAyer;
+  if (diferencia === 0) return { direccion: "flat", texto: "Igual que ayer" };
+  const simbolo = monedaRef === "USD" ? "$" : `${monedaRef} `;
+  const monto = Math.abs(diferencia).toLocaleString("es", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+  return {
+    direccion: diferencia > 0 ? "up" : "down",
+    texto: `${diferencia > 0 ? "+" : "-"}${simbolo}${monto} vs. ayer`,
+  };
+}
+
+export default async function HoyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ semana?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
@@ -119,6 +163,8 @@ export default async function HoyPage() {
   }
 
   const ahora = new Date();
+  const ayer = new Date(ahora);
+  ayer.setDate(ayer.getDate() - 1);
   const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
   const inicioMesSiguiente = new Date(
     ahora.getFullYear(),
@@ -126,24 +172,45 @@ export default async function HoyPage() {
     1,
   );
 
-  const [citas, cobrosDelDia, citasDelMes] = await Promise.all([
-    listarCitasDelDia({
-      organizacionId: session.user.organizacionId,
-      medicoId: medico.id,
-      fecha: ahora,
-    }),
-    obtenerTotalCobradoDelDia({
-      organizacionId: session.user.organizacionId,
-      medicoId: medico.id,
-      fecha: ahora,
-    }),
-    listarCitasEnRango({
-      organizacionId: session.user.organizacionId,
-      medicoId: medico.id,
-      inicio: inicioMes,
-      fin: inicioMesSiguiente,
-    }),
-  ]);
+  // Paginación de "Esta semana" (ver changelog punto 54, TiraDiasSemana):
+  // solo cambia qué semana se dibuja en la tira lateral, no la agenda de
+  // abajo, que sigue siendo siempre la de "hoy".
+  const paramsBusqueda = await searchParams;
+  const offsetSemana = Number.parseInt(paramsBusqueda.semana ?? "0", 10) || 0;
+  const fechaReferenciaSemana = new Date(ahora);
+  fechaReferenciaSemana.setDate(
+    fechaReferenciaSemana.getDate() + offsetSemana * 7,
+  );
+
+  const [citas, cobrosDelDia, citasDelMes, citasAyer, cobrosAyer] =
+    await Promise.all([
+      listarCitasDelDia({
+        organizacionId: session.user.organizacionId,
+        medicoId: medico.id,
+        fecha: ahora,
+      }),
+      obtenerTotalCobradoDelDia({
+        organizacionId: session.user.organizacionId,
+        medicoId: medico.id,
+        fecha: ahora,
+      }),
+      listarCitasEnRango({
+        organizacionId: session.user.organizacionId,
+        medicoId: medico.id,
+        inicio: inicioMes,
+        fin: inicioMesSiguiente,
+      }),
+      listarCitasDelDia({
+        organizacionId: session.user.organizacionId,
+        medicoId: medico.id,
+        fecha: ayer,
+      }),
+      obtenerTotalCobradoDelDia({
+        organizacionId: session.user.organizacionId,
+        medicoId: medico.id,
+        fecha: ayer,
+      }),
+    ]);
 
   const actividadDelMes = agruparCitasPorDiaDelMes(
     citasDelMes,
@@ -161,16 +228,44 @@ export default async function HoyPage() {
   const hayCitas = citas.length > 0;
   const cobrosHoy = formatearCobrosDelDia(cobrosDelDia);
 
+  const atendidasAyer = citasAyer.filter(
+    (cita) => cita.estado === "ATENDIDA",
+  ).length;
+  const pendientesConfirmarAyer = citasAyer.filter(
+    (cita) => cita.estado === "PENDIENTE",
+  ).length;
+
+  const deltaCitas = calcularDelta(citas.length, citasAyer.length);
+  const deltaAtendidas = calcularDelta(atendidas, atendidasAyer);
+  const deltaCobros = calcularDeltaCobros(cobrosDelDia, cobrosAyer);
+  const deltaPendientes = calcularDelta(
+    pendientesConfirmar,
+    pendientesConfirmarAyer,
+  );
+
   const accionesRapidas = (
     <>
-      <QuickAction href="/agenda" icon={CalendarDays} label="Ver agenda" />
-      <QuickAction
+      <QuickActionTile
+        href="/agenda"
+        icon={CalendarDays}
+        title="Ver agenda"
+        subtitle="Toda la semana"
+        accent="indigo"
+      />
+      <QuickActionTile
         href="/pacientes"
         icon={UserPlus}
-        label="Nueva consulta sin cita"
-        variant="primary"
+        title="Nueva consulta sin cita"
+        subtitle="Registra un paciente ahora"
+        accent="green"
       />
-      <QuickAction href="/caja" icon={Wallet} label="Registrar cobro" />
+      <QuickActionTile
+        href="/caja"
+        icon={Wallet}
+        title="Registrar cobro"
+        subtitle="Cobros y caja del día"
+        accent="amber"
+      />
     </>
   );
 
@@ -196,70 +291,79 @@ export default async function HoyPage() {
               icon={CalendarDays}
               label="Citas de hoy"
               value={String(citas.length)}
+              accent="indigo"
+              delta={deltaCitas}
             />
             <KpiCard
               icon={UserCheck}
               label="Pacientes atendidos"
               value={String(atendidas)}
+              accent="green"
+              delta={deltaAtendidas}
             />
             <KpiCard
               icon={CircleDollarSign}
               label="Cobros del día"
               value={cobrosHoy.value}
               hint={cobrosHoy.hint}
+              accent="amber"
+              delta={deltaCobros}
             />
             <KpiCard
               icon={CalendarCheck2}
               label="Por confirmar"
               value={String(pendientesConfirmar)}
+              accent="sky"
+              delta={deltaPendientes}
             />
           </section>
 
-          <section className="mt-8 rounded-card border border-border bg-surface px-5 py-4">
-            <SectionLabel>Actividad del mes</SectionLabel>
-            <p className="mt-0.5 text-body-secondary text-text-faint">
-              {citasDelMes.length} {citasDelMes.length === 1 ? "cita" : "citas"}{" "}
-              en {ahora.toLocaleDateString("es", { month: "long" })}
-            </p>
-            <div className="mt-3">
-              <ActividadMensualChart datos={actividadDelMes} />
-            </div>
-          </section>
-
-          {!hayCitas ? (
-            <section className="mt-8 rounded-card bg-brand-primary-soft px-6 py-10 text-center">
-              <p className="text-section-title font-semibold text-text-primary">
-                Tu agenda está despejada
+          {/* Fila gráfico + CTA/resumen lado a lado (ver changelog punto 54,
+              proporción equivalente a `.chart-row` de la demo). */}
+          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+            <section className="rounded-card border border-border bg-surface px-5 py-4">
+              <SectionLabel>Actividad del mes</SectionLabel>
+              <p className="mt-0.5 text-body-secondary text-text-faint">
+                {citasDelMes.length}{" "}
+                {citasDelMes.length === 1 ? "cita" : "citas"} en{" "}
+                {ahora.toLocaleDateString("es", { month: "long" })}
               </p>
-              <p className="mt-1 text-body-secondary text-text-secondary">
-                Hoy no tienes consultas programadas.
-              </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                {accionesRapidas}
+              <div className="mt-3">
+                <ActividadMensualChart datos={actividadDelMes} />
               </div>
             </section>
-          ) : (
-            <>
-              <section className="mt-8 rounded-card bg-brand-primary-soft px-5 py-4">
+
+            {!hayCitas ? (
+              <section className="flex h-full flex-col items-center justify-center rounded-card bg-brand-primary-soft px-6 py-10 text-center">
+                <p className="text-section-title font-semibold text-text-primary">
+                  Tu agenda está despejada
+                </p>
+                <p className="mt-1 text-body-secondary text-text-secondary">
+                  Hoy no tienes consultas programadas.
+                </p>
+              </section>
+            ) : (
+              <section className="rounded-card bg-brand-primary-soft px-5 py-4">
                 <p className="text-section-title font-semibold text-text-primary">
                   Tu jornada de hoy
                 </p>
                 <p className="mt-0.5 text-body-secondary text-text-secondary">
-                  {citas.length} {citas.length === 1 ? "consulta" : "consultas"}{" "}
-                  programada{citas.length === 1 ? "" : "s"}
+                  {citas.length}{" "}
+                  {citas.length === 1 ? "consulta" : "consultas"} programada
+                  {citas.length === 1 ? "" : "s"}
                   {atendidas > 0 &&
                     ` · ${atendidas} atendida${atendidas === 1 ? "" : "s"}`}
                 </p>
               </section>
+            )}
+          </div>
 
-              <section className="mt-10">
-                <SectionLabel>Acciones rápidas</SectionLabel>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  {accionesRapidas}
-                </div>
-              </section>
-            </>
-          )}
+          <section className="mt-10">
+            <SectionLabel>Acciones rápidas</SectionLabel>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {accionesRapidas}
+            </div>
+          </section>
         </div>
 
         {/* Panel lateral "Hoy" (ver changelog punto 53): tira de la semana +
@@ -269,7 +373,12 @@ export default async function HoyPage() {
           <section className="rounded-card border border-border bg-surface px-4 py-4">
             <SectionLabel>Esta semana</SectionLabel>
             <div className="mt-2">
-              <TiraDiasSemana hoy={ahora} />
+              <TiraDiasSemana
+                hoy={ahora}
+                fechaReferencia={fechaReferenciaSemana}
+                hrefSemanaAnterior={`/hoy?semana=${offsetSemana - 1}`}
+                hrefSemanaSiguiente={`/hoy?semana=${offsetSemana + 1}`}
+              />
             </div>
           </section>
 
