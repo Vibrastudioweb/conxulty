@@ -64,6 +64,7 @@ export function CitaCard({
   cita,
   destacada = false,
   variant = "card",
+  onSeleccionar,
 }: {
   cita: CitaDelDia;
   destacada?: boolean;
@@ -74,6 +75,14 @@ export function CitaCard({
    *  refleja en el badge y enlaza a continuar la consulta en vez de al
    *  perfil del paciente. */
   variant?: "card" | "row";
+  /** Si se pasa, la tarjeta deja de navegar directo a la ficha y en su
+   *  lugar abre el panel de "Detalle de la cita" (ver changelog punto 60:
+   *  paso intermedio con lo esencial + "Iniciar consulta" + un link
+   *  separado a la ficha completa). No aplica a `destacada` — esa card
+   *  mantiene su propio acceso directo a "Entrar a consulta". El estado
+   *  EN_CURSO de variant="row" sigue yendo directo a la consulta: ese caso
+   *  no es "ver detalle", es continuar algo que ya está en curso. */
+  onSeleccionar?: (cita: CitaDelDia) => void;
 }) {
   const href = `/pacientes/${cita.paciente.id}?cita=${cita.id}`;
 
@@ -134,11 +143,12 @@ export function CitaCard({
     const IconoModalidad =
       ICONO_MODALIDAD[cita.modalidad as keyof typeof ICONO_MODALIDAD];
 
-    return (
-      <Link
-        href={rowHref}
-        className={`-mx-3 flex items-center gap-4 rounded-input border-l-4 px-3 py-3 transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-primary ${BORDE_IZQUIERDO_TONO[tone]}`}
-      >
+    // EN_CURSO siempre navega directo (continuar la consulta), nunca abre
+    // el panel de detalle — ver nota del prop `onSeleccionar` arriba.
+    const abreDetalle = onSeleccionar && !consultaEnCurso;
+
+    const contenido = (
+      <>
         <span className="w-14 shrink-0 tabular-nums text-body-secondary font-medium text-text-secondary">
           {formatearHora(cita.fechaHora)}
         </span>
@@ -155,17 +165,33 @@ export function CitaCard({
           </span>
         </span>
         <Badge tone={tone}>{etiqueta}</Badge>
+      </>
+    );
+    const claseRow = `-mx-3 flex w-full items-center gap-4 rounded-input border-l-4 px-3 py-3 text-left transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-primary ${BORDE_IZQUIERDO_TONO[tone]}`;
+
+    if (abreDetalle) {
+      return (
+        <button
+          type="button"
+          onClick={() => onSeleccionar(cita)}
+          className={claseRow}
+        >
+          {contenido}
+        </button>
+      );
+    }
+
+    return (
+      <Link href={rowHref} className={claseRow}>
+        {contenido}
       </Link>
     );
   }
 
   const tonoDefault = TONO_ESTADO_CITA[cita.estado] ?? "neutral";
-
-  return (
-    <Card
-      href={href}
-      className={`border-l-4 ${BORDE_IZQUIERDO_TONO[tonoDefault]}`}
-    >
+  const claseCard = `border-l-4 ${BORDE_IZQUIERDO_TONO[tonoDefault]}`;
+  const contenidoCard = (
+    <>
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-text-primary">
           {formatearRangoHora(cita.fechaHora, cita.duracionMinutos)} —{" "}
@@ -185,6 +211,20 @@ export function CitaCard({
             : "Consulta registrada"}
         </span>
       )}
+    </>
+  );
+
+  if (onSeleccionar) {
+    return (
+      <Card onClick={() => onSeleccionar(cita)} className={claseCard}>
+        {contenidoCard}
+      </Card>
+    );
+  }
+
+  return (
+    <Card href={href} className={claseCard}>
+      {contenidoCard}
     </Card>
   );
 }

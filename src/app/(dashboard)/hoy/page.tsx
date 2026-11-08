@@ -10,13 +10,18 @@ import {
 } from "lucide-react";
 import { auth } from "@/auth";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
-import { listarCitasDelDia, listarCitasEnRango } from "@/modules/core/citas";
+import {
+  listarCitasDelDia,
+  listarCitasDelDiaConDetalle,
+  listarCitasEnRango,
+} from "@/modules/core/citas";
 import { obtenerTotalCobradoDelDia } from "@/modules/cobros-caja/cobros";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { KpiCard, type KpiDelta } from "@/components/ui/KpiCard";
 import { QuickActionTile } from "@/components/ui/QuickActionTile";
 import { ActividadMensualChart } from "@/components/ui/ActividadMensualChart";
 import { CitaCard } from "@/components/citas/CitaCard";
+import { ListaCitasSeleccionable } from "@/components/citas/ListaCitasSeleccionable";
 import { TiraDiasSemana } from "@/components/citas/TiraDiasSemana";
 
 /** Títulos profesionales que anteceden al nombre real en `Usuario.nombre`
@@ -185,7 +190,7 @@ export default async function HoyPage({
 
   const [citas, cobrosDelDia, citasDelMes, citasAyer, cobrosAyer] =
     await Promise.all([
-      listarCitasDelDia({
+      listarCitasDelDiaConDetalle({
         organizacionId: session.user.organizacionId,
         medicoId: medico.id,
         fecha: ahora,
@@ -393,11 +398,11 @@ export default async function HoyPage({
                   Ver todas
                 </Link>
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {proximasCitas.map((cita) => (
-                  <CitaCard key={cita.id} cita={cita} />
-                ))}
-              </div>
+              <ListaCitasSeleccionable
+                citas={proximasCitas}
+                variant="card"
+                className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              />
             </section>
           )}
         </div>
@@ -435,11 +440,11 @@ export default async function HoyPage({
               </span>
             </div>
             {hayCitas ? (
-              <div className="mt-2 divide-y divide-border rounded-card border border-border bg-surface px-3">
-                {citas.map((cita) => (
-                  <CitaCard key={cita.id} cita={cita} variant="row" />
-                ))}
-              </div>
+              <ListaCitasSeleccionable
+                citas={citas}
+                variant="row"
+                className="mt-2 divide-y divide-border rounded-card border border-border bg-surface px-3"
+              />
             ) : (
               <p className="mt-2 text-body-secondary text-text-faint">
                 Sin consultas programadas para hoy.

@@ -162,6 +162,59 @@ export async function listarCitasDelDia(input: {
 }
 
 /**
+ * Igual que listarCitasDelDia, pero con los datos adicionales del paciente
+ * que necesita la tarjeta de "Detalle de la cita" (ver changelog punto 60):
+ * teléfono, fecha de nacimiento, sexo y documento para la vista rápida, más
+ * sus alergias activas (mismo filtro que usa `listarAntecedentesDelPaciente`
+ * y `AlertaAlergias`: tipo ALERGIA + activo). Se separa de
+ * `listarCitasDelDia` para no cargar estos campos extra en los llamados que
+ * no los necesitan (p.ej. `citasAyer` en /hoy, que solo cuenta para los
+ * deltas). Solo la usan la vista Día de /agenda y la cita de "hoy" en /hoy,
+ * que son los dos lugares donde existe el panel de detalle.
+ */
+export async function listarCitasDelDiaConDetalle(input: {
+  organizacionId: string;
+  medicoId: string;
+  fecha: Date;
+  estado?: EstadoCita;
+  modalidad?: ModalidadCita;
+}) {
+  const inicio = new Date(input.fecha);
+  inicio.setHours(0, 0, 0, 0);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+
+  return prisma.cita.findMany({
+    where: {
+      organizacionId: input.organizacionId,
+      medicoId: input.medicoId,
+      fechaHora: { gte: inicio, lt: fin },
+      ...(input.estado ? { estado: input.estado } : {}),
+      ...(input.modalidad ? { modalidad: input.modalidad } : {}),
+    },
+    include: {
+      paciente: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          telefono: true,
+          fechaNacimiento: true,
+          sexo: true,
+          documentoIdentidad: true,
+          antecedentesMedicos: {
+            where: { tipo: "ALERGIA", activo: true },
+            select: { id: true, descripcion: true },
+          },
+        },
+      },
+      consulta: { select: { id: true, estado: true } },
+    },
+    orderBy: { fechaHora: "asc" },
+  });
+}
+
+/**
  * Igual que listarCitasDelDia pero para un rango [inicio, fin) arbitrario —
  * usado por las vistas de semana y mes, que necesitan varios días en una
  * sola consulta en vez de repetir listarCitasDelDia por cada día.
