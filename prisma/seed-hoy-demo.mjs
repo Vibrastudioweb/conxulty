@@ -180,6 +180,20 @@ async function main() {
   // --- Resto del mes: para que "Actividad del mes" tenga barras más allá
   // de hoy. 1-3 citas en días pasados del mes (nunca hoy/ayer, ya cubiertos
   // arriba, ni días futuros).
+  //
+  // Estado variado (no todas ATENDIDA, ver changelog punto 60b): días
+  // pasados reales tienen de todo — algunas canceladas, alguna sin
+  // asistencia — y con todas en el mismo estado el sistema de color por
+  // estado de Vista Mes (punto 59) se ve de un solo color, que es
+  // justo lo que el usuario reportó al probarlo. La mayoría sigue siendo
+  // ATENDIDA (lo más común en días ya pasados), pero con variedad real.
+  const ESTADOS_MES_PASADO = [
+    "ATENDIDA",
+    "ATENDIDA",
+    "ATENDIDA",
+    "CANCELADA",
+    "NO_ASISTIO",
+  ];
   let citasMes = 0;
   const diaHoy = hoy.getDate();
   for (let dia = 1; dia < diaHoy - 1; dia++) {
@@ -188,16 +202,21 @@ async function main() {
     for (let n = 0; n < cantidad; n++) {
       citasMes++;
       const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), dia);
+      const estado = ESTADOS_MES_PASADO[(dia + n) % ESTADOS_MES_PASADO.length];
       await prisma.cita.upsert({
         where: { id: `cita-demo-odonto-mes-${dia}-${n + 1}` },
-        update: {},
+        // `update` ya no vacío (a diferencia de la versión anterior de este
+        // bloque): si ya habías corrido el seed antes de este cambio, las
+        // citas quedaron creadas con estado ATENDIDA fijo y un upsert con
+        // `update: {}` nunca las habría actualizado al volver a correrlo.
+        update: { estado },
         create: {
           id: `cita-demo-odonto-mes-${dia}-${n + 1}`,
           organizacionId: organizacion.id,
           pacienteId: pacientes[(dia + n) % pacientes.length].id,
           medicoId: medico.id,
           fechaHora: conHora(fecha, 9 + n * 2, 0),
-          estado: "ATENDIDA",
+          estado,
           motivo: MOTIVOS[(dia + n) % MOTIVOS.length],
         },
       });
