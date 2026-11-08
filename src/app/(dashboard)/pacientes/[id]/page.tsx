@@ -36,6 +36,9 @@ import { TrazabilidadPacienteSeccion } from "@/components/pacientes/Trazabilidad
 import { SignosVitalesCard } from "@/components/pacientes/SignosVitalesCard";
 import { TratamientosPacienteSeccion } from "@/components/pacientes/TratamientosPacienteSeccion";
 import { TabsFicha, type TabFicha } from "@/components/pacientes/TabsFicha";
+import { AccionesRapidasPaciente } from "@/components/pacientes/AccionesRapidasPaciente";
+import { ResumenClinicoCard } from "@/components/pacientes/ResumenClinicoCard";
+import { DocumentoResumenCard } from "@/components/documentos/DocumentoResumenCard";
 
 /** Primera cita futura (PENDIENTE o CONFIRMADA), o null si no hay ninguna.
  *  `listarCitasDelPaciente` ya viene ordenada desc, así que se filtra y se
@@ -321,6 +324,52 @@ export default async function PacientePage({
           </div>
 
           <div className="space-y-6">
+            <AccionesRapidasPaciente pacienteId={paciente.id} telefono={paciente.telefono} />
+
+            <ResumenClinicoCard antecedentes={antecedentes} />
+
+            {paciente.contactoEmergenciaNombre && (
+              <section>
+                <SectionLabel>Contacto de emergencia</SectionLabel>
+                <div className="mt-2">
+                  <Card padding="cozy">
+                    <p className="text-body-secondary text-text-primary font-medium">
+                      {paciente.contactoEmergenciaNombre}
+                    </p>
+                    {paciente.contactoEmergenciaTelefono && (
+                      <p className="mt-1 text-body-secondary text-text-secondary">
+                        {paciente.contactoEmergenciaTelefono}
+                      </p>
+                    )}
+                  </Card>
+                </div>
+              </section>
+            )}
+
+            {documentos.length > 0 && (
+              <section>
+                <div className="flex items-center justify-between">
+                  <SectionLabel>Documentos recientes</SectionLabel>
+                  <Link
+                    href={`/pacientes/${paciente.id}?tab=documentos`}
+                    className="text-caption font-semibold text-brand-primary hover:underline"
+                  >
+                    Ver todas →
+                  </Link>
+                </div>
+                <ul className="mt-2 space-y-2">
+                  {documentos.slice(0, 3).map((documento) => (
+                    <li key={documento.id}>
+                      <DocumentoResumenCard
+                        consultaId={documento.consultaId}
+                        documento={documento}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             <section>
               <SectionLabel>Signos vitales</SectionLabel>
               <div className="mt-2">
