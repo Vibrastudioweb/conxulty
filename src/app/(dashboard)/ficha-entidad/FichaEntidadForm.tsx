@@ -5,7 +5,9 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { GaleriaFotosForm } from "@/components/ui/GaleriaFotosForm";
 import { guardarFichaEntidadAction, type GuardarFichaEntidadResultado } from "./actions";
+import { agregarFotoGaleriaEntidadAction, quitarFotoGaleriaEntidadAction } from "./galeriaActions";
 import type { CiudadDirectorio, FichaEntidadDirectorio } from "@/modules/directorio/sincronizacionEntidad";
 import { DIAS_SEMANA, type HorarioDia } from "@/modules/onboarding/horarioSede";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
@@ -151,6 +153,21 @@ export function FichaEntidadForm({
               </div>
             );
           })}
+        </div>
+      </Card>
+
+      <Card padding="spacious">
+        <h2 className="text-sm font-semibold text-text-primary">Fotos</h2>
+        <p className="mt-1 text-caption text-text-faint">
+          Hasta 6 fotos de tu centro — fachada, instalaciones, lo que quieras que vea quien busque en el
+          Directorio.
+        </p>
+        <div className="mt-3">
+          <GaleriaFotosForm
+            fotosIniciales={ficha?.galeria ?? []}
+            agregarAction={agregarFotoGaleriaEntidadAction}
+            quitarAction={quitarFotoGaleriaEntidadAction}
+          />
         </div>
       </Card>
 
