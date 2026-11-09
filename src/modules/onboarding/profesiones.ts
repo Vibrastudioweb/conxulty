@@ -35,15 +35,24 @@ export const LABEL_PROFESION: Record<ProfesionId, string> = {
 };
 
 /**
- * Profesiones a las que se les ofrece Plan Pro — la lista que el usuario
- * nombró explícitamente (changelog punto 29) sigue siendo HIPÓTESIS, no
- * cerrada para siempre: "esto puede cambiar" si se amplía a profesiones no
- * clínicas.
+ * Profesiones a las que se les ofrece Plan Pro — ampliado a las 11 del
+ * punto 84 (DECISIÓN del usuario: "si para todos"). Queda afuera
+ * deliberadamente OTRA: no es una profesión definida (texto libre, sin
+ * tipos_profesional correspondiente del lado del Directorio), así que no
+ * se asumió que "todos" la incluyera — confirmar si corresponde también.
  */
 export const PROFESIONES_ELEGIBLES_PRO: readonly ProfesionId[] = [
   "MEDICO",
   "ODONTOLOGO",
   "PSICOLOGO",
+  "NUTRICIONISTA",
+  "FISIOTERAPEUTA",
+  "ENFERMERO",
+  "TERAPEUTA_LENGUAJE",
+  "TERAPEUTA_OCUPACIONAL",
+  "PSICOPEDAGOGO",
+  "PODOLOGO",
+  "OPTOMETRISTA",
 ];
 
 export function esProfesionElegiblePro(profesion: ProfesionId): boolean {
