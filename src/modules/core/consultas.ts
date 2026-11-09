@@ -258,7 +258,7 @@ export async function guardarConsulta(input: {
   });
 
   const data: Partial<Record<CampoClinico, string | null>> &
-    Partial<Record<CampoVital, string | number | null>> & {
+    CamposVitales & {
       // Prisma modela un campo Json nulo con `Prisma.JsonNull`, no con el
       // `null` de JS — por eso el tipo acá no es `Record<...> | null`
       // directo (ver asignación más abajo, donde se hace la conversión).
@@ -272,7 +272,12 @@ export async function guardarConsulta(input: {
   if (input.vitales) {
     for (const campo of CAMPOS_VITALES) {
       if (campo in input.vitales) {
-        data[campo] = input.vitales[campo] ?? null;
+        // Asignación "a ciegas" deliberada: `campo` es un CampoVital (unión),
+        // y TS no correlaciona el tipo de valor de `input.vitales[campo]`
+        // con la clave en un loop genérico, aunque en runtime SÍ coincide
+        // campo a campo con CamposVitales (ver definición más arriba).
+        (data as Record<CampoVital, string | number | null>)[campo] =
+          input.vitales[campo] ?? null;
         vitalesModificados.push(campo);
       }
     }
