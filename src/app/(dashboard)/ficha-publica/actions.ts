@@ -87,7 +87,24 @@ export async function guardarFichaPublicaAction(
   // municipio de Trujillo que ya tiene cada Sede — ver sincronizacion.ts).
   // El formulario manda un campo `ciudadSede_<id>` por cada sede del OS.
   type SedeOs = { id: string; direccion: string; referencia: string | null; telefono: string | null };
-  type SedeConCiudad = { ciudadId: string; direccion: string; referencia: string | null; telefono: string | null };
+  type SedeConCiudad = {
+    ciudadId: string;
+    direccion: string;
+    referencia: string | null;
+    telefono: string | null;
+    lat: number | null;
+    lng: number | null;
+  };
+
+  // El picker de mapa manda `lat_<id>`/`lng_<id>` como string numérico solo
+  // cuando el médico marcó un punto — ausentes o vacíos quedan en null (el
+  // punto exacto es opcional, la ciudad ya alcanza para listar la sede).
+  function coordenada(valor: FormDataEntryValue | null): number | null {
+    const texto = valor?.toString().trim();
+    if (!texto) return null;
+    const numero = Number(texto);
+    return Number.isFinite(numero) ? numero : null;
+  }
 
   const sedesConCiudad = sedes
     .map((sede: SedeOs): SedeConCiudad | null => {
@@ -98,6 +115,8 @@ export async function guardarFichaPublicaAction(
         direccion: sede.direccion,
         referencia: sede.referencia,
         telefono: sede.telefono,
+        lat: coordenada(formData.get(`lat_${sede.id}`)),
+        lng: coordenada(formData.get(`lng_${sede.id}`)),
       };
     })
     .filter((s: SedeConCiudad | null): s is SedeConCiudad => s !== null);
