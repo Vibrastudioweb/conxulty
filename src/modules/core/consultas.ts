@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 import { validarConsistenciaConsulta } from "@/db/consistenciaOrganizacional";
@@ -258,7 +259,10 @@ export async function guardarConsulta(input: {
 
   const data: Partial<Record<CampoClinico, string | null>> &
     Partial<Record<CampoVital, string | number | null>> & {
-      camposEspecialidad?: Record<string, string> | null;
+      // Prisma modela un campo Json nulo con `Prisma.JsonNull`, no con el
+      // `null` de JS — por eso el tipo acá no es `Record<...> | null`
+      // directo (ver asignación más abajo, donde se hace la conversión).
+      camposEspecialidad?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
     } = {};
   for (const campo of camposModificados) {
     data[campo] = input.campos[campo] ?? null;
@@ -281,7 +285,7 @@ export async function guardarConsulta(input: {
         ? input.camposEspecialidad
         : null;
     if (JSON.stringify(nuevo) !== JSON.stringify(consulta.camposEspecialidad ?? null)) {
-      data.camposEspecialidad = nuevo;
+      data.camposEspecialidad = nuevo === null ? Prisma.JsonNull : nuevo;
       camposEspecialidadModificado = true;
     }
   }
