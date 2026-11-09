@@ -110,6 +110,43 @@ export async function sincronizarFichaDirectorio(
   }
 }
 
+export type ResultadoSubidaFoto = { ok: true; fotoUrl: string } | { ok: false; error: string };
+
+/**
+ * Sube la foto (ya convertida a webp en el navegador, ver RecortadorFoto)
+ * al Directorio — ver changelog punto 86 y el endpoint hermano del lado de
+ * vitalud, api/sincronizar-profesional/foto/+server.js. Requiere un
+ * `fichaDirectorioId` real: no crea la ficha, solo le aplica la foto.
+ */
+export async function subirFotoDirectorio(
+  fichaDirectorioId: string,
+  foto: File,
+): Promise<ResultadoSubidaFoto> {
+  const config = configuracion();
+  if (!config) {
+    return { ok: false, error: "DIRECTORIO_API_URL / CONXULTY_SYNC_SECRET no configurados en este entorno." };
+  }
+
+  try {
+    const form = new FormData();
+    form.set("id", fichaDirectorioId);
+    form.set("foto", foto, "foto.webp");
+    const respuesta = await fetch(`${config.base}/api/sincronizar-profesional/foto`, {
+      method: "POST",
+      headers: { "x-conxulty-secret": config.secreto },
+      body: form,
+    });
+    const cuerpo = (await respuesta.json().catch(() => null)) as
+      | { ok: true; fotoUrl: string }
+      | { ok: false; error: string }
+      | null;
+    if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
+    return cuerpo;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Error de red al contactar el Directorio." };
+  }
+}
+
 export interface CiudadDirectorio {
   id: string;
   nombre: string;
