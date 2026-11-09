@@ -1,0 +1,151 @@
+import crypto from "node:crypto";
+import { prisma } from "@/db/client";
+import { registrarEvento } from "@/modules/trazabilidad";
+import { crearPaciente } from "@/modules/core/pacientes";
+import { hayConflictoHorario, DURACION_MINUTOS_DEFECTO, CitaConflictoHorarioError } from "@/modules/core/citas";
+
+/**
+ * Reserva pública de citas (Task #15, changelog punto 91/97) — la ÚNICA
+ * puerta de entrada para que una Cita nazca desde FUERA del OS (la ficha
+ * pública en conxulty.com, repo `vitalud`). Llamada por
+ * /api/directorio/reservar-cita, nunca directo desde un Server Action de
+ * sesión — por eso vive en su propio módulo en vez de agregarse a
+ * citas.ts: toda función de citas.ts asume una sesión real
+ * (requireMedicoSesion) y un actorId confiable; acá no hay sesión, así
+ * que cada decisión de confianza se documenta explícitamente.
+ *
+ * Reutiliza `crearPaciente` y `hayConflictoHorario` de los módulos
+ * existentes en vez de reimplementar su lógica — la única pieza nueva de
+ * verdad es resolver `fichaDirectorioId` -> organización/médico y la
+ * generación del token de reseña.
+ */
+
+export class FichaNoEncontradaError extends Error {
+  constructor() {
+    super("No existe ninguna ficha con ese id, o no está sincronizada con un médico.");
+    this.name = "FichaNoEncontradaError";
+  }
+}
+
+export class FichaSinMedicoError extends Error {
+  constructor() {
+    super("Esta ficha no tiene un médico asociado en el OS.");
+    this.name = "FichaSinMedicoError";
+  }
+}
+
+/**
+ * Médico dueño de una ficha pública, resuelto por `fichaDirectorioId`
+ * (el mismo uuid en ambos lados — ver sincronizacion.ts). Una
+ * Organizacion tiene `medicos: Medico[]` en el esquema (deja espacio
+ * para consultorios con varios médicos a futuro), pero HOY todo el flujo
+ * de registro/"Mi ficha pública" asume uno solo por Organizacion de tipo
+ * médico — se toma el primero. HIPÓTESIS a confirmar si alguna vez se
+ * construye un onboarding multi-médico: hoy no hay forma de que haya
+ * más de uno en la práctica.
+ */
+async function resolverMedicoPorFicha(fichaDirectorioId: string) {
+  const organizacion = await prisma.organizacion.findUnique({
+    where: { fichaDirectorioId },
+    select: {
+      id: true,
+      medicos: { select: { id: true, usuarioId: true }, take: 1, orderBy: { createdAt: "asc" } },
+    },
+  });
+  if (!organizacion) throw new FichaNoEncontradaError();
+  const medico = organizacion.medicos[0];
+  if (!medico) throw new FichaSinMedicoError();
+  return { organizacionId: organizacion.id, medicoId: medico.id, actorId: medico.usuarioId };
+}
+
+/**
+ * Busca un Paciente activo de la organización por teléfono (sin
+ * documentoIdentidad, que el formulario público no pide) para no crear
+ * un registro nuevo cada vez que la misma persona reserva de nuevo.
+ * Comparación simple por teléfono normalizado (dígitos), no hay forma
+ * más confiable sin pedir cédula.
+ */
+async function buscarOCrearPacientePorTelefono(input: {
+  organizacionId: string;
+  actorId: string;
+  nombreCompleto: string;
+  telefono: string;
+}) {
+  const telefonoNormalizado = input.telefono.replace(/\D/g, "");
+
+  const existente = await prisma.paciente.findFirst({
+    where: { organizacionId: input.organizacionId, activo: true, telefono: { contains: telefonoNormalizado } },
+    select: { id: true },
+  });
+  if (existente) return existente.id;
+
+  // El formulario público pide un solo campo de nombre — se divide en
+  // nombre/apellido lo mejor posible; si no hay espacio, todo va a
+  // `nombre` y `apellido` queda con un placeholder explícito (nunca
+  // vacío: el campo es requerido en el esquema).
+  const partes = input.nombreCompleto.trim().split(/\s+/);
+  const nombre = partes[0] ?? input.nombreCompleto.trim();
+  const apellido = partes.slice(1).join(" ") || "(sin apellido)";
+
+  const paciente = await crearPaciente({
+    organizacionId: input.organizacionId,
+    actorId: input.actorId,
+    datos: { nombre, apellido, telefono: input.telefono.trim() },
+  });
+  return paciente.id;
+}
+
+export async function crearCitaPublicaPorFicha(input: {
+  fichaDirectorioId: string;
+  nombrePaciente: string;
+  telefonoPaciente: string;
+  fechaHora: Date;
+  motivo?: string | null;
+}): Promise<{ citaId: string; tokenResena: string }> {
+  const { organizacionId, medicoId, actorId } = await resolverMedicoPorFicha(input.fichaDirectorioId);
+
+  const conflicto = await hayConflictoHorario({
+    organizacionId,
+    medicoId,
+    fechaHora: input.fechaHora,
+    duracionMinutos: DURACION_MINUTOS_DEFECTO,
+  });
+  if (conflicto) throw new CitaConflictoHorarioError();
+
+  const pacienteId = await buscarOCrearPacientePorTelefono({
+    organizacionId,
+    actorId,
+    nombreCompleto: input.nombrePaciente,
+    telefono: input.telefonoPaciente,
+  });
+
+  const tokenResena = crypto.randomUUID();
+
+  const cita = await prisma.cita.create({
+    data: {
+      organizacionId,
+      pacienteId,
+      medicoId,
+      fechaHora: input.fechaHora,
+      duracionMinutos: DURACION_MINUTOS_DEFECTO,
+      modalidad: "PRESENCIAL",
+      estado: "PENDIENTE",
+      origen: "DIRECTORIO",
+      motivo: input.motivo?.trim() || null,
+      notas: "Reservada desde la ficha pública (conxulty.com) — pendiente de confirmar.",
+      tokenResena,
+    },
+    select: { id: true },
+  });
+
+  await registrarEvento({
+    organizacionId,
+    actorId,
+    accion: "crear_cita_publica",
+    entidadTipo: "Cita",
+    entidadId: cita.id,
+    pacienteId,
+  });
+
+  return { citaId: cita.id, tokenResena };
+}

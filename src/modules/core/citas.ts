@@ -91,7 +91,10 @@ function calcularFin(fechaHora: Date, duracionMinutos: number): Date {
  * calcular el fin de cada candidata en SQL, para no depender de una columna
  * generada — más simple y suficiente para el volumen de una agenda médica.
  */
-async function hayConflictoHorario(input: {
+/// Exportada para citasPublicas.ts (Task #15) — la reserva pública usa
+/// exactamente la misma regla de conflicto que la agenda del OS, nunca
+/// una reimplementación aparte que pudiera desincronizarse.
+export async function hayConflictoHorario(input: {
   organizacionId: string;
   medicoId: string;
   fechaHora: Date;
