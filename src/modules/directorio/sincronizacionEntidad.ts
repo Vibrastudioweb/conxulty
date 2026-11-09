@@ -78,6 +78,9 @@ export interface FichaEntidadDirectorio {
   telefono: string | null;
   horarios: HorarioDia[] | null;
   horario_turno: HorarioDia[] | null;
+  /** Hasta 6 fotos (Task #11, changelog punto 90/92) — gestionada aparte
+   *  por GaleriaFotosForm, nunca se manda en el POST principal. */
+  galeria: string[];
   publicada: boolean;
 }
 

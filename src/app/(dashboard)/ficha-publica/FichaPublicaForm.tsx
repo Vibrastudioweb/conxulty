@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { RecortadorFoto } from "@/components/ui/RecortadorFoto";
+import { GaleriaFotosForm } from "@/components/ui/GaleriaFotosForm";
 import { guardarFichaPublicaAction, type GuardarFichaPublicaResultado } from "./actions";
+import { agregarFotoGaleriaMedicoAction, quitarFotoGaleriaMedicoAction } from "./galeriaActions";
 import type { CiudadDirectorio, FichaDirectorio, SedeDirectorio } from "@/modules/directorio/sincronizacion";
 
 // Leaflet necesita `window` al cargar — sin esto, Next intenta renderizar
@@ -126,6 +128,15 @@ export function FichaPublicaForm({
           textoEjemplo="Medio cuerpo, con la cara en la parte de arriba. Así se ve mejor en tu ficha."
         />
         <input ref={fotoInputRef} type="file" name="foto" className="hidden" accept="image/webp" />
+      </div>
+
+      <div>
+        <p className={LABEL}>Fotos del consultorio</p>
+        <GaleriaFotosForm
+          fotosIniciales={ficha?.galeria ?? []}
+          agregarAction={agregarFotoGaleriaMedicoAction}
+          quitarAction={quitarFotoGaleriaMedicoAction}
+        />
       </div>
 
       <div>

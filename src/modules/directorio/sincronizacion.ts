@@ -154,6 +154,9 @@ export interface FichaDirectorio {
   cobertura_zonas: string[];
   registro_numero: string | null;
   foto_url: string | null;
+  /** Hasta 6 fotos (Task #11, changelog punto 90/92) — gestionada aparte
+   *  por GaleriaFotosForm, nunca se manda en el POST principal. */
+  galeria: string[];
   descripcion: string | null;
   instagram: string | null;
   correo: string | null;
