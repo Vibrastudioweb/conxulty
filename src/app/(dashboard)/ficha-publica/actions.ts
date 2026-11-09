@@ -5,12 +5,13 @@ import { prisma } from "@/db/client";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
 import {
   sincronizarFichaDirectorio,
+  subirFotoDirectorio,
+  obtenerFichaDirectorio,
   mapearModalidadDirectorio,
   ModalidadNoMapeableError,
 } from "@/modules/directorio/sincronizacion";
 
 const fichaPublicaSchema = z.object({
-  fotoUrl: z.string().trim().max(500).optional(),
   descripcion: z.string().trim().max(2000).optional(),
   instagram: z.string().trim().max(160).optional(),
   correo: z.string().trim().max(160).optional(),
@@ -21,7 +22,7 @@ const fichaPublicaSchema = z.object({
 });
 
 export type GuardarFichaPublicaResultado =
-  | { ok: true; slug: string }
+  | { ok: true; slug: string; advertenciaFoto?: string }
   | { ok: false; error: string }
   | null;
 
@@ -44,7 +45,6 @@ export async function guardarFichaPublicaAction(
   const { session, medico } = await requireMedicoSesion();
 
   const parseo = fichaPublicaSchema.safeParse({
-    fotoUrl: vacio(formData.get("fotoUrl")),
     descripcion: vacio(formData.get("descripcion")),
     instagram: vacio(formData.get("instagram")),
     correo: vacio(formData.get("correo")),
@@ -128,6 +128,15 @@ export async function guardarFichaPublicaAction(
     };
   }
 
+  // La foto ya no se edita como texto (ver changelog punto 86) — este POST
+  // sigue necesitando MANDAR el valor actual de foto_url, o el Directorio
+  // la pondría en null en cada guardado de los demás campos. La subida de
+  // una foto nueva (si llegó un archivo) pasa aparte, DESPUÉS de este sync,
+  // porque necesita un fichaDirectorioId real (lo crea este mismo llamado
+  // si todavía no existía).
+  const directorioActual = await obtenerFichaDirectorio(organizacion.fichaDirectorioId);
+  const fotoUrlActual = directorioActual.ok ? directorioActual.ficha?.foto_url ?? null : null;
+
   const resultado = await sincronizarFichaDirectorio({
     fichaDirectorioId: organizacion.fichaDirectorioId,
     nombre: organizacion.nombre,
@@ -137,7 +146,7 @@ export async function guardarFichaPublicaAction(
     modalidad: modalidadDirectorio,
     zonasCobertura: medicoCompleto.zonasCobertura,
     sedes: sedesConCiudad,
-    fotoUrl: parseo.data.fotoUrl ?? null,
+    fotoUrl: fotoUrlActual,
     descripcion: parseo.data.descripcion ?? null,
     instagram: parseo.data.instagram ?? null,
     correo: parseo.data.correo ?? null,
@@ -160,5 +169,16 @@ export async function guardarFichaPublicaAction(
     },
   });
 
-  return { ok: true, slug: resultado.slug };
+  // Foto nueva: el input oculto solo trae un archivo si RecortadorFoto
+  // confirmó un recorte en esta misma carga del form (ver
+  // FichaPublicaForm.tsx) — subirFotoDirectorio aplica foto_url directo en
+  // el Directorio, no hace falta un segundo sync completo para eso.
+  const archivoFoto = formData.get("foto");
+  let advertenciaFoto: string | undefined;
+  if (archivoFoto instanceof File && archivoFoto.size > 0) {
+    const subida = await subirFotoDirectorio(resultado.id, archivoFoto);
+    if (!subida.ok) advertenciaFoto = subida.error;
+  }
+
+  return { ok: true, slug: resultado.slug, advertenciaFoto };
 }

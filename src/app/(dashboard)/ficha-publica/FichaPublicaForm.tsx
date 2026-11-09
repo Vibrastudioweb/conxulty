@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { RecortadorFoto } from "@/components/ui/RecortadorFoto";
 import { guardarFichaPublicaAction, type GuardarFichaPublicaResultado } from "./actions";
 import type { CiudadDirectorio, FichaDirectorio, SedeDirectorio } from "@/modules/directorio/sincronizacion";
 
@@ -40,6 +41,19 @@ export function FichaPublicaForm({
     null,
   );
 
+  // La foto no se manda como texto: se recorta/convierte a webp en el
+  // navegador (RecortadorFoto) y se deja en este input oculto vía
+  // DataTransfer, para que viaje como archivo dentro del mismo FormData
+  // del form principal al enviar — ver changelog punto 86.
+  const fotoInputRef = useRef<HTMLInputElement | null>(null);
+
+  function alRecortarFoto(blob: Blob) {
+    const archivo = new File([blob], "foto.webp", { type: "image/webp" });
+    const dt = new DataTransfer();
+    dt.items.add(archivo);
+    if (fotoInputRef.current) fotoInputRef.current.files = dt.files;
+  }
+
   // Precarga la ciudad del Directorio ya elegida antes para cada sede,
   // emparejando por dirección (es lo único comparable entre los dos lados
   // — ver sincronizacion.ts sobre por qué municipio≠ciudad).
@@ -54,6 +68,11 @@ export function FichaPublicaForm({
       {resultado?.ok === true && (
         <Alert tone="success" title="Guardado">
           Tu ficha pública quedó actualizada en conxulty.com/medico/{resultado.slug}
+        </Alert>
+      )}
+      {resultado?.ok === true && resultado.advertenciaFoto && (
+        <Alert tone="warning" title="La foto no se pudo actualizar">
+          {resultado.advertenciaFoto} El resto de los cambios sí se guardó.
         </Alert>
       )}
 
@@ -99,10 +118,14 @@ export function FichaPublicaForm({
       )}
 
       <div>
-        <label className={LABEL} htmlFor="fotoUrl">
-          Foto (URL)
-        </label>
-        <Input id="fotoUrl" name="fotoUrl" type="url" placeholder="https://…" defaultValue={ficha?.foto_url ?? ""} />
+        <RecortadorFoto
+          etiqueta="Foto de perfil"
+          fotoActualUrl={ficha?.foto_url ?? null}
+          onRecortada={alRecortarFoto}
+          mostrarEjemplo
+          textoEjemplo="Medio cuerpo, con la cara en la parte de arriba. Así se ve mejor en tu ficha."
+        />
+        <input ref={fotoInputRef} type="file" name="foto" className="hidden" accept="image/webp" />
       </div>
 
       <div>
