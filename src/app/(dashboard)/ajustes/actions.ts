@@ -1,35 +1,34 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireMedico } from "@/modules/core/autorizacion";
-import { crearSesionDePago, SpidiNoConfiguradoError } from "@/modules/suscripcion/spidi";
-
-export interface CambiarPlanResultado {
-  ok: boolean;
-  error?: string;
-}
+import {
+  pedirBajaAFicha,
+  registrarPagoRealizado,
+  YaHayPagoPendienteError,
+} from "@/modules/suscripcion/pagoManual";
 
 /**
- * Ambos botones de /ajustes (subir a Pro, agregar método de pago) pasan
- * por acá — hoy siempre falla con un mensaje claro en vez de simular un
- * pago, porque `crearSesionDePago` todavía no está conectado a SPIDI (ver
- * spidi.ts). No hay nada que mockear: cuando esté conectado, esta función
- * redirige al checkout real que devuelva SPIDI.
+ * "Ya pagué" en /ajustes — crea el `Pago` en PENDIENTE (ver pagoManual.ts).
+ * No hay nada que validar del lado de SPIDI acá (cuenta personal, sin
+ * API): confirmar que el pago existió de verdad lo hace una persona en
+ * /superadmin/pagos, viendo el comprobante que el médico manda aparte.
  */
-export async function iniciarCambioPlan(
-  plan: "FICHA" | "PRO",
-): Promise<CambiarPlanResultado> {
+export async function confirmarPagoRealizadoAction(formData: FormData) {
   const session = await requireMedico();
+  const plan = formData.get("plan");
+  if (plan !== "FICHA" && plan !== "PRO") return;
 
   try {
-    await crearSesionDePago({
-      organizacionId: session.user.organizacionId,
-      plan,
-    });
-    return { ok: true };
+    await registrarPagoRealizado(session.user.organizacionId, plan);
   } catch (err) {
-    if (err instanceof SpidiNoConfiguradoError) {
-      return { ok: false, error: err.message };
-    }
-    throw err;
+    if (!(err instanceof YaHayPagoPendienteError)) throw err;
   }
+  revalidatePath("/ajustes");
+}
+
+export async function pedirBajaAFichaAction() {
+  const session = await requireMedico();
+  await pedirBajaAFicha(session.user.organizacionId);
+  revalidatePath("/ajustes");
 }

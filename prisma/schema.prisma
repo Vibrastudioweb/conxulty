@@ -712,12 +712,17 @@ enum ProveedorPago {
 /// todavía no se baja a FICHA sola (da un margen de gracia antes de
 /// degradar). BAJANDO_A_FICHA: el médico pidió la baja, sigue en PRO hasta
 /// `finPeriodoActual`. SIN_METODO_DE_PAGO: eligió PRO pero nunca completó
-/// el pago inicial con SPIDI — equivale a FICHA en la práctica.
+/// el pago inicial. PENDIENTE_CONFIRMACION: el médico dijo "ya pagué" en
+/// SPIDI y queda un `Pago` en PENDIENTE hasta que alguien del equipo lo
+/// confirme a mano — ver changelog punto 89 (sin cuenta comercial en
+/// SPIDI no hay API ni webhook; el cobro pasa por SPIDI, la confirmación
+/// es manual).
 enum EstadoSuscripcion {
   ACTIVA
   PENDIENTE_PAGO
   BAJANDO_A_FICHA
   SIN_METODO_DE_PAGO
+  PENDIENTE_CONFIRMACION
 }
 
 enum EstadoPago {
@@ -745,14 +750,13 @@ model Suscripcion {
   planAlRenovar       PlanOrganizacion?
   inicioPeriodoActual DateTime?
   finPeriodoActual    DateTime?
-  /// Identificadores del lado de SPIDI — opacos acá a propósito: lo que
-  /// significan se define en su Referencia de API, todavía no integrada
-  /// (ver changelog punto 89).
+  /// Sin uso por ahora: la cuenta de SPIDI del usuario es personal, no
+  /// comercial, y el API (donde existirían estos ids) es solo para cuentas
+  /// comerciales — ver changelog punto 89. Quedan por si en algún momento
+  /// se abre cuenta comercial y vale la pena automatizar esto de verdad.
   spidiClienteId      String?
   spidiSuscripcionId  String?
-  /// Cacheado solo para pintar "Visa •••• 1234" sin llamar a SPIDI en cada
-  /// carga de /ajustes — la fuente de verdad del método de pago vive en
-  /// SPIDI, esto es una copia de lectura.
+  /// Sin uso por ahora, mismo motivo — no hay API para consultarlo.
   metodoPagoResumen   String?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
@@ -763,8 +767,10 @@ model Suscripcion {
 }
 
 /// Historial de cobros — la sección "Facturas" de /ajustes. Una fila por
-/// intento de cobro que SPIDI confirme (vía webhook, todavía no integrado),
-/// no por cada carga de página.
+/// intento real de pago: la crea el médico al decir "ya pagué" (estado
+/// PENDIENTE) y la confirma alguien del equipo a mano en /superadmin/pagos
+/// (PAGADO/FALLIDO) — no hay webhook de SPIDI que lo haga solo (cuenta
+/// personal, sin API). Ver changelog punto 89.
 model Pago {
   id             String       @id @default(cuid())
   organizacionId String

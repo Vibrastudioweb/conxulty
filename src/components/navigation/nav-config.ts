@@ -8,7 +8,8 @@ export type NavIconKey =
   | "reportes"
   | "admin"
   | "staff"
-  | "fichaPublica";
+  | "fichaPublica"
+  | "pagos";
 
 export interface NavItem {
   href: string;
@@ -56,6 +57,9 @@ const NAV_ADMIN: NavItem[] = [
 
 const NAV_SUPERADMIN: NavItem[] = [
   { href: "/superadmin", label: "Solicitudes", iconKey: "admin", primary: true },
+  // Confirmación manual de pagos del Plan Pro (changelog punto 89) — cuenta
+  // personal en SPIDI, sin API ni webhook, así que esto ES la activación.
+  { href: "/superadmin/pagos", label: "Pagos", iconKey: "pagos", primary: true },
 ];
 
 const NAV_STAFF: NavItem[] = [
