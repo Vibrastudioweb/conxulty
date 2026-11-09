@@ -19,6 +19,29 @@ const fichaPublicaSchema = z.object({
   disponibilidad: z.string().trim().max(500).optional(),
 });
 
+// Task #13: el médico edita la lista con ServiciosPreciosForm.tsx, que
+// mantiene el estado completo en UN input oculto (`servicios`, JSON) —
+// más simple que repuntar índice por índice del lado del servidor. Se
+// valida acá, no se confía en el JSON tal cual llega del cliente.
+const servicioPrecioSchema = z.object({
+  nombre: z.string().trim().min(1).max(160),
+  precio: z.number().finite().min(0).nullable(),
+});
+const serviciosSchema = z.array(servicioPrecioSchema).max(20);
+
+function leerServiciosDeFormData(formData: FormData): { nombre: string; precio: number | null }[] {
+  const crudo = formData.get("servicios")?.toString();
+  if (!crudo) return [];
+  try {
+    const parseo = serviciosSchema.safeParse(JSON.parse(crudo));
+    return parseo.success ? parseo.data : [];
+  } catch {
+    // JSON inválido (no debería pasar viniendo del propio formulario) —
+    // se descarta en vez de bloquear el resto del guardado.
+    return [];
+  }
+}
+
 export type GuardarFichaPublicaResultado =
   | { ok: true; slug: string; advertenciaFoto?: string }
   | { ok: false; error: string }
@@ -54,6 +77,8 @@ export async function guardarFichaPublicaAction(
   if (!parseo.success) {
     return { ok: false, error: "Revisa los campos marcados — alguno quedó demasiado largo." };
   }
+
+  const servicios = leerServiciosDeFormData(formData);
 
   const [organizacion, medicoCompleto, sedes] = await Promise.all([
     prisma.organizacion.findUniqueOrThrow({
@@ -151,6 +176,7 @@ export async function guardarFichaPublicaAction(
     rif: parseo.data.rif ?? null,
     domicilioFiscal: parseo.data.domicilioFiscal ?? null,
     disponibilidad: parseo.data.disponibilidad ?? null,
+    servicios,
   });
 
   if (!resultado.ok) {

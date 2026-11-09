@@ -23,6 +23,13 @@ import type { ProfesionId } from "@/modules/onboarding/profesiones";
  * ninguna combinación necesita mapeo ni queda sin representar.
  */
 
+/** Catálogo de servicios con precio propio del médico (Task #13) — ver
+ *  ServiciosPreciosForm.tsx. `precio` en USD, `null` = "a consultar". */
+export interface ServicioPrecioSincronizacion {
+  nombre: string;
+  precio: number | null;
+}
+
 export interface SedeSincronizacion {
   ciudadId: string;
   direccion: string;
@@ -52,6 +59,8 @@ export interface DatosFichaDirectorio {
   rif?: string | null;
   domicilioFiscal?: string | null;
   disponibilidad?: string | null;
+  /** Task #13 — ver ServicioPrecioSincronizacion. */
+  servicios?: ServicioPrecioSincronizacion[];
 }
 
 export type ResultadoSincronizacion =
@@ -164,6 +173,8 @@ export interface FichaDirectorio {
   rif: string | null;
   domicilio_fiscal: string | null;
   disponibilidad: string | null;
+  /** Task #13, changelog punto 91/93. */
+  servicios: ServicioPrecioSincronizacion[];
   publicada: boolean;
 }
 
