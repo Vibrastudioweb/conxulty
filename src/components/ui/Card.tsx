@@ -20,8 +20,9 @@ interface CardOwnProps {
 }
 
 type CardProps =
-  | (CardOwnProps & { href?: undefined })
-  | (CardOwnProps & { href: string });
+  | (CardOwnProps & { href?: undefined; onClick?: undefined })
+  | (CardOwnProps & { href: string; onClick?: undefined })
+  | (CardOwnProps & { href?: undefined; onClick: () => void });
 
 export function Card({
   children,
@@ -30,14 +31,16 @@ export function Card({
   highlighted = false,
   elevated = false,
   href,
+  onClick,
 }: CardProps) {
+  const esInteractiva = Boolean(href) || Boolean(onClick);
   const classes = [
     "rounded-card border bg-surface text-sm",
     PADDING_CLASSES[padding],
     highlighted ? "border-brand-primary" : "border-border",
     elevated ? "shadow-card" : "",
-    href
-      ? "block transition hover:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+    esInteractiva
+      ? "block w-full text-left transition hover:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
       : "",
     className,
   ]
@@ -49,6 +52,16 @@ export function Card({
       <Link href={href} className={classes}>
         {children}
       </Link>
+    );
+  }
+
+  // onClick (sin href): tarjeta como botón — p.ej. abrir el panel de
+  // "Detalle de la cita" (ver changelog punto 60) en vez de navegar.
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={classes}>
+        {children}
+      </button>
     );
   }
 

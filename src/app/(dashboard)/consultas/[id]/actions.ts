@@ -7,13 +7,30 @@ import {
   guardarConsulta,
   cerrarConsulta,
   type CamposClinicos,
+  type CamposVitales,
 } from "@/modules/core/consultas";
+import { resolverPlantilla } from "@/modules/consultas/plantillasEspecialidad";
 
 function leerCampo(formData: FormData, campo: string): string | null | undefined {
   const valor = formData.get(campo);
   if (valor === null) return undefined;
   const texto = String(valor).trim();
   return texto === "" ? null : texto;
+}
+
+/**
+ * Igual que leerCampo pero numérico — un campo vacío se guarda como null
+ * (no se registró), y un valor no numérico se trata como "no enviado"
+ * (undefined) en vez de bloquear el guardado de los demás campos: un
+ * signo vital mal tecleado no debería impedir guardar el resto de la nota.
+ */
+function leerCampoNumerico(formData: FormData, campo: string): number | null | undefined {
+  const valor = formData.get(campo);
+  if (valor === null) return undefined;
+  const texto = String(valor).trim();
+  if (texto === "") return null;
+  const numero = Number(texto);
+  return Number.isFinite(numero) ? numero : undefined;
 }
 
 export async function guardarConsultaAction(formData: FormData) {
@@ -43,12 +60,39 @@ export async function guardarConsultaAction(formData: FormData) {
     tratamiento: leerCampo(formData, "tratamiento"),
   };
 
+  const vitales: CamposVitales = {
+    presionArterial: leerCampo(formData, "presionArterial"),
+    frecuenciaCardiaca: leerCampoNumerico(formData, "frecuenciaCardiaca"),
+    temperatura: leerCampoNumerico(formData, "temperatura"),
+    saturacionOxigeno: leerCampoNumerico(formData, "saturacionOxigeno"),
+    pesoKg: leerCampoNumerico(formData, "pesoKg"),
+    tallaCm: leerCampoNumerico(formData, "tallaCm"),
+  };
+
+  // Plantilla por especialidad (ver changelog punto 49) — se resuelve por
+  // la profesión/especialidad del médico DUEÑO de la consulta (ya
+  // confirmado arriba que es el mismo que la sesión actual), nunca por lo
+  // que venga del formulario, igual criterio que el resto de esta acción.
+  const plantilla = resolverPlantilla({
+    profesion: consultaExistente.medico.profesion,
+    especialidad: consultaExistente.medico.especialidad,
+  });
+  const camposEspecialidad: Record<string, string> = {};
+  if (plantilla) {
+    for (const campo of plantilla) {
+      const valor = leerCampo(formData, `especialidad_${campo.id}`);
+      if (valor) camposEspecialidad[campo.id] = valor;
+    }
+  }
+
   try {
     await guardarConsulta({
       organizacionId: session.user.organizacionId,
       actorId: session.user.id,
       consultaId,
       campos,
+      vitales,
+      camposEspecialidad,
     });
   } catch {
     redirect(`/consultas/${consultaId}?error=1`);

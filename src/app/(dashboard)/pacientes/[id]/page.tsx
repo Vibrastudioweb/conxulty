@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireMedico } from "@/modules/core/autorizacion";
+import { requireMedicoSesion } from "@/modules/core/autorizacion";
 import { obtenerPaciente } from "@/modules/core/pacientes";
 import { obtenerCita, listarCitasDelPaciente } from "@/modules/core/citas";
 import { listarConsultasDelPaciente } from "@/modules/core/consultas";
@@ -10,16 +10,21 @@ import { listarEventosDelPaciente } from "@/modules/trazabilidad";
 import { formatearFechaISO } from "@/components/citas/fecha";
 import {
   iniciarConsultaAction,
+  recetarAction,
   archivarPacienteAction,
   reactivarPacienteAction,
   crearAntecedenteAction,
   editarAntecedenteAction,
   desactivarAntecedenteAction,
+  actualizarOdontogramaAction,
 } from "./actions";
+import type { Odontograma } from "@/modules/consultas/odontograma";
+import { OdontogramaSeccion } from "@/components/pacientes/OdontogramaSeccion";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { ConsultaHistorialCard } from "@/components/consultas/ConsultaHistorialCard";
@@ -28,6 +33,29 @@ import { AntecedentesSeccion } from "@/components/pacientes/AntecedentesSeccion"
 import { CitasPacienteSeccion } from "@/components/pacientes/CitasPacienteSeccion";
 import { DocumentosPacienteSeccion } from "@/components/pacientes/DocumentosPacienteSeccion";
 import { TrazabilidadPacienteSeccion } from "@/components/pacientes/TrazabilidadPacienteSeccion";
+import { SignosVitalesCard } from "@/components/pacientes/SignosVitalesCard";
+import { TratamientosPacienteSeccion } from "@/components/pacientes/TratamientosPacienteSeccion";
+import { TabsFicha, type TabFicha } from "@/components/pacientes/TabsFicha";
+import { AccionesRapidasPaciente } from "@/components/pacientes/AccionesRapidasPaciente";
+import { ResumenClinicoCard } from "@/components/pacientes/ResumenClinicoCard";
+import { DocumentoResumenCard } from "@/components/documentos/DocumentoResumenCard";
+
+/** Primera cita futura (PENDIENTE o CONFIRMADA), o null si no hay ninguna.
+ *  `listarCitasDelPaciente` ya viene ordenada desc, así que se filtra y se
+ *  reordena asc en vez de asumir alguna posición fija. */
+function proximaCita<T extends { fechaHora: Date; estado: string }>(
+  citas: T[],
+): T | null {
+  const ahora = new Date();
+  const futuras = citas
+    .filter(
+      (c) =>
+        c.fechaHora >= ahora &&
+        (c.estado === "PENDIENTE" || c.estado === "CONFIRMADA"),
+    )
+    .sort((a, b) => a.fechaHora.getTime() - b.fechaHora.getTime());
+  return futuras[0] ?? null;
+}
 
 function calcularEdad(fechaNacimiento: Date): number {
   const hoy = new Date();
@@ -46,6 +74,7 @@ const MENSAJES_EXITO: Record<string, string> = {
   antecedente_creado: "Antecedente registrado.",
   antecedente_editado: "Antecedente actualizado.",
   antecedente_desactivado: "Antecedente desactivado.",
+  odontograma_actualizado: "Odontograma actualizado.",
 };
 
 export default async function PacientePage({
@@ -55,11 +84,26 @@ export default async function PacientePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const session = await requireMedico();
+  const { session, medico } = await requireMedicoSesion();
+  const mostrarOdontograma = medico.profesion === "ODONTOLOGO";
 
   const { id } = await params;
-  const { cita: citaId, error, ...resto } = await searchParams;
+  const { cita: citaId, error, tab: tabParam, ...resto } = await searchParams;
   const mensajeExito = Object.keys(MENSAJES_EXITO).find((clave) => clave in resto);
+  const TABS_VALIDAS: TabFicha[] = [
+    "resumen",
+    "datos",
+    "antecedentes",
+    "historial",
+    "tratamientos",
+    "citas",
+    "documentos",
+    "ia",
+    ...(mostrarOdontograma ? (["odontograma"] as TabFicha[]) : []),
+  ];
+  const tab: TabFicha = TABS_VALIDAS.includes(tabParam as TabFicha)
+    ? (tabParam as TabFicha)
+    : "resumen";
 
   const paciente = await obtenerPaciente({
     organizacionId: session.user.organizacionId,
@@ -203,6 +247,21 @@ export default async function PacientePage({
           >
             + Nueva cita
           </Link>
+          {/* "Recetar" directo desde la ficha (ver changelog punto 62: el
+              usuario pidió poder "entrar al paciente e ir a recetas" sin
+              que dependa de una consulta EN_CURSO ya abierta). Reutiliza
+              recetarAction, que abre/continúa la consulta y aterriza
+              directo en el formulario de la receta — misma regla de
+              citaNoDisponible que ya aplica a "Iniciar consulta". */}
+          {!citaNoDisponible && (
+            <form action={recetarAction}>
+              <input type="hidden" name="pacienteId" value={paciente.id} />
+              {citaId && <input type="hidden" name="citaId" value={citaId} />}
+              <Button type="submit" variant="secondary">
+                Recetar
+              </Button>
+            </form>
+          )}
           <form action={archivarPacienteAction} className="ml-auto">
             <input type="hidden" name="pacienteId" value={paciente.id} />
             <Button type="submit" variant="ghost" size="sm">
@@ -212,19 +271,155 @@ export default async function PacientePage({
         </div>
       )}
 
-      <AntecedentesSeccion
+      <TabsFicha
+        tabActual={tab}
         pacienteId={paciente.id}
-        antecedentes={antecedentes}
-        crearAction={crearAntecedenteAction}
-        editarAction={editarAntecedenteAction}
-        desactivarAction={desactivarAntecedenteAction}
+        mostrarOdontograma={mostrarOdontograma}
       />
 
-      <CitasPacienteSeccion citas={citas} />
+      {tab === "resumen" && (
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <section>
+              <SectionLabel>Consultas recientes</SectionLabel>
+              <div className="mt-2">
+                {consultasPrevias.length === 0 ? (
+                  <EmptyState compact message="Sin consultas anteriores." />
+                ) : (
+                  <ul className="space-y-2">
+                    {consultasPrevias.slice(0, 3).map((consulta) => (
+                      <li key={consulta.id}>
+                        <ConsultaHistorialCard consulta={consulta} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
 
-      <section className="mt-8">
-        <SectionLabel>Historia clínica</SectionLabel>
+            {(() => {
+              const proxima = proximaCita(citas);
+              return (
+                <section>
+                  <SectionLabel>Próxima cita</SectionLabel>
+                  <div className="mt-2">
+                    {proxima ? (
+                      <Card padding="cozy">
+                        <span className="text-text-secondary">
+                          {proxima.fechaHora.toLocaleDateString("es", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "short",
+                          })}{" "}
+                          · {proxima.estado}
+                        </span>
+                      </Card>
+                    ) : (
+                      <EmptyState compact message="Sin citas programadas." />
+                    )}
+                  </div>
+                </section>
+              );
+            })()}
+          </div>
+
+          <div className="space-y-6">
+            <AccionesRapidasPaciente pacienteId={paciente.id} telefono={paciente.telefono} />
+
+            <ResumenClinicoCard antecedentes={antecedentes} />
+
+            {paciente.contactoEmergenciaNombre && (
+              <section>
+                <SectionLabel>Contacto de emergencia</SectionLabel>
+                <div className="mt-2">
+                  <Card padding="cozy">
+                    <p className="text-body-secondary text-text-primary font-medium">
+                      {paciente.contactoEmergenciaNombre}
+                    </p>
+                    {paciente.contactoEmergenciaTelefono && (
+                      <p className="mt-1 text-body-secondary text-text-secondary">
+                        {paciente.contactoEmergenciaTelefono}
+                      </p>
+                    )}
+                  </Card>
+                </div>
+              </section>
+            )}
+
+            {documentos.length > 0 && (
+              <section>
+                <div className="flex items-center justify-between">
+                  <SectionLabel>Documentos recientes</SectionLabel>
+                  <Link
+                    href={`/pacientes/${paciente.id}?tab=documentos`}
+                    className="text-caption font-semibold text-brand-primary hover:underline"
+                  >
+                    Ver todas →
+                  </Link>
+                </div>
+                <ul className="mt-2 space-y-2">
+                  {documentos.slice(0, 3).map((documento) => (
+                    <li key={documento.id}>
+                      <DocumentoResumenCard
+                        consultaId={documento.consultaId}
+                        documento={documento}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section>
+              <SectionLabel>Signos vitales</SectionLabel>
+              <div className="mt-2">
+                <SignosVitalesCard consultas={consultasPrevias} />
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
+
+      {tab === "datos" && (
+        <div className="mt-6 space-y-8">
+          <section>
+            <SectionLabel>Datos de contacto</SectionLabel>
+            <dl className="mt-2 space-y-1 text-body-secondary text-text-secondary">
+              {paciente.telefono && <div>Tel: {paciente.telefono}</div>}
+              {paciente.email && <div>Email: {paciente.email}</div>}
+              {paciente.direccion && <div>Dirección: {paciente.direccion}</div>}
+              {paciente.contactoEmergenciaNombre && (
+                <div>
+                  Emergencia: {paciente.contactoEmergenciaNombre}
+                  {paciente.contactoEmergenciaTelefono &&
+                    ` — ${paciente.contactoEmergenciaTelefono}`}
+                </div>
+              )}
+              {!paciente.telefono &&
+                !paciente.email &&
+                !paciente.direccion &&
+                !paciente.contactoEmergenciaNombre && <div>Sin datos adicionales.</div>}
+            </dl>
+          </section>
+
+          <TrazabilidadPacienteSeccion eventos={eventos} />
+        </div>
+      )}
+
+      {tab === "antecedentes" && (
         <div className="mt-2">
+          <AntecedentesSeccion
+            pacienteId={paciente.id}
+            antecedentes={antecedentes}
+            crearAction={crearAntecedenteAction}
+            editarAction={editarAntecedenteAction}
+            desactivarAction={desactivarAntecedenteAction}
+          />
+        </div>
+      )}
+
+      {tab === "historial" && (
+        <section className="mt-6">
           {consultasPrevias.length === 0 ? (
             <EmptyState compact message="Sin consultas anteriores." />
           ) : (
@@ -236,31 +431,55 @@ export default async function PacientePage({
               ))}
             </ul>
           )}
+        </section>
+      )}
+
+      {tab === "tratamientos" && (
+        <section className="mt-6">
+          <TratamientosPacienteSeccion consultas={consultasPrevias} />
+        </section>
+      )}
+
+      {tab === "odontograma" && mostrarOdontograma && (
+        <div className="mt-2">
+          <OdontogramaSeccion
+            pacienteId={paciente.id}
+            odontograma={(paciente.odontograma as Odontograma | null) ?? {}}
+            notasOdontograma={paciente.notasOdontograma}
+            action={actualizarOdontogramaAction}
+          />
         </div>
-      </section>
+      )}
 
-      <DocumentosPacienteSeccion documentos={documentos} />
+      {tab === "citas" && (
+        <div className="mt-2">
+          <CitasPacienteSeccion citas={citas} />
+        </div>
+      )}
 
-      <section className="mt-8 border-t border-border pt-4">
-        <SectionLabel>Datos de contacto</SectionLabel>
-        <dl className="mt-2 space-y-1 text-body-secondary text-text-secondary">
-          {paciente.telefono && <div>Tel: {paciente.telefono}</div>}
-          {paciente.email && <div>Email: {paciente.email}</div>}
-          {paciente.direccion && <div>Dirección: {paciente.direccion}</div>}
-          {paciente.contactoEmergenciaNombre && (
-            <div>
-              Emergencia: {paciente.contactoEmergenciaNombre}
-              {paciente.contactoEmergenciaTelefono && ` — ${paciente.contactoEmergenciaTelefono}`}
-            </div>
-          )}
-          {!paciente.telefono &&
-            !paciente.email &&
-            !paciente.direccion &&
-            !paciente.contactoEmergenciaNombre && <div>Sin datos adicionales.</div>}
-        </dl>
-      </section>
+      {tab === "documentos" && (
+        <div className="mt-2">
+          <DocumentosPacienteSeccion documentos={documentos} />
+        </div>
+      )}
 
-      <TrazabilidadPacienteSeccion eventos={eventos} />
+      {tab === "ia" && (
+        <section className="mt-6">
+          <Card padding="spacious" className="text-center">
+            <Badge tone="info">Próximamente</Badge>
+            <p className="mt-3 text-section-title font-semibold text-text-primary">
+              Resumen del expediente con IA
+            </p>
+            <p className="mx-auto mt-1 max-w-sm text-body-secondary text-text-secondary">
+              Todavía no existe el módulo de IA del producto — antes de
+              construir esto hay que decidir su alcance (qué resume, con
+              qué fuente, y que el médico apruebe cualquier contenido antes
+              de que entre al expediente). No es un botón decorativo
+              escondido: es una pieza que falta a propósito.
+            </p>
+          </Card>
+        </section>
+      )}
     </main>
   );
 }

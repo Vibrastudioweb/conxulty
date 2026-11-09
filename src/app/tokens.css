@@ -1,13 +1,16 @@
 /**
- * Tokens de diseño — Design System v2 de CONXULTY (Phase 2A, paleta Deep Teal).
+ * Tokens de diseño — Design System v2 de CONXULTY.
  *
- * Fuente de verdad: paleta y tipografía entregadas para Phase 2A/2B (chat de
- * validación de Phase 1). Reemplaza la paleta Violeta del Design System v1
- * (Figma Brand System, ver historial de este archivo) en todos los tokens
- * semánticos de superficie/texto/estado. `--color-brand-secondary` y
- * `--gradient-brand` NO se tocan: son el degradado del isotipo provisional
- * (BrandMark/Wordmark, ver public/brand/README.md), fuera del alcance de
- * esta fase.
+ * Marca (08-nov-2026, ver changelog punto 52): REVERTIDA de Deep Teal
+ * (`#0f6b6d`, Phase 2A/2B) a la paleta Índigo + Verde que el usuario pidió
+ * explícitamente llevar de la demo navegable a toda la app real
+ * ("el rebranding que hicimos lo quiero en toda la app real") — la misma
+ * paleta que el changelog del proyecto ya tenía anotada desde el punto 1
+ * como "PENDIENTE DE DECIDIR si se traslada a tokens.css real". Deep Teal
+ * queda en el historial de este archivo si hay que revertir. El resto de
+ * los tokens (superficie/texto/estado/radios/sombra/tipografía) NO cambió
+ * — la decisión fue solo sobre el color de marca, no sobre todo el
+ * sistema.
  */
 
 @theme inline {
@@ -20,14 +23,15 @@
   --font-sans: var(--font-geist), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
 
-  /* Marca — Deep Teal es el color dominante de la identidad v2. */
-  --color-brand-primary: #0f6b6d;       /* Deep Teal */
-  --color-brand-primary-hover: #0b595b; /* Hover */
-  --color-brand-primary-soft: #e7f4f3;  /* Soft */
-  --color-brand-secondary: #4361ee;     /* Azul 500 — sin cambios, ver nota de cabecera */
+  /* Marca — Índigo + Verde (rebranding del 08-nov-2026, ver nota de cabecera). */
+  --color-brand-primary: #4f46e5;       /* Índigo 600 */
+  --color-brand-primary-hover: #4338ca; /* Índigo 700 */
+  --color-brand-primary-soft: #eef0fd;  /* Índigo, tinte muy suave */
+  --color-brand-secondary: #4361ee;     /* Azul 500 — sin cambios, no forma parte de este rebranding */
 
-  /* Degradado de firma del isotipo provisional — sin cambios, ver nota de cabecera. */
-  --gradient-brand: linear-gradient(120deg, #38bdf8, #4361ee, #7c3aed);
+  /* Degradado de firma del isotipo (BrandMark/Wordmark) — verde → índigo,
+     igual que en la demo. */
+  --gradient-brand: linear-gradient(120deg, #22c55e, #4f46e5, #4338ca);
 
   /* Fondo y superficie */
   --color-background: #f7f8f8;    /* Canvas */

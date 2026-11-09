@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
+import { METODOS_PAGO, INFO_METODO_PAGO, type MetodoPagoId } from "@/modules/cobros-caja/metodosPago";
 
 export class CajaYaAbiertaError extends Error {
   constructor() {
@@ -55,7 +56,8 @@ export async function obtenerCajaAbierta(input: { organizacionId: string }) {
 export async function abrirCaja(input: {
   organizacionId: string;
   actorId: string;
-  montoInicial: number | string;
+  montoInicialUsd: number | string;
+  montoInicialBs: number | string;
 }): Promise<{ cajaId: string }> {
   const cajaAbierta = await prisma.caja.findFirst({
     where: { organizacionId: input.organizacionId, estado: "ABIERTA" },
@@ -72,7 +74,8 @@ export async function abrirCaja(input: {
       data: {
         organizacionId: input.organizacionId,
         abiertaPorId: input.actorId,
-        montoInicial: input.montoInicial,
+        montoInicialUsd: input.montoInicialUsd,
+        montoInicialBs: input.montoInicialBs,
       },
     });
   } catch (err) {
@@ -96,11 +99,14 @@ export async function abrirCaja(input: {
 
 /**
  * Cierra la caja abierta actual de la organización con arqueo: calcula
- * montoEsperado a partir de montoInicial + movimientos de esa caja (nunca
- * editado a mano), recibe montoContado (obligatorio, incluso si es 0 — lo
- * que se rechaza es la AUSENCIA del dato, no el valor cero) y guarda
- * diferencia = montoContado - montoEsperado. Si no cuadra, la diferencia
- * queda registrada y visible — no hay reversión automática.
+ * montoEsperadoUsd/Bs a partir de montoInicialUsd/Bs + movimientos EFECTIVO
+ * (esEfectivo: true) de esa caja, agrupados por moneda y nunca sumados
+ * entre sí (ver changelog punto 46 — el cálculo anterior mezclaba USD y Bs,
+ * y contaba pagos no físicos como si fueran plata en la gaveta). Recibe
+ * montoContadoUsd/Bs (ambos obligatorios, incluso si son 0 — lo que se
+ * rechaza es la AUSENCIA del dato, no el valor cero) y guarda
+ * diferenciaUsd/Bs = montoContado - montoEsperado por moneda. Si no cuadra,
+ * la diferencia queda registrada y visible — no hay reversión automática.
  *
  * No recibe cajaId: usa la caja abierta actual, mismo criterio que
  * registrarCobro/registrarGasto. Toda la aritmética de dinero usa
@@ -109,9 +115,21 @@ export async function abrirCaja(input: {
 export async function cerrarCaja(input: {
   organizacionId: string;
   actorId: string;
-  montoContado: number | string | null | undefined;
-}): Promise<{ cajaId: string; montoEsperado: string; diferencia: string }> {
-  if (input.montoContado === null || input.montoContado === undefined) {
+  montoContadoUsd: number | string | null | undefined;
+  montoContadoBs: number | string | null | undefined;
+}): Promise<{
+  cajaId: string;
+  montoEsperadoUsd: string;
+  montoEsperadoBs: string;
+  diferenciaUsd: string;
+  diferenciaBs: string;
+}> {
+  if (
+    input.montoContadoUsd === null ||
+    input.montoContadoUsd === undefined ||
+    input.montoContadoBs === null ||
+    input.montoContadoBs === undefined
+  ) {
     throw new MontoContadoRequeridoError();
   }
 
@@ -122,42 +140,76 @@ export async function cerrarCaja(input: {
     throw new CajaNoAbiertaError();
   }
 
-  const montoContado = new Prisma.Decimal(input.montoContado);
+  const montoContadoUsd = new Prisma.Decimal(input.montoContadoUsd);
+  const montoContadoBs = new Prisma.Decimal(input.montoContadoBs);
 
-  const { montoEsperado, diferencia } = await prisma.$transaction(async (tx) => {
-    const [ingresos, egresos] = await Promise.all([
-      tx.movimientoCaja.aggregate({
-        where: { cajaId: cajaAbierta.id, tipo: "INGRESO" },
-        _sum: { monto: true },
-      }),
-      tx.movimientoCaja.aggregate({
-        where: { cajaId: cajaAbierta.id, tipo: "EGRESO" },
-        _sum: { monto: true },
-      }),
-    ]);
+  const { montoEsperadoUsd, montoEsperadoBs, diferenciaUsd, diferenciaBs } =
+    await prisma.$transaction(async (tx) => {
+      // El arqueo solo le importa al EFECTIVO: los movimientos con métodos
+      // no físicos (Zelle, transferencia, etc.) no entran en esta cuenta —
+      // ver changelog punto 46. Se agrupa por `moneda` porque un cobro en
+      // USD y uno en Bs nunca deben sumarse entre sí.
+      const [ingresos, egresos] = await Promise.all([
+        tx.movimientoCaja.groupBy({
+          by: ["moneda"],
+          where: { cajaId: cajaAbierta.id, tipo: "INGRESO", esEfectivo: true },
+          _sum: { monto: true },
+        }),
+        tx.movimientoCaja.groupBy({
+          by: ["moneda"],
+          where: { cajaId: cajaAbierta.id, tipo: "EGRESO", esEfectivo: true },
+          _sum: { monto: true },
+        }),
+      ]);
 
-    const totalIngresos = ingresos._sum.monto ?? new Prisma.Decimal(0);
-    const totalEgresos = egresos._sum.monto ?? new Prisma.Decimal(0);
-    const montoEsperado = cajaAbierta.montoInicial.plus(totalIngresos).minus(totalEgresos);
-    const diferencia = montoContado.minus(montoEsperado);
+      const totalPorMoneda = (
+        filas: Array<{ moneda: string; _sum: { monto: Prisma.Decimal | null } }>,
+        moneda: string,
+      ) =>
+        filas.find((f) => f.moneda === moneda)?._sum.monto ?? new Prisma.Decimal(0);
 
-    const actualizada = await tx.caja.updateMany({
-      where: { id: cajaAbierta.id, organizacionId: input.organizacionId, estado: "ABIERTA" },
-      data: {
-        estado: "CERRADA",
-        fechaCierre: new Date(),
-        montoContado,
-        montoEsperado,
-        diferencia,
-      },
+      // Hoy el formulario no deja elegir moneda (siempre "USD" por default
+      // del schema) — todo lo que no sea "USD" se cuenta como Bs. Cuando el
+      // selector de moneda exista (Caja 10-15), esto sigue siendo correcto
+      // sin cambios.
+      const totalIngresosUsd = totalPorMoneda(ingresos, "USD");
+      const totalEgresosUsd = totalPorMoneda(egresos, "USD");
+      const totalIngresosBs = ingresos
+        .filter((f) => f.moneda !== "USD")
+        .reduce((acc, f) => acc.plus(f._sum.monto ?? new Prisma.Decimal(0)), new Prisma.Decimal(0));
+      const totalEgresosBs = egresos
+        .filter((f) => f.moneda !== "USD")
+        .reduce((acc, f) => acc.plus(f._sum.monto ?? new Prisma.Decimal(0)), new Prisma.Decimal(0));
+
+      const montoEsperadoUsd = cajaAbierta.montoInicialUsd
+        .plus(totalIngresosUsd)
+        .minus(totalEgresosUsd);
+      const montoEsperadoBs = cajaAbierta.montoInicialBs
+        .plus(totalIngresosBs)
+        .minus(totalEgresosBs);
+      const diferenciaUsd = montoContadoUsd.minus(montoEsperadoUsd);
+      const diferenciaBs = montoContadoBs.minus(montoEsperadoBs);
+
+      const actualizada = await tx.caja.updateMany({
+        where: { id: cajaAbierta.id, organizacionId: input.organizacionId, estado: "ABIERTA" },
+        data: {
+          estado: "CERRADA",
+          fechaCierre: new Date(),
+          montoContadoUsd,
+          montoContadoBs,
+          montoEsperadoUsd,
+          montoEsperadoBs,
+          diferenciaUsd,
+          diferenciaBs,
+        },
+      });
+
+      if (actualizada.count !== 1) {
+        throw new CajaNoAbiertaError();
+      }
+
+      return { montoEsperadoUsd, montoEsperadoBs, diferenciaUsd, diferenciaBs };
     });
-
-    if (actualizada.count !== 1) {
-      throw new CajaNoAbiertaError();
-    }
-
-    return { montoEsperado, diferencia };
-  });
 
   await registrarEvento({
     organizacionId: input.organizacionId,
@@ -166,15 +218,86 @@ export async function cerrarCaja(input: {
     entidadTipo: "Caja",
     entidadId: cajaAbierta.id,
     cambios: {
-      montoContado: montoContado.toString(),
-      montoEsperado: montoEsperado.toString(),
-      diferencia: diferencia.toString(),
+      montoContadoUsd: montoContadoUsd.toString(),
+      montoContadoBs: montoContadoBs.toString(),
+      montoEsperadoUsd: montoEsperadoUsd.toString(),
+      montoEsperadoBs: montoEsperadoBs.toString(),
+      diferenciaUsd: diferenciaUsd.toString(),
+      diferenciaBs: diferenciaBs.toString(),
     },
   });
 
   return {
     cajaId: cajaAbierta.id,
-    montoEsperado: montoEsperado.toString(),
-    diferencia: diferencia.toString(),
+    montoEsperadoUsd: montoEsperadoUsd.toString(),
+    montoEsperadoBs: montoEsperadoBs.toString(),
+    diferenciaUsd: diferenciaUsd.toString(),
+    diferenciaBs: diferenciaBs.toString(),
   };
+}
+
+export interface SaldoCuenta {
+  metodoPago: MetodoPagoId;
+  label: string;
+  moneda: "USD" | "Bs";
+  esEfectivo: boolean;
+  saldo: string;
+}
+
+/**
+ * Saldo del día por cada método de pago (ver changelog punto 11/46): monto
+ * inicial (solo aplica a los dos métodos de efectivo — los métodos
+ * digitales no tienen "apertura", arrancan en 0 cada caja) + ingresos −
+ * egresos de ESE método dentro de la caja abierta actual. No es un
+ * acumulado histórico entre cierres — cada caja nueva reinicia el saldo de
+ * cada cuenta, igual que ya se decidió para el arqueo de efectivo.
+ *
+ * Devuelve `null` si no hay caja abierta (no hay nada que mostrar).
+ */
+export async function obtenerSaldoPorCuenta(input: {
+  organizacionId: string;
+}): Promise<SaldoCuenta[] | null> {
+  const cajaAbierta = await obtenerCajaAbierta({
+    organizacionId: input.organizacionId,
+  });
+  if (!cajaAbierta) {
+    return null;
+  }
+
+  const [ingresos, egresos] = await Promise.all([
+    prisma.movimientoCaja.groupBy({
+      by: ["metodoPago"],
+      where: { cajaId: cajaAbierta.id, tipo: "INGRESO" },
+      _sum: { monto: true },
+    }),
+    prisma.movimientoCaja.groupBy({
+      by: ["metodoPago"],
+      where: { cajaId: cajaAbierta.id, tipo: "EGRESO" },
+      _sum: { monto: true },
+    }),
+  ]);
+
+  const buscar = (
+    filas: Array<{ metodoPago: MetodoPagoId; _sum: { monto: Prisma.Decimal | null } }>,
+    metodo: MetodoPagoId,
+  ) => filas.find((f) => f.metodoPago === metodo)?._sum.monto ?? new Prisma.Decimal(0);
+
+  return METODOS_PAGO.map((metodo) => {
+    const info = INFO_METODO_PAGO[metodo];
+    const inicial =
+      metodo === "EFECTIVO_USD"
+        ? cajaAbierta.montoInicialUsd
+        : metodo === "EFECTIVO_BS"
+          ? cajaAbierta.montoInicialBs
+          : new Prisma.Decimal(0);
+    const saldo = inicial.plus(buscar(ingresos, metodo)).minus(buscar(egresos, metodo));
+
+    return {
+      metodoPago: metodo,
+      label: info.label,
+      moneda: info.moneda,
+      esEfectivo: info.esEfectivo,
+      saldo: saldo.toString(),
+    };
+  });
 }

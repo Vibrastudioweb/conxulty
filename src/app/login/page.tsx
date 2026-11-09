@@ -28,9 +28,9 @@ async function autenticar(formData: FormData) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; creada?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, creada } = await searchParams;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
@@ -39,6 +39,14 @@ export default async function LoginPage({
         <p className="mt-2 text-sm text-text-secondary">
           Inicia sesión para continuar
         </p>
+
+        {creada && (
+          <div className="mt-4">
+            <Alert tone="success">
+              Tu cuenta se creó correctamente — inicia sesión con tu correo y contraseña.
+            </Alert>
+          </div>
+        )}
 
         <form action={autenticar} className="mt-6 space-y-4">
           <div>
@@ -68,6 +76,10 @@ export default async function LoginPage({
           </Button>
         </form>
       </Card>
+
+      <p className="mt-4 text-center text-sm text-text-secondary">
+        ¿No tienes cuenta? <a href="/registro" className="text-brand-primary">Regístrate</a>
+      </p>
 
       <div className="mt-6">
         <VibraSignature className="text-center" />

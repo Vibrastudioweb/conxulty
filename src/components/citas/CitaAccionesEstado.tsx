@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { Button, type ButtonVariant } from "@/components/ui/Button";
-import { accionesDeEstadoDisponibles, citaEsEditable } from "@/modules/core/citas";
+import {
+  accionesDeEstadoDisponibles,
+  citaEsEditable,
+} from "@/modules/core/citasEstado";
 import type { CitaDelDia } from "@/components/citas/CitaCard";
 
 type EstadoAccionable = "CONFIRMADA" | "CANCELADA" | "ATENDIDA" | "NO_ASISTIO";
@@ -23,7 +26,9 @@ const VARIANTE_ACCION: Record<EstadoAccionable, ButtonVariant> = {
 
 /**
  * Botones de cambio de estado para una cita en la vista Día/Semana de
- * /agenda. Reutiliza accionesDeEstadoDisponibles (modules/core/citas.ts)
+ * /agenda. Reutiliza accionesDeEstadoDisponibles (modules/core/citasEstado.ts
+ * — NO modules/core/citas.ts: ese módulo importa prisma, y este componente
+ * ahora también se usa desde un Client Component, ver changelog punto 60)
  * para no duplicar la matriz de transiciones permitidas en la capa de UI:
  * si el servidor no permitiría la transición, el botón directamente no
  * aparece. Las Server Actions se reciben por prop en vez de importarse

@@ -4,8 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Banknote,
+  BarChart3,
   CalendarDays,
   ClipboardList,
+  IdCard,
   ShieldCheck,
   Sun,
   Users,
@@ -18,8 +20,10 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   agenda: CalendarDays,
   pacientes: Users,
   caja: Banknote,
+  reportes: BarChart3,
   admin: ShieldCheck,
   staff: ClipboardList,
+  fichaPublica: IdCard,
 };
 
 /**
@@ -76,14 +80,17 @@ export function NavList({
             <Link
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3.5 rounded-button px-3 py-3 text-body transition ${
+              title={item.label}
+              className={`flex items-center gap-3.5 rounded-button px-3 py-3 text-body transition group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:px-0 ${
                 active
                   ? "bg-brand-primary-soft font-semibold text-brand-primary"
                   : "font-medium text-text-secondary hover:bg-surface-muted hover:text-text-primary"
               }`}
             >
               <Icon size={24} strokeWidth={active ? 2.25 : 2} aria-hidden="true" />
-              {item.label}
+              <span className="truncate group-data-[collapsed=true]/sidebar:hidden">
+                {item.label}
+              </span>
             </Link>
           </li>
         );

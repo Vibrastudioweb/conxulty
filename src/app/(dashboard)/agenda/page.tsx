@@ -1,16 +1,19 @@
 import Link from "next/link";
 import type { EstadoCita, ModalidadCita } from "@prisma/client";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
-import { listarCitasDelDia, listarCitasEnRango } from "@/modules/core/citas";
+import {
+  listarCitasDelDiaConDetalle,
+  listarCitasEnRango,
+} from "@/modules/core/citas";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import {
-  CitaCard,
   ETIQUETAS_ESTADO_CITA,
   ETIQUETAS_MODALIDAD,
 } from "@/components/citas/CitaCard";
-import { CitaAccionesEstado } from "@/components/citas/CitaAccionesEstado";
+import { ListaDiaConDetalle } from "@/components/citas/ListaDiaConDetalle";
+import { ResumenEstadosCita } from "@/components/citas/ResumenEstadosCita";
 import { FiltrosAgenda } from "@/components/citas/FiltrosAgenda";
 import { SelectorVista, type VistaAgenda } from "@/components/citas/SelectorVista";
 import { VistaSemana } from "@/components/citas/VistaSemana";
@@ -193,7 +196,7 @@ async function VistaDia({
   const anteriorISO = formatearFechaISO(sumarDias(fecha, -1));
   const siguienteISO = formatearFechaISO(sumarDias(fecha, 1));
 
-  const citas = await listarCitasDelDia({
+  const citas = await listarCitasDelDiaConDetalle({
     organizacionId,
     medicoId,
     fecha,
@@ -214,6 +217,8 @@ async function VistaDia({
 
   return (
     <>
+      <ResumenEstadosCita citas={citas} />
+
       <div className="mt-6 flex items-center justify-between gap-2">
         <Link
           href={`/agenda?vista=dia&fecha=${anteriorISO}${sufijoNav}`}
@@ -246,18 +251,11 @@ async function VistaDia({
         {citas.length === 0 ? (
           <EmptyState message="No hay citas para este día." />
         ) : (
-          <ul className="space-y-2">
-            {citas.map((cita) => (
-              <li key={cita.id}>
-                <CitaCard cita={cita} />
-                <CitaAccionesEstado
-                  cita={cita}
-                  volverA={volverA}
-                  acciones={ACCIONES_ESTADO}
-                />
-              </li>
-            ))}
-          </ul>
+          <ListaDiaConDetalle
+            citas={citas}
+            volverA={volverA}
+            acciones={ACCIONES_ESTADO}
+          />
         )}
       </section>
     </>
@@ -297,6 +295,8 @@ async function VistaSemanaContainer({
 
   return (
     <>
+      <ResumenEstadosCita citas={citas} />
+
       <div className="mt-6 flex items-center justify-between gap-2">
         <Link
           href={`/agenda?vista=semana&fecha=${anteriorISO}`}
@@ -357,6 +357,8 @@ async function VistaMesContainer({
 
   return (
     <>
+      <ResumenEstadosCita citas={citas} />
+
       <div className="mt-6 flex items-center justify-between gap-2">
         <Link
           href={`/agenda?vista=mes&fecha=${formatearFechaISO(mesAnteriorRef)}`}

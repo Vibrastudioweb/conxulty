@@ -12,10 +12,12 @@ import {
   actualizarPaciente,
   archivarPaciente,
   reactivarPaciente,
+  actualizarOdontograma,
   DocumentoIdentidadDuplicadoError,
   PacienteNoEncontradoError,
   PacienteArchivadoError,
 } from "@/modules/core/pacientes";
+import { DIENTES_FDI, esEstadoDiente } from "@/modules/consultas/odontograma";
 import {
   crearAntecedente,
   editarAntecedente,
@@ -75,6 +77,48 @@ export async function iniciarConsultaAction(formData: FormData) {
   }
 
   redirect(`/consultas/${consultaId}`);
+}
+
+/**
+ * "Recetar" desde la ficha del paciente (ver changelog punto 62): el
+ * usuario pidió poder "entrar al paciente e ir a recetas" directo, sin que
+ * dependa de que ya exista una consulta EN_CURSO abierta de antes. Reutiliza
+ * exactamente la misma `abrirOCrearConsulta` que `iniciarConsultaAction`
+ * (abre una si no hay, continúa la EN_CURSO si ya existe — nunca crea una
+ * segunda) y los mismos errores/redirects; solo cambia el destino final:
+ * en vez de `/consultas/[id]`, va directo al formulario de la receta.
+ */
+export async function recetarAction(formData: FormData) {
+  const { session, medico } = await requireMedicoSesion();
+
+  const pacienteId = String(formData.get("pacienteId") ?? "");
+  const citaIdCampo = formData.get("citaId");
+  const citaId = citaIdCampo ? String(citaIdCampo) : null;
+
+  if (!pacienteId) {
+    throw new Error("Falta el paciente para recetar.");
+  }
+
+  let consultaId: string;
+  try {
+    ({ consultaId } = await abrirOCrearConsulta({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      medicoId: medico.id,
+      pacienteId,
+      citaId,
+    }));
+  } catch (err) {
+    if (err instanceof CitaNoDisponibleError) {
+      redirect(`/pacientes/${pacienteId}?error=cita_no_disponible`);
+    }
+    if (err instanceof PacienteArchivadoError) {
+      redirect(`/pacientes/${pacienteId}?error=paciente_archivado`);
+    }
+    throw err;
+  }
+
+  redirect(`/consultas/${consultaId}/documentos/nueva`);
 }
 
 export async function actualizarPacienteAction(formData: FormData) {
@@ -267,4 +311,50 @@ export async function desactivarAntecedenteAction(formData: FormData) {
   }
 
   redirect(`/pacientes/${pacienteId}?antecedente_desactivado=1`);
+}
+
+/**
+ * Odontograma (ver changelog punto 51) — la pantalla siempre envía los 32
+ * selects, uno por diente FDI; solo se guardan los que NO están en "SANO"
+ * (ver doc en actualizarOdontograma: SANO es la ausencia de entrada). Un
+ * valor fuera del enum (manipulación del form) se descarta en silencio en
+ * vez de romper el guardado completo — mismo criterio de tolerancia que el
+ * resto de los formularios sin validación de esquema con zod.
+ */
+export async function actualizarOdontogramaAction(formData: FormData) {
+  const { session } = await requireMedicoSesion();
+
+  const pacienteId = String(formData.get("pacienteId") ?? "");
+  if (!pacienteId) {
+    throw new Error("Falta el paciente.");
+  }
+
+  const odontograma: Record<string, string> = {};
+  for (const numero of DIENTES_FDI) {
+    const valor = formData.get(`diente_${numero}`);
+    if (typeof valor !== "string") continue;
+    if (valor === "SANO") continue;
+    if (esEstadoDiente(valor)) {
+      odontograma[numero] = valor;
+    }
+  }
+
+  const notasOdontograma = leerTexto(formData, "notasOdontograma");
+
+  try {
+    await actualizarOdontograma({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      pacienteId,
+      odontograma,
+      notasOdontograma,
+    });
+  } catch (err) {
+    if (err instanceof PacienteNoEncontradoError) {
+      redirect("/pacientes");
+    }
+    throw err;
+  }
+
+  redirect(`/pacientes/${pacienteId}?tab=odontograma&odontograma_actualizado=1`);
 }

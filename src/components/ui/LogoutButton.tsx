@@ -11,10 +11,11 @@ export function LogoutButton() {
     <form action={cerrarSesion}>
       <button
         type="submit"
+        title="Cerrar sesión"
         className="inline-flex items-center gap-1.5 text-caption text-text-faint transition hover:text-text-secondary"
       >
         <LogOut size={14} aria-hidden="true" />
-        Cerrar sesión
+        <span className="group-data-[collapsed=true]/sidebar:hidden">Cerrar sesión</span>
       </button>
     </form>
   );

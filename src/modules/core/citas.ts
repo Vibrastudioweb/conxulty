@@ -3,11 +3,21 @@ import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 import { validarConsistenciaCita } from "@/db/consistenciaOrganizacional";
 import { PacienteArchivadoError } from "@/modules/core/pacientes";
+import {
+  ESTADOS_ACTIVOS,
+  TRANSICIONES_PERMITIDAS,
+  type EstadoCitaAccionable,
+} from "@/modules/core/citasEstado";
 
 /**
  * Casos de uso de Cita. Toda lectura y escritura va scoped por
  * organizacionId + medicoId de la sesión, nunca por medicoId enviado por el
  * cliente.
+ *
+ * La matriz de transiciones de estado (`ESTADOS_ACTIVOS`,
+ * `TRANSICIONES_PERMITIDAS`, `EstadoCitaAccionable`) vive en
+ * `citasEstado.ts`, no aquí (ver ese archivo) — este módulo importa prisma
+ * y no puede llegar nunca a un Client Component.
  */
 
 export const DURACION_MINUTOS_DEFECTO = 30;
@@ -21,26 +31,6 @@ const ESTADOS_QUE_BLOQUEAN_HORARIO: EstadoCita[] = [
   "CONFIRMADA",
   "ATENDIDA",
 ];
-
-/** Estados sobre los que todavía tiene sentido actuar (editar, reprogramar,
- *  cambiar de estado). Un estado terminal (CANCELADA/ATENDIDA/NO_ASISTIO)
- *  no admite más acciones en este bloque. */
-const ESTADOS_ACTIVOS: EstadoCita[] = ["PENDIENTE", "CONFIRMADA"];
-
-type EstadoCitaAccionable = "CONFIRMADA" | "CANCELADA" | "ATENDIDA" | "NO_ASISTIO";
-
-/** Transiciones de estado permitidas. Una cita cancelada, atendida o
- *  marcada como no asistió es terminal: no hay acción en este bloque que la
- *  regrese a un estado anterior (ver AGENTS del bloque, sección 3 — si se
- *  necesita reabrir una cita, debe ser una acción explícita de un bloque
- *  futuro, no una transición implícita). */
-const TRANSICIONES_PERMITIDAS: Record<EstadoCita, EstadoCitaAccionable[]> = {
-  PENDIENTE: ["CONFIRMADA", "CANCELADA", "ATENDIDA", "NO_ASISTIO"],
-  CONFIRMADA: ["CANCELADA", "ATENDIDA", "NO_ASISTIO"],
-  ATENDIDA: [],
-  CANCELADA: [],
-  NO_ASISTIO: [],
-};
 
 const ACCION_TRAZABILIDAD_POR_ESTADO: Record<EstadoCitaAccionable, string> = {
   CONFIRMADA: "confirmar_cita",
@@ -155,6 +145,59 @@ export async function listarCitasDelDia(input: {
     },
     include: {
       paciente: { select: { id: true, nombre: true, apellido: true } },
+      consulta: { select: { id: true, estado: true } },
+    },
+    orderBy: { fechaHora: "asc" },
+  });
+}
+
+/**
+ * Igual que listarCitasDelDia, pero con los datos adicionales del paciente
+ * que necesita la tarjeta de "Detalle de la cita" (ver changelog punto 60):
+ * teléfono, fecha de nacimiento, sexo y documento para la vista rápida, más
+ * sus alergias activas (mismo filtro que usa `listarAntecedentesDelPaciente`
+ * y `AlertaAlergias`: tipo ALERGIA + activo). Se separa de
+ * `listarCitasDelDia` para no cargar estos campos extra en los llamados que
+ * no los necesitan (p.ej. `citasAyer` en /hoy, que solo cuenta para los
+ * deltas). Solo la usan la vista Día de /agenda y la cita de "hoy" en /hoy,
+ * que son los dos lugares donde existe el panel de detalle.
+ */
+export async function listarCitasDelDiaConDetalle(input: {
+  organizacionId: string;
+  medicoId: string;
+  fecha: Date;
+  estado?: EstadoCita;
+  modalidad?: ModalidadCita;
+}) {
+  const inicio = new Date(input.fecha);
+  inicio.setHours(0, 0, 0, 0);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+
+  return prisma.cita.findMany({
+    where: {
+      organizacionId: input.organizacionId,
+      medicoId: input.medicoId,
+      fechaHora: { gte: inicio, lt: fin },
+      ...(input.estado ? { estado: input.estado } : {}),
+      ...(input.modalidad ? { modalidad: input.modalidad } : {}),
+    },
+    include: {
+      paciente: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          telefono: true,
+          fechaNacimiento: true,
+          sexo: true,
+          documentoIdentidad: true,
+          antecedentesMedicos: {
+            where: { tipo: "ALERGIA", activo: true },
+            select: { id: true, descripcion: true },
+          },
+        },
+      },
       consulta: { select: { id: true, estado: true } },
     },
     orderBy: { fechaHora: "asc" },
@@ -480,19 +523,13 @@ async function cambiarEstadoCita(input: {
   });
 }
 
-/**
- * Transiciones de estado válidas desde `estado`, para que la UI (agenda)
- * decida qué botones mostrar sin reimplementar la matriz de transiciones.
- */
-export function accionesDeEstadoDisponibles(
-  estado: EstadoCita,
-): EstadoCitaAccionable[] {
-  return TRANSICIONES_PERMITIDAS[estado];
-}
-
-export function citaEsEditable(estado: EstadoCita): boolean {
-  return ESTADOS_ACTIVOS.includes(estado);
-}
+// `accionesDeEstadoDisponibles` y `citaEsEditable` viven en
+// `citasEstado.ts` (ver nota de cabecera de este archivo). Se reexportan
+// acá por compatibilidad con quien ya las importaba de `citas.ts`
+// (`agenda/[id]/editar/page.tsx`, un Server Component sin problema de
+// bundling) — `CitaAccionesEstado.tsx`, que sí puede llegar a un Client
+// Component, las importa directo de `citasEstado.ts`.
+export { accionesDeEstadoDisponibles, citaEsEditable } from "@/modules/core/citasEstado";
 
 export async function confirmarCita(input: {
   organizacionId: string;
