@@ -331,6 +331,22 @@ model Cita {
   /// Notas operativas de agenda (p.ej. "confirmar por teléfono"). Nunca
   /// contenido clínico: eso vive exclusivamente en Consulta.
   notas           String?
+  /// Task #15 (changelog punto 91/97): de dónde vino la cita — OS (el
+  /// médico/su staff la cargó desde la agenda) o DIRECTORIO (un paciente
+  /// la reservó desde la ficha pública en conxulty.com). Sirve para que
+  /// la agenda distinga cuáles vienen de afuera y necesitan revisión
+  /// prioritaria — no cambia ninguna regla de negocio por sí solo.
+  origen          CitaOrigen    @default(OS)
+  /// Task #16 (changelog punto 91/98): token de un solo uso que habilita
+  /// dejar una reseña pública de ESTA cita. Solo se genera para citas
+  /// origen DIRECTORIO (ver citasPublicas.ts) — pedido explícito del
+  /// usuario: "quien las deja: solo quien reserve una cita por medio de
+  /// conxulty". Una cita cargada desde la agenda del OS no tiene token,
+  /// nunca habilita reseña. No se borra al usarse — `tokenResenaUsado`
+  /// es lo que lo invalida, así queda trazabilidad de qué reseña vino
+  /// de qué cita.
+  tokenResena       String?     @unique
+  tokenResenaUsado  Boolean     @default(false)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   medico          Medico        @relation(fields: [medicoId], references: [id])
@@ -660,6 +676,12 @@ enum ModalidadCita {
   PRESENCIAL
   VIDEOCONSULTA
   DOMICILIO
+}
+
+/// Task #15 — ver comentario de Cita.origen.
+enum CitaOrigen {
+  OS
+  DIRECTORIO
 }
 
 enum TipoAntecedente {
