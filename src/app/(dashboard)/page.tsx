@@ -16,5 +16,10 @@ export default async function DashboardRootPage() {
       redirect("/staff");
     case "SUPERADMIN":
       redirect("/superadmin");
+    case "ENTIDAD":
+      // Sin Agenda ni "Hoy" — la ficha pública es lo único que tiene una
+      // cuenta de clínica/farmacia (changelog punto 90/92), así que es
+      // directamente su home.
+      redirect("/ficha-entidad");
   }
 }

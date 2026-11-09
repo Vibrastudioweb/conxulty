@@ -57,6 +57,43 @@ export async function requireMedicoSesion() {
 }
 
 /**
+ * Punto único de guarda para rutas y acciones de clínica/farmacia — ver
+ * changelog punto 90/92. Igual que `requireMedico`: si no hay sesión,
+ * redirige a /login; si la sesión existe pero el rol no es ENTIDAD,
+ * redirige a donde le corresponde en vez de dejarlo avanzar.
+ */
+export async function requireEntidad() {
+  const session = await requireSesion();
+
+  if (session.user.rol !== "ENTIDAD") {
+    redirect(
+      session.user.rol === "MEDICO"
+        ? "/hoy"
+        : session.user.rol === "ADMIN"
+          ? "/admin"
+          : session.user.rol === "SUPERADMIN"
+            ? "/superadmin"
+            : "/staff",
+    );
+  }
+
+  return session;
+}
+
+/**
+ * Exige sesión de ENTIDAD (ver requireEntidad) y resuelve su perfil
+ * Entidad. La pantalla de "Mi ficha pública" de clínica/farmacia parte de
+ * acá, igual que requireMedicoSesion resuelve `Medico` para la suya.
+ */
+export async function requireEntidadSesion() {
+  const session = await requireEntidad();
+  const entidad = await prisma.entidad.findUniqueOrThrow({
+    where: { usuarioId: session.user.id },
+  });
+  return { session, entidad };
+}
+
+/**
  * Guarda de todo lo que cuelga de /superadmin (páginas Y server actions —
  * estas últimas son endpoints públicos y deben validar por sí mismas).
  * Además del rol del JWT, confirma contra la base que el usuario sigue

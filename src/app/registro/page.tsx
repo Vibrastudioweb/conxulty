@@ -323,6 +323,10 @@ export default async function RegistroPage({
       <p className="mt-4 text-center text-sm text-text-secondary">
         ¿Ya tienes cuenta? <a href="/login" className="text-brand-primary">Inicia sesión</a>
       </p>
+      <p className="mt-2 text-center text-sm text-text-secondary">
+        ¿Vienes a registrar una clínica o farmacia?{" "}
+        <a href="/registro/entidad" className="text-brand-primary">Regístrala aquí</a>
+      </p>
 
       <div className="mt-6">
         <VibraSignature className="text-center" />
