@@ -46,7 +46,7 @@ export async function AppShell({
       </SidebarFrame>
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <MobileHeader alertas={alertas} className="lg:hidden" />
+        <MobileHeader alertas={alertas} rol={user.rol} className="lg:hidden" />
         <Topbar alertas={alertas} className="hidden lg:flex" />
         {/* No es <main>: cada página ya renderiza su propio <main> — anidar
             landmarks "main" es inválido en HTML y duplica el landmark para

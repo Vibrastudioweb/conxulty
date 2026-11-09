@@ -4,6 +4,7 @@ import { Logo } from "@/components/brand/Logo";
 import { VibraSignature } from "@/components/brand/VibraSignature";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { SupportButton } from "@/components/ui/SupportButton";
+import { AjustesButton } from "@/components/ui/AjustesButton";
 import { NavList } from "@/components/navigation/NavList";
 import type { NavItem } from "@/components/navigation/nav-config";
 
@@ -44,6 +45,7 @@ export function Sidebar({
           <p className="truncate px-2 text-caption text-text-faint">{user.email}</p>
         </div>
         <div className="mt-2 flex items-center gap-3 px-2 group-data-[collapsed=true]/sidebar:flex-col group-data-[collapsed=true]/sidebar:gap-2 group-data-[collapsed=true]/sidebar:px-0">
+          {user.rol === "MEDICO" && <AjustesButton />}
           <SupportButton />
           <LogoutButton />
         </div>

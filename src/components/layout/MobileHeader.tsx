@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 import { LogoutButton } from "@/components/ui/LogoutButton";
+import { AjustesButton } from "@/components/ui/AjustesButton";
 import type { AlertaTopbar } from "@/modules/core/notificaciones";
+import type { RolUsuario } from "@prisma/client";
 import { NotificacionesBell } from "./NotificacionesBell";
 
 /**
@@ -16,13 +18,16 @@ import { NotificacionesBell } from "./NotificacionesBell";
  * el viewport.
  *
  * El acceso a `/ajustes` (agregado en el punto 56) se REVIRTIÓ el mismo
- * día (punto 57) — ver nota en `Topbar.tsx`.
+ * día (punto 57) por ser de solo lectura — vuelve a aparecer acá en el
+ * punto 89 con Plan/Pago/Facturas reales detrás (ver `AjustesButton`).
  */
 export function MobileHeader({
   alertas,
+  rol,
   className = "",
 }: {
   alertas: AlertaTopbar[];
+  rol: RolUsuario;
   className?: string;
 }) {
   return (
@@ -34,6 +39,7 @@ export function MobileHeader({
       </Link>
       <div className="flex items-center gap-1">
         <NotificacionesBell alertas={alertas} />
+        {rol === "MEDICO" && <AjustesButton />}
         <LogoutButton />
       </div>
     </header>
