@@ -249,8 +249,22 @@ export default async function RegistroPage({
 
           <div className="mt-4 space-y-3">
             <SedeFields numero={1} requerida />
-            <SedeFields numero={2} />
-            <SedeFields numero={3} />
+            <details className="group rounded-input border border-dashed border-border p-3">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-button border border-brand-primary px-4 py-2 text-body-secondary font-semibold text-brand-primary hover:bg-brand-primary-soft [&::-webkit-details-marker]:hidden">
+                + Agregar sede
+              </summary>
+              <div className="mt-3 space-y-3">
+                <SedeFields numero={2} />
+                <details className="group rounded-input border border-dashed border-border p-3">
+                  <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-button border border-brand-primary px-4 py-2 text-body-secondary font-semibold text-brand-primary hover:bg-brand-primary-soft [&::-webkit-details-marker]:hidden">
+                    + Agregar otra sede
+                  </summary>
+                  <div className="mt-3">
+                    <SedeFields numero={3} />
+                  </div>
+                </details>
+              </div>
+            </details>
           </div>
           <p className="mt-2 text-caption text-text-faint">
             Llena al menos la Sede 1 si marcaste &quot;Presencial en consultorio&quot;.
