@@ -42,6 +42,21 @@ function leerServiciosDeFormData(formData: FormData): { nombre: string; precio: 
   }
 }
 
+// Task #14: mismo patrón que servicios — texto libre, sin catálogo
+// cerrado (no se investigó ninguno compartido con el Directorio).
+const aseguradorasSchema = z.array(z.string().trim().min(1).max(160)).max(15);
+
+function leerAseguradorasDeFormData(formData: FormData): string[] {
+  const crudo = formData.get("aseguradoras")?.toString();
+  if (!crudo) return [];
+  try {
+    const parseo = aseguradorasSchema.safeParse(JSON.parse(crudo));
+    return parseo.success ? parseo.data : [];
+  } catch {
+    return [];
+  }
+}
+
 export type GuardarFichaPublicaResultado =
   | { ok: true; slug: string; advertenciaFoto?: string }
   | { ok: false; error: string }
@@ -79,6 +94,7 @@ export async function guardarFichaPublicaAction(
   }
 
   const servicios = leerServiciosDeFormData(formData);
+  const aseguradoras = leerAseguradorasDeFormData(formData);
 
   const [organizacion, medicoCompleto, sedes] = await Promise.all([
     prisma.organizacion.findUniqueOrThrow({
@@ -177,6 +193,7 @@ export async function guardarFichaPublicaAction(
     domicilioFiscal: parseo.data.domicilioFiscal ?? null,
     disponibilidad: parseo.data.disponibilidad ?? null,
     servicios,
+    aseguradoras,
   });
 
   if (!resultado.ok) {

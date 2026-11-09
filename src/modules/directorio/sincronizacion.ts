@@ -61,6 +61,8 @@ export interface DatosFichaDirectorio {
   disponibilidad?: string | null;
   /** Task #13 — ver ServicioPrecioSincronizacion. */
   servicios?: ServicioPrecioSincronizacion[];
+  /** Task #14 — texto libre, sin catálogo cerrado (ver AseguradorasForm.tsx). */
+  aseguradoras?: string[];
 }
 
 export type ResultadoSincronizacion =
@@ -175,6 +177,8 @@ export interface FichaDirectorio {
   disponibilidad: string | null;
   /** Task #13, changelog punto 91/93. */
   servicios: ServicioPrecioSincronizacion[];
+  /** Task #14, changelog punto 91/95. */
+  aseguradoras: string[];
   publicada: boolean;
 }
 
