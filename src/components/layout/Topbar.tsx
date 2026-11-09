@@ -21,7 +21,9 @@ import { NotificacionesBell } from "./NotificacionesBell";
  * configuración real detrás no valía el acceso permanente en el topbar.
  * Mismo criterio que ya se aplicó para descartar el icono de cuadrícula
  * de la demo, solo que esta vez se construyó primero y se corrigió
- * después de verlo en uso real.
+ * después de verlo en uso real. /ajustes vuelve en el punto 89 (Plan Pro
+ * real), pero el acceso vive en `Sidebar`/`MobileHeader`
+ * (`AjustesButton`), no acá — no hay razón para duplicarlo en el topbar.
  *
  * Deliberadamente NO hay un chip de usuario/avatar aquí: `Sidebar` ya
  * muestra nombre, correo y cerrar sesión al pie — duplicarlo en el Topbar

@@ -41,8 +41,10 @@ model Organizacion {
   medicos               Medico[]
   movimientosCaja       MovimientoCaja[]
   pacientes             Paciente[]
+  pagos                 Pago[]
   registrosTrazabilidad RegistroTrazabilidad[]
   sedes                 Sede[]
+  suscripcion           Suscripcion?
   usuarios              Usuario[]
 
   @@map("organizaciones")
@@ -699,6 +701,85 @@ enum ModalidadAtencion {
 enum PlanOrganizacion {
   FICHA
   PRO
+}
+
+/// Ver changelog punto 89 (flujo de pago real del Plan Pro, pasarela SPIDI).
+enum ProveedorPago {
+  SPIDI
+}
+
+/// ACTIVA: cobro al día. PENDIENTE_PAGO: venció y no se pudo renovar —
+/// todavía no se baja a FICHA sola (da un margen de gracia antes de
+/// degradar). BAJANDO_A_FICHA: el médico pidió la baja, sigue en PRO hasta
+/// `finPeriodoActual`. SIN_METODO_DE_PAGO: eligió PRO pero nunca completó
+/// el pago inicial con SPIDI — equivale a FICHA en la práctica.
+enum EstadoSuscripcion {
+  ACTIVA
+  PENDIENTE_PAGO
+  BAJANDO_A_FICHA
+  SIN_METODO_DE_PAGO
+}
+
+enum EstadoPago {
+  PAGADO
+  FALLIDO
+  PENDIENTE
+}
+
+/// Estado de la suscripción al Plan Pro — 1:1 con Organizacion. No existe
+/// fila para organizaciones que siempre estuvieron en Ficha sin intentar
+/// subir de plan nunca; `obtenerSuscripcion()` sintetiza ese caso (ver
+/// src/modules/suscripcion/obtenerSuscripcion.ts) en vez de forzar un
+/// backfill — evita una migración de datos que no cambia ningún
+/// comportamiento.
+model Suscripcion {
+  id                  String             @id @default(cuid())
+  organizacionId      String             @unique
+  proveedor           ProveedorPago      @default(SPIDI)
+  estado              EstadoSuscripcion  @default(SIN_METODO_DE_PAGO)
+  /// A qué plan vuelve Organizacion.plan al llegar `finPeriodoActual` — null
+  /// significa "se renueva igual". Es lo único que cambia una baja: no hay
+  /// corte inmediato (DECISIÓN pendiente de confirmar con el usuario, ver
+  /// changelog punto 89 — asumido "al final del periodo pagado" por falta
+  /// de respuesta explícita).
+  planAlRenovar       PlanOrganizacion?
+  inicioPeriodoActual DateTime?
+  finPeriodoActual    DateTime?
+  /// Identificadores del lado de SPIDI — opacos acá a propósito: lo que
+  /// significan se define en su Referencia de API, todavía no integrada
+  /// (ver changelog punto 89).
+  spidiClienteId      String?
+  spidiSuscripcionId  String?
+  /// Cacheado solo para pintar "Visa •••• 1234" sin llamar a SPIDI en cada
+  /// carga de /ajustes — la fuente de verdad del método de pago vive en
+  /// SPIDI, esto es una copia de lectura.
+  metodoPagoResumen   String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  organizacion        Organizacion       @relation(fields: [organizacionId], references: [id])
+  pagos               Pago[]
+
+  @@map("suscripciones")
+}
+
+/// Historial de cobros — la sección "Facturas" de /ajustes. Una fila por
+/// intento de cobro que SPIDI confirme (vía webhook, todavía no integrado),
+/// no por cada carga de página.
+model Pago {
+  id             String       @id @default(cuid())
+  organizacionId String
+  suscripcionId  String
+  plan           PlanOrganizacion
+  montoCentavos  Int
+  moneda         String       @default("USD")
+  estado         EstadoPago
+  spidiPagoId    String?      @unique
+  fecha          DateTime     @default(now())
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  suscripcion    Suscripcion  @relation(fields: [suscripcionId], references: [id])
+
+  @@index([organizacionId, fecha])
+  @@map("pagos")
 }
 
 enum TipoMovimientoCaja {
