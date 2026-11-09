@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { RecortadorFoto } from "@/components/ui/RecortadorFoto";
 import { GaleriaFotosForm } from "@/components/ui/GaleriaFotosForm";
 import { ServiciosPreciosForm } from "@/components/ui/ServiciosPreciosForm";
+import { AseguradorasForm } from "@/components/ui/AseguradorasForm";
 import { guardarFichaPublicaAction, type GuardarFichaPublicaResultado } from "./actions";
 import { agregarFotoGaleriaMedicoAction, quitarFotoGaleriaMedicoAction } from "./galeriaActions";
 import type { CiudadDirectorio, FichaDirectorio, SedeDirectorio } from "@/modules/directorio/sincronizacion";
@@ -143,6 +144,11 @@ export function FichaPublicaForm({
       <div>
         <p className={LABEL}>Servicios y precios</p>
         <ServiciosPreciosForm serviciosIniciales={ficha?.servicios ?? []} />
+      </div>
+
+      <div>
+        <p className={LABEL}>Aseguradoras que aceptas</p>
+        <AseguradorasForm aseguradorasIniciales={ficha?.aseguradoras ?? []} />
       </div>
 
       <div>
