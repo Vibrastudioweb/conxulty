@@ -67,6 +67,13 @@ const NAV_STAFF: NavItem[] = [
   { href: "/caja", label: "Caja", iconKey: "caja", primary: true },
 ];
 
+// Clínica/farmacia (changelog punto 90/92) — deliberadamente UN SOLO ítem:
+// sin Agenda, Pacientes, Caja ni Reportes, porque no tienen consultas que
+// agendar ni cobrar. "Mi ficha pública" es su home (ver (dashboard)/page.tsx).
+const NAV_ENTIDAD: NavItem[] = [
+  { href: "/ficha-entidad", label: "Mi ficha pública", iconKey: "fichaPublica", primary: true },
+];
+
 export function navForRol(rol: RolUsuario): NavItem[] {
   switch (rol) {
     case "MEDICO":
@@ -77,6 +84,8 @@ export function navForRol(rol: RolUsuario): NavItem[] {
       return NAV_STAFF;
     case "SUPERADMIN":
       return NAV_SUPERADMIN;
+    case "ENTIDAD":
+      return NAV_ENTIDAD;
     default:
       return [];
   }

@@ -37,6 +37,7 @@ model Organizacion {
   cobros                Cobro[]
   consultas             Consulta[]
   documentos            Documento[]
+  entidades             Entidad[]
   gastos                Gasto[]
   medicos               Medico[]
   movimientosCaja       MovimientoCaja[]
@@ -126,6 +127,7 @@ model Usuario {
   updatedAt                 DateTime                 @updatedAt
   accesosExternosRealizados AccesoExternoHistorial[]
   cajasAbiertas             Caja[]                   @relation("CajaAbiertaPor")
+  entidad                   Entidad?
   gastosRegistrados         Gasto[]                  @relation("GastoRegistradoPor")
   medico                    Medico?
   movimientosRegistrados    MovimientoCaja[]         @relation("MovimientoRegistradoPor")
@@ -134,6 +136,37 @@ model Usuario {
 
   @@index([organizacionId])
   @@map("usuarios")
+}
+
+/// Perfil de clínica o farmacia (changelog punto 90/92) — equivalente de
+/// `Medico` para el rol ENTIDAD, deliberadamente sin nada de agenda/citas:
+/// esa es justo la diferencia de producto con un médico. `horario` es el
+/// horario regular (mismo formato que `Sede.horario`, 7 entradas
+/// {dia,atiende,horaInicio,horaFin}); `horarioTurno` es exclusivo de
+/// FARMACIA (mismo formato) — la UI para editarlo llega en una tarea
+/// aparte, la columna se crea ahora para no migrar dos veces.
+model Entidad {
+  id             String      @id @default(cuid())
+  usuarioId      String      @unique
+  organizacionId String
+  tipo           TipoEntidad
+  /// Catálogo cerrado de municipios de Trujillo, mismo que `Sede.municipio`
+  /// — una entidad tiene UNA sola ubicación (a diferencia del médico, que
+  /// puede tener varias sedes).
+  municipio      String?
+  direccion      String?
+  telefono       String?
+  horario        Json        @default("[]")
+  /// Solo tiene sentido si `tipo` = FARMACIA — nadie valida que una
+  /// CLINICA lo deje vacío, simplemente la UI no se lo pide.
+  horarioTurno   Json        @default("[]")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
+
+  @@index([organizacionId])
+  @@map("entidades")
 }
 
 /// Perfil profesional del médico: lo que lo identifica en agenda, consulta y documentos.
@@ -593,6 +626,19 @@ enum RolUsuario {
   /// Dueño de la plataforma: gestiona solicitudes de acceso y crea
   /// organizaciones. No es un rol de tenant (ver /superadmin).
   SUPERADMIN
+  /// Clínica o farmacia (changelog punto 90/92) — tenant sin Agenda,
+  /// Pacientes, Consultas ni Caja: el perfil asociado es `Entidad`, no
+  /// `Medico`. Mismo sistema de cuentas (correo+contraseña, misma
+  /// Organizacion), shell de navegación distinto.
+  ENTIDAD
+}
+
+/// Catálogo cerrado — ver changelog punto 90/92. Determina qué campos pide
+/// el registro (horario de turno solo aplica a FARMACIA) y a qué
+/// `tipos_entidad` del Directorio sincroniza (ver sincronizacionEntidad.ts).
+enum TipoEntidad {
+  CLINICA
+  FARMACIA
 }
 
 enum EstadoSolicitudAcceso {
