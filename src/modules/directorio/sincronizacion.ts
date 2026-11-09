@@ -50,6 +50,9 @@ export interface SedeSincronizacion {
   direccion: string;
   referencia?: string | null;
   telefono?: string | null;
+  /** Punto exacto marcado en el mapa (opcional) — ver changelog punto 80. */
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface DatosFichaDirectorio {
@@ -120,6 +123,8 @@ export interface SedeDirectorio {
   telefono: string | null;
   principal: boolean;
   orden: number;
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface FichaDirectorio {

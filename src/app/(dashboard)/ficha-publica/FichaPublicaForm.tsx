@@ -1,12 +1,24 @@
 "use client";
 
 import { useActionState } from "react";
+import dynamic from "next/dynamic";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { guardarFichaPublicaAction, type GuardarFichaPublicaResultado } from "./actions";
 import type { CiudadDirectorio, FichaDirectorio, SedeDirectorio } from "@/modules/directorio/sincronizacion";
+
+// Leaflet necesita `window` al cargar — sin esto, Next intenta renderizar
+// el mapa en el servidor y rompe. `ssr: false` lo deja solo para el cliente.
+const MapaSede = dynamic(() => import("@/components/ui/MapaSede").then((m) => m.MapaSede), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-64 items-center justify-center rounded-input border border-border text-caption text-text-faint">
+      Cargando mapa…
+    </div>
+  ),
+});
 
 const LABEL = "mb-1 block text-sm font-medium text-text-primary";
 const SELECT_CLASES =
@@ -32,6 +44,9 @@ export function FichaPublicaForm({
   // emparejando por dirección (es lo único comparable entre los dos lados
   // — ver sincronizacion.ts sobre por qué municipio≠ciudad).
   const ciudadPorDireccion = new Map(sedesDirectorio.map((s) => [s.direccion, s.ciudad_id]));
+  // Mismo emparejamiento por dirección, para precargar el punto del mapa
+  // que ya se haya marcado antes (ver MapaSede.tsx).
+  const puntoPorDireccion = new Map(sedesDirectorio.map((s) => [s.direccion, { lat: s.lat, lng: s.lng }]));
 
   return (
     <form action={accion} className="space-y-6">
@@ -70,6 +85,14 @@ export function FichaPublicaForm({
                   </option>
                 ))}
               </select>
+              <div className="mt-3">
+                <MapaSede
+                  sedeId={sede.id}
+                  etiqueta={sede.direccion}
+                  lat={puntoPorDireccion.get(sede.direccion)?.lat ?? null}
+                  lng={puntoPorDireccion.get(sede.direccion)?.lng ?? null}
+                />
+              </div>
             </div>
           ))}
         </fieldset>
