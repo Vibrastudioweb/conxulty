@@ -10,6 +10,7 @@ import {
   CreditCard,
   IdCard,
   ShieldCheck,
+  Star,
   Sun,
   Users,
   type LucideIcon,
@@ -26,6 +27,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   staff: ClipboardList,
   fichaPublica: IdCard,
   pagos: CreditCard,
+  resenas: Star,
 };
 
 /**

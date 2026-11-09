@@ -9,7 +9,8 @@ export type NavIconKey =
   | "admin"
   | "staff"
   | "fichaPublica"
-  | "pagos";
+  | "pagos"
+  | "resenas";
 
 export interface NavItem {
   href: string;
@@ -47,6 +48,10 @@ const NAV_MEDICO: NavItem[] = [
   // retiró (changelog punto 75/76). Solo médicos: Admin/Staff no tienen
   // ficha pública propia.
   { href: "/ficha-publica", label: "Mi ficha pública", iconKey: "fichaPublica" },
+  // Moderación de reseñas negativas (Task #16, changelog punto 91/98) —
+  // las positivas se publican solas, esto es solo para las que esperan
+  // una decisión del médico.
+  { href: "/resenas", label: "Reseñas", iconKey: "resenas" },
 ];
 
 const NAV_ADMIN: NavItem[] = [
