@@ -9,6 +9,7 @@ import { guardarFichaEntidadAction, type GuardarFichaEntidadResultado } from "./
 import type { CiudadDirectorio, FichaEntidadDirectorio } from "@/modules/directorio/sincronizacionEntidad";
 import { DIAS_SEMANA, type HorarioDia } from "@/modules/onboarding/horarioSede";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
+import { tieneHorarioTurno } from "@/modules/onboarding/tiposEntidad";
 import type { Entidad } from "@prisma/client";
 
 const LABEL = "mb-1 block text-sm font-medium text-text-primary";
@@ -36,6 +37,18 @@ export function FichaEntidadForm({
   // último sync, nunca se edita directo ahí).
   const horarioActual = (entidad.horario as unknown as HorarioDia[] | null) ?? [];
   const horarioPorDia = new Map(horarioActual.map((h) => [h.dia, h]));
+
+  // Horario de turno (solo farmacia, changelog punto 90/92/Task #10): un
+  // patrón semanal fijo — "estos días y horas estamos de turno" — distinto
+  // del horario de atención normal de arriba. Reutiliza el mismo shape
+  // HorarioDia (y el mismo helper de lectura, con otro prefijo de campo),
+  // NO un botón "estoy de turno ahora": el usuario corrigió esa primera
+  // suposición explícitamente. horaFin < horaInicio es válido y representa
+  // un turno que cruza la medianoche (ej. 20:00 a 08:00) — el cálculo de
+  // "de turno ahora" en vitalud lo interpreta así, ver SeccionTurno.svelte.
+  const horarioTurnoActual = (entidad.horarioTurno as unknown as HorarioDia[] | null) ?? [];
+  const horarioTurnoPorDia = new Map(horarioTurnoActual.map((h) => [h.dia, h]));
+  const esFarmacia = tieneHorarioTurno(entidad.tipo);
 
   return (
     <form action={accion} className="space-y-6">
@@ -140,6 +153,47 @@ export function FichaEntidadForm({
           })}
         </div>
       </Card>
+
+      {esFarmacia && (
+        <Card padding="spacious">
+          <h2 className="text-sm font-semibold text-text-primary">Horario de turno</h2>
+          <p className="mt-1 text-caption text-text-faint">
+            Los días y horas en los que tu farmacia está de turno — distinto del horario de atención de
+            arriba. Se usa para el carrusel &ldquo;De turno&rdquo; del Directorio. Si el turno cruza la
+            medianoche (por ejemplo, de 8:00 p.m. a 8:00 a.m.), pon la hora de fin igual al día siguiente:
+            el sistema lo entiende solo.
+          </p>
+          <div className="mt-3 space-y-2">
+            {DIAS_SEMANA.map((dia) => {
+              const actual = horarioTurnoPorDia.get(dia);
+              return (
+                <div key={dia} className="grid grid-cols-[auto_1fr_1fr] items-center gap-2 text-sm">
+                  <label className="flex items-center gap-1.5 text-text-primary">
+                    <input
+                      type="checkbox"
+                      name={`horarioTurno_${dia}_atiende`}
+                      defaultChecked={actual?.atiende ?? false}
+                    />
+                    {dia}
+                  </label>
+                  <input
+                    type="time"
+                    name={`horarioTurno_${dia}_horaInicio`}
+                    defaultValue={actual?.horaInicio ?? ""}
+                    className="rounded-input border border-border bg-surface px-2 py-1 text-sm"
+                  />
+                  <input
+                    type="time"
+                    name={`horarioTurno_${dia}_horaFin`}
+                    defaultValue={actual?.horaFin ?? ""}
+                    className="rounded-input border border-border bg-surface px-2 py-1 text-sm"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <Button type="submit" disabled={pendiente}>
         {pendiente ? "Guardando…" : "Guardar"}
