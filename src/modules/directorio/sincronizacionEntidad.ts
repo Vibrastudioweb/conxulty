@@ -21,6 +21,11 @@ export interface DatosFichaEntidad {
   direccion?: string | null;
   telefono?: string | null;
   horario: HorarioDia[];
+  /** Patrón semanal de turno (solo FARMACIA, Task #10) — ver el campo
+   *  hermano `horario_turno` en `entidades` del lado de vitalud, que
+   *  reemplaza el uso de turno_reportado_en/turno_hasta (ver changelog
+   *  punto 90/92). Se omite para CLINICA. */
+  horarioTurno?: HorarioDia[];
 }
 
 export type ResultadoSincronizacionEntidad =
@@ -72,6 +77,7 @@ export interface FichaEntidadDirectorio {
   direccion: string | null;
   telefono: string | null;
   horarios: HorarioDia[] | null;
+  horario_turno: HorarioDia[] | null;
   publicada: boolean;
 }
 

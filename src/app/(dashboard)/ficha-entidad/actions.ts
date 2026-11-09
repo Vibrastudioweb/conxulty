@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { requireEntidadSesion } from "@/modules/core/autorizacion";
 import { leerHorarioSedeDeFormData } from "@/modules/onboarding/horarioSede";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
+import { tieneHorarioTurno } from "@/modules/onboarding/tiposEntidad";
 import { sincronizarFichaEntidad } from "@/modules/directorio/sincronizacionEntidad";
 
 const fichaEntidadSchema = z.object({
@@ -43,6 +44,15 @@ export async function guardarFichaEntidadAction(
 
   const horario = leerHorarioSedeDeFormData(formData, "horario");
 
+  // Horario de turno (Task #10, solo FARMACIA) — se lee siempre que venga
+  // en el formData, pero solo se persiste/sincroniza si el tipo de esta
+  // entidad lo tiene; para CLINICA queda vacío aunque el campo no exista
+  // en su formulario (leerHorarioSedeDeFormData devuelve los 7 días con
+  // atiende:false cuando no encuentra los checkboxes).
+  const horarioTurno = tieneHorarioTurno(entidad.tipo)
+    ? leerHorarioSedeDeFormData(formData, "horarioTurno")
+    : [];
+
   const organizacion = await prisma.organizacion.findUniqueOrThrow({
     where: { id: session.user.organizacionId },
     select: { id: true, fichaDirectorioId: true },
@@ -56,6 +66,7 @@ export async function guardarFichaEntidadAction(
     direccion: parseo.data.direccion ?? null,
     telefono: parseo.data.telefono ?? null,
     horario,
+    horarioTurno,
   });
   if (!resultadoSync.ok) {
     return { ok: false, error: resultadoSync.error };
@@ -78,6 +89,7 @@ export async function guardarFichaEntidadAction(
         direccion: parseo.data.direccion?.trim() || null,
         telefono: parseo.data.telefono?.trim() || null,
         horario: horario as unknown as Prisma.InputJsonValue,
+        horarioTurno: horarioTurno as unknown as Prisma.InputJsonValue,
       },
     }),
   ]);
