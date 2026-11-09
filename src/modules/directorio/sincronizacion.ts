@@ -1,9 +1,8 @@
 import type { ProfesionId } from "@/modules/onboarding/profesiones";
-import type { ModalidadAtencionId } from "@/modules/onboarding/modalidades";
 
 /**
  * Cliente del endpoint de sincronización del Directorio — ver changelog
- * puntos 74/75/76 y `vitalud/site/src/routes/api/sincronizar-profesional/
+ * puntos 74/75/76/87 y `vitalud/site/src/routes/api/sincronizar-profesional/
  * +server.js` (el lado que recibe estas llamadas).
  *
  * Nunca lanza: toda falla (red, configuración faltante, error del
@@ -11,39 +10,18 @@ import type { ModalidadAtencionId } from "@/modules/onboarding/modalidades";
  * decida — el registro la trata como best-effort (no bloquea la cuenta
  * nueva si el Directorio está caído), "Mi ficha pública" la trata como
  * bloqueante (el médico necesita saber si de verdad se guardó).
+ *
+ * Hasta el punto 87, esto mandaba un `modalidad: 'sede'|'domicilio'|'ambas'`
+ * calculado acá — y no había forma de representar "100% online", así que
+ * un médico que solo atiende online no podía sincronizar su ficha. Se
+ * investigó antes de aceptar eso como límite del Directorio: resultó ser
+ * un endpoint desactualizado, no una limitación real — el Directorio
+ * reemplazó ese enum por tres columnas booleanas independientes
+ * (`atiende_presencial/domicilio/online`, 02/11, ver vitalud-esquema.sql)
+ * ANTES de que se construyera esta integración (08/11), y el endpoint
+ * nunca se actualizó para usarlas. Ahora se manda cada una tal cual —
+ * ninguna combinación necesita mapeo ni queda sin representar.
  */
-
-export type ModalidadDirectorio = "sede" | "domicilio" | "ambas";
-
-export class ModalidadNoMapeableError extends Error {
-  constructor() {
-    super(
-      "El Directorio todavía no admite una ficha 100% online — agrega al menos una sede presencial o cobertura a domicilio para publicarla.",
-    );
-    this.name = "ModalidadNoMapeableError";
-  }
-}
-
-/**
- * El OS admite PRESENCIAL / DOMICILIO / ONLINE (multi-select, changelog
- * punto 30). El Directorio solo modela 'sede' / 'domicilio' / 'ambas' — no
- * tiene ningún concepto de "online". Mapeo deliberado, sin inventar un
- * valor que no existe en el esquema real:
- *  - PRESENCIAL + DOMICILIO → 'ambas'
- *  - solo PRESENCIAL        → 'sede'
- *  - solo DOMICILIO         → 'domicilio'
- *  - ONLINE se ignora para esta decisión (no participa del cálculo); si
- *    es la ÚNICA modalidad elegida, no hay nada que mapear → lanza
- *    ModalidadNoMapeableError en vez de adivinar.
- */
-export function mapearModalidadDirectorio(modalidades: ModalidadAtencionId[]): ModalidadDirectorio {
-  const presencial = modalidades.includes("PRESENCIAL");
-  const domicilio = modalidades.includes("DOMICILIO");
-  if (presencial && domicilio) return "ambas";
-  if (presencial) return "sede";
-  if (domicilio) return "domicilio";
-  throw new ModalidadNoMapeableError();
-}
 
 export interface SedeSincronizacion {
   ciudadId: string;
@@ -61,7 +39,9 @@ export interface DatosFichaDirectorio {
   profesion: ProfesionId;
   numeroMpps?: string | null;
   numeroColegiado?: string | null;
-  modalidad: ModalidadDirectorio;
+  atiendePresencial: boolean;
+  atiendeDomicilio: boolean;
+  atiendeOnline: boolean;
   zonasCobertura?: string[];
   sedes: SedeSincronizacion[];
   fotoUrl?: string | null;
@@ -168,7 +148,9 @@ export interface FichaDirectorio {
   id: string;
   nombre: string;
   slug: string;
-  modalidad: ModalidadDirectorio;
+  atiende_presencial: boolean;
+  atiende_domicilio: boolean;
+  atiende_online: boolean;
   cobertura_zonas: string[];
   registro_numero: string | null;
   foto_url: string | null;

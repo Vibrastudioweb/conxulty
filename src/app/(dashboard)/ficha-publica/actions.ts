@@ -7,8 +7,6 @@ import {
   sincronizarFichaDirectorio,
   subirFotoDirectorio,
   obtenerFichaDirectorio,
-  mapearModalidadDirectorio,
-  ModalidadNoMapeableError,
 } from "@/modules/directorio/sincronizacion";
 
 const fichaPublicaSchema = z.object({
@@ -73,15 +71,12 @@ export async function guardarFichaPublicaAction(
     }),
   ]);
 
-  let modalidadDirectorio;
-  try {
-    modalidadDirectorio = mapearModalidadDirectorio(medicoCompleto.modalidades);
-  } catch (err) {
-    if (err instanceof ModalidadNoMapeableError) {
-      return { ok: false, error: err.message };
-    }
-    throw err;
-  }
+  // changelog punto 87: ya no hace falta mapear/validar la modalidad acá —
+  // las tres booleanas viajan tal cual, cualquier combinación (incluida
+  // solo ONLINE) es representable del lado del Directorio.
+  const atiendePresencial = medicoCompleto.modalidades.includes("PRESENCIAL");
+  const atiendeDomicilio = medicoCompleto.modalidades.includes("DOMICILIO");
+  const atiendeOnline = medicoCompleto.modalidades.includes("ONLINE");
 
   // Cada sede necesita una ciudad REAL del Directorio (catálogo distinto al
   // municipio de Trujillo que ya tiene cada Sede — ver sincronizacion.ts).
@@ -121,7 +116,7 @@ export async function guardarFichaPublicaAction(
     })
     .filter((s: SedeConCiudad | null): s is SedeConCiudad => s !== null);
 
-  if (modalidadDirectorio !== "domicilio" && sedesConCiudad.length === 0 && sedes.length > 0) {
+  if (atiendePresencial && sedesConCiudad.length === 0 && sedes.length > 0) {
     return {
       ok: false,
       error: "Elige la ciudad del Directorio para al menos una de tus sedes antes de guardar.",
@@ -143,7 +138,9 @@ export async function guardarFichaPublicaAction(
     profesion: medicoCompleto.profesion,
     numeroMpps: medicoCompleto.numeroMpps,
     numeroColegiado: medicoCompleto.numeroColegiado,
-    modalidad: modalidadDirectorio,
+    atiendePresencial,
+    atiendeDomicilio,
+    atiendeOnline,
     zonasCobertura: medicoCompleto.zonasCobertura,
     sedes: sedesConCiudad,
     fotoUrl: fotoUrlActual,
