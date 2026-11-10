@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -210,6 +210,13 @@ export function FichaPublicaForm({
   // DataTransfer, para que viaje como archivo dentro del mismo FormData
   // del form principal al enviar — ver changelog punto 86.
   const fotoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // 10-nov-2026, pedido del usuario: "zonas de cobertura a domicilio... debe
+  // aparecer si elijo que atiendo a domicilio" — antes se mostraba siempre
+  // (se había sacado la condición para no depender de JS). El checkbox de
+  // modalidad ya está en este mismo form "use client", así que alcanza con
+  // un estado simple ligado a su onChange — no hace falta nada del server.
+  const [atiendeDomicilio, setAtiendeDomicilio] = useState(modalidadesActuales.includes("DOMICILIO"));
 
   function alRecortarFoto(blob: Blob) {
     const archivo = new File([blob], "foto.webp", { type: "image/webp" });
@@ -423,7 +430,12 @@ export function FichaPublicaForm({
         <div className="flex flex-wrap gap-4">
           {MODALIDADES_ATENCION.map((m) => (
             <label key={m} className="flex items-center gap-2 text-sm text-text-primary">
-              <input type="checkbox" name={`modalidad_${m}`} defaultChecked={modalidadesActuales.includes(m)} />
+              <input
+                type="checkbox"
+                name={`modalidad_${m}`}
+                defaultChecked={modalidadesActuales.includes(m)}
+                onChange={m === "DOMICILIO" ? (e) => setAtiendeDomicilio(e.target.checked) : undefined}
+              />
               {LABEL_MODALIDAD[m]}
             </label>
           ))}
@@ -575,28 +587,30 @@ export function FichaPublicaForm({
           </details>
         )}
 
-        <div className="border-t border-border pt-4">
-          <label className={LABEL} htmlFor="zonasCobertura">
-            Zonas de cobertura a domicilio
-          </label>
-          <select
-            id="zonasCobertura"
-            name="zonasCobertura"
-            multiple
-            size={8}
-            defaultValue={zonasCobertura}
-            className={SELECT_CLASES}
-          >
-            {MUNICIPIOS_TRUJILLO.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-caption text-text-faint">
-            Solo se usa si marcaste &quot;A domicilio&quot; arriba. Mantén Ctrl (o Cmd) presionado para elegir varias.
-          </p>
-        </div>
+        {atiendeDomicilio && (
+          <div className="border-t border-border pt-4">
+            <label className={LABEL} htmlFor="zonasCobertura">
+              Zonas de cobertura a domicilio
+            </label>
+            <select
+              id="zonasCobertura"
+              name="zonasCobertura"
+              multiple
+              size={8}
+              defaultValue={zonasCobertura}
+              className={SELECT_CLASES}
+            >
+              {MUNICIPIOS_TRUJILLO.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-caption text-text-faint">
+              Mantén Ctrl (o Cmd) presionado para elegir varias.
+            </p>
+          </div>
+        )}
         {/* 10-nov-2026: "Disponibilidad" se saca de acá — pedido del
             usuario tras confirmar que esa columna nunca se imprime en
             ningún lado de la ficha pública (medico/[slug]/+page.svelte,
