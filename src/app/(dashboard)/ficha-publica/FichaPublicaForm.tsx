@@ -4,6 +4,8 @@ import { useActionState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { SectionLabel } from "@/components/ui/SectionLabel";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { RecortadorFoto } from "@/components/ui/RecortadorFoto";
@@ -80,137 +82,151 @@ export function FichaPublicaForm({
         </Alert>
       )}
 
-      {sedesOs.length > 0 && (
-        <fieldset className="space-y-4 rounded-card border border-border p-4">
-          <legend className="px-1 text-sm font-semibold text-text-primary">
-            Ciudad de cada sede (para el Directorio)
-          </legend>
-          <p className="text-caption text-text-secondary">
-            El municipio que usás para tu agenda y la ciudad del Directorio
-            son catálogos distintos — elegí acá la ciudad real donde aparece
-            cada sede en conxulty.com.
-          </p>
-          {sedesOs.map((sede) => (
-            <div key={sede.id}>
-              <label className={LABEL} htmlFor={`ciudadSede_${sede.id}`}>
-                {sede.direccion} <span className="text-text-faint">({sede.municipio})</span>
-              </label>
-              <select
-                id={`ciudadSede_${sede.id}`}
-                name={`ciudadSede_${sede.id}`}
-                defaultValue={ciudadPorDireccion.get(sede.direccion) ?? ""}
-                className={SELECT_CLASES}
-              >
-                <option value="">Sin elegir — no aparece en el Directorio</option>
-                {ciudades.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-              <div className="mt-3">
-                <MapaSede
-                  sedeId={sede.id}
-                  etiqueta={sede.direccion}
-                  lat={puntoPorDireccion.get(sede.direccion)?.lat ?? null}
-                  lng={puntoPorDireccion.get(sede.direccion)?.lng ?? null}
-                />
+      {/* Reorganizado en tarjetas por tema (10-nov-2026, pedido del usuario:
+          "mejorar organizacion y diseño de esto") — antes era un único
+          flujo plano de ~9 secciones sin agrupar. Ningún `name` de campo
+          cambia, así que `guardarFichaPublicaAction` sigue leyendo el
+          mismo FormData de siempre. */}
+      <Card padding="spacious" className="space-y-4">
+        <SectionLabel>Identidad visual</SectionLabel>
+        <div>
+          <RecortadorFoto
+            etiqueta="Foto de perfil"
+            fotoActualUrl={ficha?.foto_url ?? null}
+            onRecortada={alRecortarFoto}
+            mostrarEjemplo
+            textoEjemplo="Medio cuerpo, con la cara en la parte de arriba. Así se ve mejor en tu ficha."
+          />
+          <input ref={fotoInputRef} type="file" name="foto" className="hidden" accept="image/webp" />
+        </div>
+        <div className="border-t border-border pt-4">
+          <p className={LABEL}>Fotos del consultorio</p>
+          <GaleriaFotosForm
+            fotosIniciales={ficha?.galeria ?? []}
+            agregarAction={agregarFotoGaleriaMedicoAction}
+            quitarAction={quitarFotoGaleriaMedicoAction}
+          />
+        </div>
+      </Card>
+
+      <Card padding="spacious" className="space-y-4">
+        <SectionLabel>Servicios, precios y seguros</SectionLabel>
+        <div>
+          <p className={LABEL}>Servicios y precios</p>
+          <ServiciosPreciosForm serviciosIniciales={ficha?.servicios ?? []} />
+        </div>
+        <div className="border-t border-border pt-4">
+          <p className={LABEL}>Aseguradoras que aceptas</p>
+          <AseguradorasForm aseguradorasIniciales={ficha?.aseguradoras ?? []} />
+        </div>
+      </Card>
+
+      <Card padding="spacious" className="space-y-4">
+        <SectionLabel>Sobre ti</SectionLabel>
+        <div>
+          <label className={LABEL} htmlFor="descripcion">
+            Descripción
+          </label>
+          <Textarea
+            id="descripcion"
+            name="descripcion"
+            rows={4}
+            placeholder="Lo que un paciente nuevo debería saber de ti."
+            defaultValue={ficha?.descripcion ?? ""}
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={LABEL} htmlFor="instagram">
+              Instagram
+            </label>
+            <Input id="instagram" name="instagram" placeholder="@tuusuario" defaultValue={ficha?.instagram ?? ""} />
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="sitioWeb">
+              Sitio web
+            </label>
+            <Input id="sitioWeb" name="sitioWeb" type="url" placeholder="https://…" defaultValue={ficha?.sitio_web ?? ""} />
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="correo">
+              Correo público
+            </label>
+            <Input id="correo" name="correo" type="email" defaultValue={ficha?.correo ?? ""} />
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="rif">
+              RIF
+            </label>
+            <Input id="rif" name="rif" defaultValue={ficha?.rif ?? ""} />
+          </div>
+        </div>
+
+        <div>
+          <label className={LABEL} htmlFor="domicilioFiscal">
+            Domicilio fiscal
+          </label>
+          <Input id="domicilioFiscal" name="domicilioFiscal" defaultValue={ficha?.domicilio_fiscal ?? ""} />
+        </div>
+      </Card>
+
+      <Card padding="spacious" className="space-y-4">
+        <SectionLabel>Sedes y disponibilidad</SectionLabel>
+
+        {sedesOs.length > 0 && (
+          <fieldset className="space-y-4">
+            <legend className="sr-only">Ciudad de cada sede (para el Directorio)</legend>
+            <p className="text-caption text-text-secondary">
+              El municipio que usás para tu agenda y la ciudad del Directorio
+              son catálogos distintos — elegí acá la ciudad real donde aparece
+              cada sede en conxulty.com.
+            </p>
+            {sedesOs.map((sede) => (
+              <div key={sede.id} className="rounded-input border border-border p-3">
+                <label className={LABEL} htmlFor={`ciudadSede_${sede.id}`}>
+                  {sede.direccion} <span className="text-text-faint">({sede.municipio})</span>
+                </label>
+                <select
+                  id={`ciudadSede_${sede.id}`}
+                  name={`ciudadSede_${sede.id}`}
+                  defaultValue={ciudadPorDireccion.get(sede.direccion) ?? ""}
+                  className={SELECT_CLASES}
+                >
+                  <option value="">Sin elegir — no aparece en el Directorio</option>
+                  {ciudades.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-3">
+                  <MapaSede
+                    sedeId={sede.id}
+                    etiqueta={sede.direccion}
+                    lat={puntoPorDireccion.get(sede.direccion)?.lat ?? null}
+                    lng={puntoPorDireccion.get(sede.direccion)?.lng ?? null}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
-        </fieldset>
-      )}
+            ))}
+          </fieldset>
+        )}
 
-      <div>
-        <RecortadorFoto
-          etiqueta="Foto de perfil"
-          fotoActualUrl={ficha?.foto_url ?? null}
-          onRecortada={alRecortarFoto}
-          mostrarEjemplo
-          textoEjemplo="Medio cuerpo, con la cara en la parte de arriba. Así se ve mejor en tu ficha."
-        />
-        <input ref={fotoInputRef} type="file" name="foto" className="hidden" accept="image/webp" />
-      </div>
-
-      <div>
-        <p className={LABEL}>Fotos del consultorio</p>
-        <GaleriaFotosForm
-          fotosIniciales={ficha?.galeria ?? []}
-          agregarAction={agregarFotoGaleriaMedicoAction}
-          quitarAction={quitarFotoGaleriaMedicoAction}
-        />
-      </div>
-
-      <div>
-        <p className={LABEL}>Servicios y precios</p>
-        <ServiciosPreciosForm serviciosIniciales={ficha?.servicios ?? []} />
-      </div>
-
-      <div>
-        <p className={LABEL}>Aseguradoras que aceptas</p>
-        <AseguradorasForm aseguradorasIniciales={ficha?.aseguradoras ?? []} />
-      </div>
-
-      <div>
-        <label className={LABEL} htmlFor="descripcion">
-          Descripción
-        </label>
-        <Textarea
-          id="descripcion"
-          name="descripcion"
-          rows={4}
-          placeholder="Lo que un paciente nuevo debería saber de ti."
-          defaultValue={ficha?.descripcion ?? ""}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={LABEL} htmlFor="instagram">
-            Instagram
+        <div className={sedesOs.length > 0 ? "border-t border-border pt-4" : ""}>
+          <label className={LABEL} htmlFor="disponibilidad">
+            Disponibilidad (si atiendes a domicilio)
           </label>
-          <Input id="instagram" name="instagram" placeholder="@tuusuario" defaultValue={ficha?.instagram ?? ""} />
+          <Input
+            id="disponibilidad"
+            name="disponibilidad"
+            placeholder="Ej.: lunes a viernes, tardes"
+            defaultValue={ficha?.disponibilidad ?? ""}
+          />
         </div>
-        <div>
-          <label className={LABEL} htmlFor="sitioWeb">
-            Sitio web
-          </label>
-          <Input id="sitioWeb" name="sitioWeb" type="url" placeholder="https://…" defaultValue={ficha?.sitio_web ?? ""} />
-        </div>
-        <div>
-          <label className={LABEL} htmlFor="correo">
-            Correo público
-          </label>
-          <Input id="correo" name="correo" type="email" defaultValue={ficha?.correo ?? ""} />
-        </div>
-        <div>
-          <label className={LABEL} htmlFor="rif">
-            RIF
-          </label>
-          <Input id="rif" name="rif" defaultValue={ficha?.rif ?? ""} />
-        </div>
-      </div>
+      </Card>
 
-      <div>
-        <label className={LABEL} htmlFor="domicilioFiscal">
-          Domicilio fiscal
-        </label>
-        <Input id="domicilioFiscal" name="domicilioFiscal" defaultValue={ficha?.domicilio_fiscal ?? ""} />
-      </div>
-
-      <div>
-        <label className={LABEL} htmlFor="disponibilidad">
-          Disponibilidad (si atiendes a domicilio)
-        </label>
-        <Input
-          id="disponibilidad"
-          name="disponibilidad"
-          placeholder="Ej.: lunes a viernes, tardes"
-          defaultValue={ficha?.disponibilidad ?? ""}
-        />
-      </div>
-
-      <Button type="submit" loading={pendiente}>
+      <Button type="submit" loading={pendiente} fullWidth size="lg">
         Guardar y publicar
       </Button>
     </form>
