@@ -333,7 +333,7 @@ export default async function HoyPage() {
   );
 
   return (
-    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 lg:max-w-6xl lg:px-10 lg:py-12">
+    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 lg:max-w-none lg:px-10 lg:py-12">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-page-title font-semibold tracking-tight text-text-primary lg:text-display">
@@ -370,13 +370,19 @@ export default async function HoyPage() {
        * otras semanas, que el boceto no tenía; /agenda sigue sirviendo
        * para eso).
        */}
-      {/* Sin `lg:items-start`: las 3 columnas se estiran a la altura de la
-          más alta (grid por defecto), y la última tarjeta de cada una
-          lleva `flex-1` para absorber el resto — así ninguna columna deja
-          lienzo gris debajo, tenga los datos que tenga (ver cambio
-          10-nov-2026: con 0 citas las columnas quedaban de alturas muy
-          distintas y el fondo gris se notaba debajo de las más cortas). */}
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12">
+      {/* 10-nov-2026 (revertido): se había probado estirar la última
+          tarjeta de cada columna (`flex-1`) para que las 3 columnas
+          terminaran a la misma altura y no quedara lienzo gris debajo de
+          las más cortas. Resultado real: con pocos datos, esa tarjeta
+          estirada se convertía en una caja gigante con relleno en blanco
+          adentro — el vacío no desaparecía, solo se movía de "detrás de la
+          columna" a "dentro de la tarjeta" (ni parecido al boceto, que
+          tiene tarjetas compactas, del tamaño de su contenido). Vuelve a
+          `items-start`: cada tarjeta mide lo que necesita su contenido;
+          las columnas pueden terminar a distinta altura, igual que en
+          cualquier dashboard real (Stripe, Linear, Notion no igualan
+          columnas a la fuerza). */}
+      <div className="mt-6 grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
         {/* Izquierda: accesos rápidos + cobros + reseñas recientes. */}
         <div className="lg:col-span-3 flex flex-col gap-5">
           <section>
@@ -406,9 +412,7 @@ export default async function HoyPage() {
             </div>
           </section>
 
-          <section
-            className={`rounded-card border border-border bg-surface px-4 py-3 ${!resenas?.ok ? "flex flex-1 flex-col" : ""}`}
-          >
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
             <SectionLabel>Cobros</SectionLabel>
             <div className="mt-2">
               <p className="font-display text-page-title font-semibold text-text-primary">
@@ -431,7 +435,7 @@ export default async function HoyPage() {
           </section>
 
           {resenas?.ok && (
-            <section className="flex flex-1 flex-col rounded-card border border-border bg-surface px-4 py-3">
+            <section className="rounded-card border border-border bg-surface px-4 py-3">
               <div className="flex items-center justify-between">
                 <SectionLabel>Reseñas recientes</SectionLabel>
                 {resenas.promedio !== null && (
@@ -527,7 +531,7 @@ export default async function HoyPage() {
 
           <section
             id="actividad-del-mes"
-            className="flex flex-1 flex-col rounded-card border border-border bg-surface px-4 py-3"
+            className="rounded-card border border-border bg-surface px-4 py-3"
           >
             <SectionLabel>Actividad del mes</SectionLabel>
             <p className="mt-0.5 text-body-secondary text-text-faint">
@@ -535,7 +539,7 @@ export default async function HoyPage() {
               {citasDelMes.length === 1 ? "cita" : "citas"} en{" "}
               {ahora.toLocaleDateString("es", { month: "long" })}
             </p>
-            <div className="mt-2 flex flex-1 flex-col justify-center">
+            <div className="mt-2">
               <ActividadMensualChart datos={actividadDelMes} />
             </div>
           </section>
@@ -561,9 +565,9 @@ export default async function HoyPage() {
             </Link>
           </section>
 
-          <section className="flex flex-1 flex-col rounded-card border border-border bg-surface px-4 py-3">
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
             <SectionLabel>Resumen de hoy</SectionLabel>
-            <div className="mt-3 grid flex-1 grid-cols-2 content-center gap-3">
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <KpiCard
                 icon={CalendarDays}
                 label="Citas de hoy"
