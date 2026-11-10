@@ -14,7 +14,12 @@ import { ServiciosPreciosForm } from "@/components/ui/ServiciosPreciosForm";
 import { AseguradorasForm } from "@/components/ui/AseguradorasForm";
 import { guardarFichaPublicaAction, type GuardarFichaPublicaResultado } from "./actions";
 import { agregarFotoGaleriaMedicoAction, quitarFotoGaleriaMedicoAction } from "./galeriaActions";
-import type { CiudadDirectorio, FichaDirectorio, SedeDirectorio } from "@/modules/directorio/sincronizacion";
+import type {
+  CiudadDirectorio,
+  EspecialidadDirectorio,
+  FichaDirectorio,
+  SedeDirectorio,
+} from "@/modules/directorio/sincronizacion";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import type { ProfesionId } from "@/modules/onboarding/profesiones";
 
@@ -45,6 +50,8 @@ export function FichaPublicaForm({
   especialidadesSecundarias,
   atiendeDomicilio,
   zonasCobertura,
+  especialidades,
+  especialidadId,
 }: {
   ficha: FichaDirectorio | null;
   ciudades: CiudadDirectorio[];
@@ -57,6 +64,8 @@ export function FichaPublicaForm({
   especialidadesSecundarias: string[];
   atiendeDomicilio: boolean;
   zonasCobertura: string[];
+  especialidades: EspecialidadDirectorio[];
+  especialidadId: string | null;
 }) {
   const [resultado, accion, pendiente] = useActionState<GuardarFichaPublicaResultado, FormData>(
     guardarFichaPublicaAction,
@@ -83,6 +92,19 @@ export function FichaPublicaForm({
   // Mismo emparejamiento por dirección, para precargar el punto del mapa
   // que ya se haya marcado antes (ver MapaSede.tsx).
   const puntoPorDireccion = new Map(sedesDirectorio.map((s) => [s.direccion, { lat: s.lat, lng: s.lng }]));
+  // 10-nov-2026: mismo emparejamiento, para "piso/consultorio" y "sector" —
+  // columnas nuevas del lado del Directorio, antes el OS no las capturaba.
+  const consultorioPorDireccion = new Map(sedesDirectorio.map((s) => [s.direccion, s.consultorio]));
+  const sectorPorDireccion = new Map(sedesDirectorio.map((s) => [s.direccion, s.sector]));
+
+  // Agrupa el catálogo de especialidades por `grupo` para el <select> —
+  // mismo criterio visual que usa el propio Directorio, sin inventar
+  // agrupaciones nuevas.
+  const especialidadesPorGrupo = new Map<string, EspecialidadDirectorio[]>();
+  for (const e of especialidades) {
+    const clave = e.grupo ?? "Otras";
+    especialidadesPorGrupo.set(clave, [...(especialidadesPorGrupo.get(clave) ?? []), e]);
+  }
 
   return (
     <form action={accion} className="space-y-6">
@@ -186,6 +208,33 @@ export function FichaPublicaForm({
           <Input id="domicilioFiscal" name="domicilioFiscal" defaultValue={ficha?.domicilio_fiscal ?? ""} />
         </div>
 
+        {/* 10-nov-2026: antes esto no existía — el OS guarda `especialidad`
+            como texto libre y el Directorio usa catálogo cerrado, mapear a
+            ciegas generaba coincidencias falsas. Acá el médico ELIGE la
+            suya del catálogo real (nunca se adivina ni se guarda sola:
+            recién al tocar "Guardar y publicar"). Si el texto que ya tenía
+            coincidía exacto con una opción, viene preseleccionada. */}
+        <div className="border-t border-border pt-4">
+          <label className={LABEL} htmlFor="especialidadId">
+            Especialidad (como aparece en el Directorio)
+          </label>
+          <select id="especialidadId" name="especialidadId" defaultValue={especialidadId ?? ""} className={SELECT_CLASES}>
+            <option value="">— Sin elegir —</option>
+            {[...especialidadesPorGrupo.entries()].map(([grupo, lista]) => (
+              <optgroup key={grupo} label={grupo}>
+                {lista.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <p className="mt-1 text-caption text-text-faint">
+            Es la que ve el paciente en tu ficha — distinta de la que elegiste al registrarte, que es solo interna.
+          </p>
+        </div>
+
         {/* 10-nov-2026: cédula, MPPS, colegiado y especialidad secundaria se
             sacaron del registro ("menos pasos") — se llenan/editan acá. */}
         <div className="border-t border-border pt-4">
@@ -255,6 +304,34 @@ export function FichaPublicaForm({
                     </option>
                   ))}
                 </select>
+
+                {/* 10-nov-2026: antes el Directorio no tenía de dónde sacar
+                    esto — la ficha caía a mostrar solo la dirección. */}
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className={LABEL} htmlFor={`consultorioSede_${sede.id}`}>
+                      Piso / consultorio (opcional)
+                    </label>
+                    <Input
+                      id={`consultorioSede_${sede.id}`}
+                      name={`consultorioSede_${sede.id}`}
+                      placeholder="Ej.: Piso 3, consultorio 302"
+                      defaultValue={consultorioPorDireccion.get(sede.direccion) ?? ""}
+                    />
+                  </div>
+                  <div>
+                    <label className={LABEL} htmlFor={`sectorSede_${sede.id}`}>
+                      Sector (opcional)
+                    </label>
+                    <Input
+                      id={`sectorSede_${sede.id}`}
+                      name={`sectorSede_${sede.id}`}
+                      placeholder="Ej.: Las Acacias"
+                      defaultValue={sectorPorDireccion.get(sede.direccion) ?? ""}
+                    />
+                  </div>
+                </div>
+
                 <div className="mt-3">
                   <MapaSede
                     sedeId={sede.id}

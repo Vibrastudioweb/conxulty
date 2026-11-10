@@ -33,6 +33,13 @@ export interface ServicioPrecioSincronizacion {
 export interface SedeSincronizacion {
   ciudadId: string;
   direccion: string;
+  /** 'Piso 3, consultorio 302' — distinto de `referencia` (una seña como
+   *  "frente al Hospital Central"). Columna propia desde el 10-nov-2026;
+   *  antes el OS no la capturaba y la ficha caía a mostrar solo la
+   *  dirección. */
+  consultorio?: string | null;
+  /** Sector/barrio ('Las Acacias') — igual, nueva desde el 10-nov-2026. */
+  sector?: string | null;
   referencia?: string | null;
   telefono?: string | null;
   /** Punto exacto marcado en el mapa (opcional) — ver changelog punto 80. */
@@ -63,6 +70,16 @@ export interface DatosFichaDirectorio {
   servicios?: ServicioPrecioSincronizacion[];
   /** Task #14 — texto libre, sin catálogo cerrado (ver AseguradorasForm.tsx). */
   aseguradoras?: string[];
+  /**
+   * 10-nov-2026 — RESUELTO: antes esto no existía porque el OS guarda
+   * `especialidad` como texto libre y el Directorio usa un catálogo
+   * cerrado (`especialidades.id`) — mapear uno a otro a ciegas generaría
+   * coincidencias falsas (nota de alcance original del endpoint del
+   * lado de vitalud). En vez de adivinar, el médico ELIGE acá el id real
+   * del catálogo del Directorio (ver `especialidades` en
+   * `ResultadoConsultaFicha` — lo manda el GET para armar el selector).
+   */
+  especialidadId?: string | null;
 }
 
 export type ResultadoSincronizacion =
@@ -147,6 +164,8 @@ export interface SedeDirectorio {
   id: string;
   ciudad_id: string | null;
   direccion: string;
+  consultorio: string | null;
+  sector: string | null;
   referencia_escrita: string | null;
   telefono: string | null;
   principal: boolean;
@@ -180,10 +199,25 @@ export interface FichaDirectorio {
   /** Task #14, changelog punto 91/95. */
   aseguradoras: string[];
   publicada: boolean;
+  /** Especialidad principal ya elegida del catálogo (ver `especialidadId`
+   *  en `DatosFichaDirectorio`) — null si todavía no se eligió ninguna. */
+  especialidad_id: string | null;
+}
+
+export interface EspecialidadDirectorio {
+  id: string;
+  nombre: string;
+  grupo: string | null;
 }
 
 export type ResultadoConsultaFicha =
-  | { ok: true; ficha: FichaDirectorio | null; sedes: SedeDirectorio[]; ciudades: CiudadDirectorio[] }
+  | {
+      ok: true;
+      ficha: FichaDirectorio | null;
+      sedes: SedeDirectorio[];
+      ciudades: CiudadDirectorio[];
+      especialidades: EspecialidadDirectorio[];
+    }
   | { ok: false; error: string };
 
 /**
@@ -211,7 +245,13 @@ export async function obtenerFichaDirectorio(
     const cuerpo = await respuesta.json().catch(() => null);
     if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
     if (!cuerpo.ok) return { ok: false, error: cuerpo.error ?? "Error desconocido del Directorio." };
-    return { ok: true, ficha: cuerpo.ficha ?? null, sedes: cuerpo.sedes ?? [], ciudades: cuerpo.ciudades ?? [] };
+    return {
+      ok: true,
+      ficha: cuerpo.ficha ?? null,
+      sedes: cuerpo.sedes ?? [],
+      ciudades: cuerpo.ciudades ?? [],
+      especialidades: cuerpo.especialidades ?? [],
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Error de red al contactar el Directorio." };
   }

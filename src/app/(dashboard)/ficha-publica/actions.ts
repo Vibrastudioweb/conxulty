@@ -24,6 +24,9 @@ const fichaPublicaSchema = z.object({
   numeroColegiado: z.string().trim().max(40).optional(),
   numeroMpps: z.string().trim().max(40).optional(),
   especialidadSecundaria1: z.string().trim().max(160).optional(),
+  // 10-nov-2026: el médico elige del catálogo real del Directorio (un
+  // uuid), nunca se manda texto libre — ver nota en sincronizacion.ts.
+  especialidadId: z.string().trim().max(60).optional(),
 });
 
 // Task #13: el médico edita la lista con ServiciosPreciosForm.tsx, que
@@ -99,6 +102,7 @@ export async function guardarFichaPublicaAction(
     numeroColegiado: vacio(formData.get("numeroColegiado")),
     numeroMpps: vacio(formData.get("numeroMpps")),
     especialidadSecundaria1: vacio(formData.get("especialidadSecundaria1")),
+    especialidadId: vacio(formData.get("especialidadId")),
   });
   if (!parseo.success) {
     return { ok: false, error: "Revisa los campos marcados — alguno quedó demasiado largo." };
@@ -163,6 +167,11 @@ export async function guardarFichaPublicaAction(
   type SedeConCiudad = {
     ciudadId: string;
     direccion: string;
+    // 10-nov-2026: antes el Directorio no tenía estas dos columnas — la
+    // ficha caía a mostrar solo la dirección. `consultorioSede_<id>` y
+    // `sectorSede_<id>` son nuevos en FichaPublicaForm.tsx.
+    consultorio: string | null;
+    sector: string | null;
     referencia: string | null;
     telefono: string | null;
     lat: number | null;
@@ -186,6 +195,8 @@ export async function guardarFichaPublicaAction(
       return {
         ciudadId,
         direccion: sede.direccion,
+        consultorio: vacio(formData.get(`consultorioSede_${sede.id}`)) ?? null,
+        sector: vacio(formData.get(`sectorSede_${sede.id}`)) ?? null,
         referencia: sede.referencia,
         telefono: sede.telefono,
         lat: coordenada(formData.get(`lat_${sede.id}`)),
@@ -231,6 +242,7 @@ export async function guardarFichaPublicaAction(
     disponibilidad: parseo.data.disponibilidad ?? null,
     servicios,
     aseguradoras,
+    especialidadId: parseo.data.especialidadId ?? null,
   });
 
   if (!resultado.ok) {
