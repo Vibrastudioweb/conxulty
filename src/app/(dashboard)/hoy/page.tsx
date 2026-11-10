@@ -4,6 +4,8 @@ import {
   CalendarDays,
   CalendarCheck2,
   CircleDollarSign,
+  IdCard,
+  Star,
   UserCheck,
   UserPlus,
   Wallet,
@@ -227,18 +229,10 @@ export default async function HoyPage({
   const proxima = citas.find(
     (cita) => cita.estado === "PENDIENTE" || cita.estado === "CONFIRMADA",
   );
-  // "Próximas citas" (ver changelog punto 56): preview de ancho completo
-  // de lo que viene, no un duplicado de "Agenda de hoy" del panel lateral
-  // — ahí se ve TODO el día (incluidas las ya atendidas/canceladas); aquí
-  // solo lo que falta por pasar, limitado a 3, pensado para escanear
-  // rápido. `citas` ya viene ordenada asc por hora.
-  const proximasCitas = citas
-    .filter(
-      (cita) =>
-        (cita.estado === "PENDIENTE" || cita.estado === "CONFIRMADA") &&
-        cita.fechaHora > ahora,
-    )
-    .slice(0, 3);
+  // "Próximas citas" como sección propia desapareció en el rediseño
+  // 10-nov-2026: su contenido (lo que falta por pasar hoy) ya está
+  // cubierto por "Agenda de hoy", que ahora vive en la columna central
+  // en vez del panel lateral.
   const atendidas = citas.filter((cita) => cita.estado === "ATENDIDA").length;
   const pendientesConfirmar = citas.filter(
     (cita) => cita.estado === "PENDIENTE",
@@ -288,6 +282,20 @@ export default async function HoyPage({
         subtitle="Cobros y caja del día"
         accent="amber"
       />
+      <QuickActionTile
+        href="/ficha-publica"
+        icon={IdCard}
+        title="Mi ficha pública"
+        subtitle="Cómo te ven tus pacientes"
+        accent="sky"
+      />
+      <QuickActionTile
+        href="/resenas"
+        icon={Star}
+        title="Reseñas"
+        subtitle="Ver y moderar reseñas"
+        accent="indigo"
+      />
     </>
   );
 
@@ -304,137 +312,34 @@ export default async function HoyPage({
         </p>
       </header>
 
-      <div className="mt-5 grid grid-cols-1 gap-6 lg:mt-5 lg:grid-cols-[2.15fr_1fr] lg:items-start">
-        {/* Columna principal: panorama del día (KPIs, actividad del mes,
-            resumen de jornada/CTA, acciones rápidas). */}
-        <div>
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <KpiCard
-              icon={CalendarDays}
-              label="Citas de hoy"
-              value={String(citas.length)}
-              accent="indigo"
-              delta={deltaCitas}
-              href="/agenda"
-            />
-            <KpiCard
-              icon={UserCheck}
-              label="Pacientes atendidos"
-              value={String(atendidas)}
-              accent="green"
-              delta={deltaAtendidas}
-              href="/agenda?estado=ATENDIDA"
-            />
-            <KpiCard
-              icon={CircleDollarSign}
-              label="Cobros del día"
-              value={cobrosHoy.value}
-              hint={cobrosHoy.hint}
-              accent="amber"
-              delta={deltaCobros}
-              href="/caja"
-            />
-            <KpiCard
-              icon={CalendarCheck2}
-              label="Por confirmar"
-              value={String(pendientesConfirmar)}
-              accent="sky"
-              delta={deltaPendientes}
-              href="/agenda?estado=PENDIENTE"
-            />
+      {/*
+       * Rediseño 10-nov-2026 (ver changelog): grid de 3 columnas en vez de
+       * fila de KPIs + fila gráfico/CTA + grid de acciones + sidebar
+       * aparte. Objetivo explícito del usuario: aprovechar el 100% de la
+       * pantalla sin espacios vacíos. No agrega NINGÚN dato ni consulta
+       * nueva — es la misma información de siempre (KPIs, agenda del día,
+       * actividad del mes, próxima consulta, tira de la semana, accesos
+       * rápidos), solo reordenada en columnas densas. "Pacientes
+       * atendidos"/"chart-row"/"Próximas citas" como secciones separadas
+       * desaparecen porque su contenido ya vive en "Agenda de hoy" y
+       * "Resumen de hoy" de abajo.
+       */}
+      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
+        {/* Izquierda: accesos rápidos (mismas 5 tiles de siempre, ahora
+            agrupadas en su propia columna en vez de una fila debajo). */}
+        <div className="lg:col-span-3">
+          <section>
+            <SectionLabel>Accesos rápidos</SectionLabel>
+            <div className="mt-2 grid grid-cols-1 gap-3">{accionesRapidas}</div>
           </section>
-
-          {/* Fila gráfico + CTA/resumen lado a lado (ver changelog punto 54,
-              proporción equivalente a `.chart-row` de la demo). */}
-          <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr] lg:items-start">
-            <section className="rounded-card border border-border bg-surface px-4 py-3">
-              <SectionLabel>Actividad del mes</SectionLabel>
-              <p className="mt-0.5 text-body-secondary text-text-faint">
-                {citasDelMes.length}{" "}
-                {citasDelMes.length === 1 ? "cita" : "citas"} en{" "}
-                {ahora.toLocaleDateString("es", { month: "long" })}
-              </p>
-              <div className="mt-2">
-                <ActividadMensualChart datos={actividadDelMes} />
-              </div>
-            </section>
-
-            {!hayCitas ? (
-              <section className="flex h-full flex-col items-center justify-center rounded-card bg-brand-primary-soft px-6 py-6 text-center">
-                <p className="text-section-title font-semibold text-text-primary">
-                  Tu agenda está despejada
-                </p>
-                <p className="mt-1 text-body-secondary text-text-secondary">
-                  Hoy no tienes consultas programadas.
-                </p>
-              </section>
-            ) : (
-              <section className="rounded-card bg-brand-primary-soft px-4 py-3">
-                <p className="text-section-title font-semibold text-text-primary">
-                  Tu jornada de hoy
-                </p>
-                <p className="mt-0.5 text-body-secondary text-text-secondary">
-                  {citas.length}{" "}
-                  {citas.length === 1 ? "consulta" : "consultas"} programada
-                  {citas.length === 1 ? "" : "s"}
-                  {atendidas > 0 &&
-                    ` · ${atendidas} atendida${atendidas === 1 ? "" : "s"}`}
-                </p>
-              </section>
-            )}
-          </div>
-
-          <section className="mt-6">
-            <SectionLabel>Acciones rápidas</SectionLabel>
-            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {accionesRapidas}
-            </div>
-          </section>
-
-          {proximasCitas.length > 0 && (
-            <section className="mt-6">
-              <div className="flex items-baseline justify-between">
-                <SectionLabel>Próximas citas</SectionLabel>
-                <Link
-                  href="/agenda"
-                  className="text-caption font-semibold text-brand-primary hover:underline"
-                >
-                  Ver todas
-                </Link>
-              </div>
-              <ListaCitasSeleccionable
-                citas={proximasCitas}
-                variant="card"
-                className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-              />
-            </section>
-          )}
         </div>
 
-        {/* Panel lateral "Hoy" (ver changelog punto 53): tira de la semana +
-            próxima consulta + agenda del día. Sticky solo en desktop — en
-            mobile ya es la última sección de una sola columna.
-            "Agenda de hoy" se corta en 5 + "Ver todas →" a /agenda (vista
-            día, hoy por defecto) en vez de scroll interno (punto 66,
-            revertido: el usuario prefirió el tope + enlace) — así el resto
-            del panel (semana, próxima consulta) siempre es visible sin
-            necesidad de que el usuario sepa que hay un scroll escondido
-            adentro de una tarjeta. */}
-        <aside className="lg:sticky lg:top-8">
-          <section className="rounded-card border border-border bg-surface px-4 py-3">
-            <SectionLabel>Esta semana</SectionLabel>
-            <div className="mt-2">
-              <TiraDiasSemana
-                hoy={ahora}
-                fechaReferencia={fechaReferenciaSemana}
-                hrefSemanaAnterior={`/hoy?semana=${offsetSemana - 1}`}
-                hrefSemanaSiguiente={`/hoy?semana=${offsetSemana + 1}`}
-              />
-            </div>
-          </section>
-
+        {/* Centro: la jornada de hoy — próxima consulta, agenda completa
+            del día y actividad del mes, todo con los mismos datos que ya
+            calculaba esta página. */}
+        <div className="lg:col-span-6 flex flex-col gap-5">
           {proxima && (
-            <section className="mt-4">
+            <section>
               <SectionLabel>Próxima consulta</SectionLabel>
               <div className="mt-2">
                 <CitaCard cita={proxima} destacada />
@@ -442,7 +347,7 @@ export default async function HoyPage({
             </section>
           )}
 
-          <section className="mt-4">
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
             <div className="flex items-baseline justify-between">
               <SectionLabel>Agenda de hoy</SectionLabel>
               <span className="text-caption text-text-faint">
@@ -454,7 +359,7 @@ export default async function HoyPage({
                 <ListaCitasSeleccionable
                   citas={citas.slice(0, 5)}
                   variant="row"
-                  className="mt-2 divide-y divide-border rounded-card border border-border bg-surface px-3"
+                  className="mt-2 divide-y divide-border"
                 />
                 {citas.length > 5 && (
                   <Link
@@ -470,6 +375,74 @@ export default async function HoyPage({
                 Sin consultas programadas para hoy.
               </p>
             )}
+          </section>
+
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
+            <SectionLabel>Actividad del mes</SectionLabel>
+            <p className="mt-0.5 text-body-secondary text-text-faint">
+              {citasDelMes.length}{" "}
+              {citasDelMes.length === 1 ? "cita" : "citas"} en{" "}
+              {ahora.toLocaleDateString("es", { month: "long" })}
+            </p>
+            <div className="mt-2">
+              <ActividadMensualChart datos={actividadDelMes} />
+            </div>
+          </section>
+        </div>
+
+        {/* Derecha: tira de la semana + resumen del día (los mismos 4 KPIs
+            de siempre, solo que ahora en su propia columna sticky en vez
+            de una fila horizontal arriba de todo). */}
+        <aside className="lg:col-span-3 lg:sticky lg:top-8 flex flex-col gap-5">
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
+            <SectionLabel>Esta semana</SectionLabel>
+            <div className="mt-2">
+              <TiraDiasSemana
+                hoy={ahora}
+                fechaReferencia={fechaReferenciaSemana}
+                hrefSemanaAnterior={`/hoy?semana=${offsetSemana - 1}`}
+                hrefSemanaSiguiente={`/hoy?semana=${offsetSemana + 1}`}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
+            <SectionLabel>Resumen de hoy</SectionLabel>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <KpiCard
+                icon={CalendarDays}
+                label="Citas de hoy"
+                value={String(citas.length)}
+                accent="indigo"
+                delta={deltaCitas}
+                href="/agenda"
+              />
+              <KpiCard
+                icon={UserCheck}
+                label="Atendidos"
+                value={String(atendidas)}
+                accent="green"
+                delta={deltaAtendidas}
+                href="/agenda?estado=ATENDIDA"
+              />
+              <KpiCard
+                icon={CircleDollarSign}
+                label="Cobros"
+                value={cobrosHoy.value}
+                hint={cobrosHoy.hint}
+                accent="amber"
+                delta={deltaCobros}
+                href="/caja"
+              />
+              <KpiCard
+                icon={CalendarCheck2}
+                label="Por confirmar"
+                value={String(pendientesConfirmar)}
+                accent="sky"
+                delta={deltaPendientes}
+                href="/agenda?estado=PENDIENTE"
+              />
+            </div>
           </section>
         </aside>
       </div>
