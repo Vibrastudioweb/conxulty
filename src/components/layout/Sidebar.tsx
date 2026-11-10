@@ -37,19 +37,24 @@ export function Sidebar({
         <NavList items={items} variant="sidebar" />
       </nav>
 
-      <div className="border-t border-border pt-4">
-        <div className="group-data-[collapsed=true]/sidebar:hidden">
+      {/* Pie del sidebar, estilo texto apilado (10-nov-2026, "me gusta esto
+          asi" sobre el boceto) — reemplaza la fila de iconos compacta por
+          una lista vertical de enlaces de texto plano, igual que el
+          boceto aprobado. Colapsado: se esconde todo menos el estado
+          plegado no tenía equivalente de icono para esto, así que
+          simplemente no se muestra (el usuario expande para acceder). */}
+      <div className="border-t border-border pt-4 group-data-[collapsed=true]/sidebar:hidden">
+        <div>
           <p className="truncate px-2 text-body font-medium text-text-primary">
             {user.name}
           </p>
-          <p className="truncate px-2 text-caption text-text-faint">{user.email}</p>
         </div>
-        <div className="mt-2 flex items-center gap-3 px-2 group-data-[collapsed=true]/sidebar:flex-col group-data-[collapsed=true]/sidebar:gap-2 group-data-[collapsed=true]/sidebar:px-0">
-          {user.rol === "MEDICO" && <AjustesButton />}
-          <SupportButton />
-          <LogoutButton />
+        <div className="mt-2 flex flex-col gap-2 px-2">
+          {user.rol === "MEDICO" && <AjustesButton variant="text" />}
+          <SupportButton variant="text" />
+          <LogoutButton variant="text" />
         </div>
-        <div className="mt-4 px-2 group-data-[collapsed=true]/sidebar:hidden">
+        <div className="mt-4 px-2">
           <VibraSignature />
         </div>
       </div>

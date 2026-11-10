@@ -8,7 +8,20 @@ import { MessageCircle } from "lucide-react";
  */
 const WHATSAPP_SOPORTE = "584227472852";
 
-export function SupportButton() {
+export function SupportButton({ variant = "icon" }: { variant?: "icon" | "text" }) {
+  if (variant === "text") {
+    return (
+      <a
+        href={`https://wa.me/${WHATSAPP_SOPORTE}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block text-body-secondary text-text-secondary transition hover:text-text-primary"
+      >
+        Soporte
+      </a>
+    );
+  }
+
   return (
     <a
       href={`https://wa.me/${WHATSAPP_SOPORTE}`}

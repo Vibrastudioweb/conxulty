@@ -400,7 +400,7 @@ export default async function HoyPage() {
                 icon={Wallet}
                 title="Registrar cobro"
                 subtitle="Cobros y caja del día"
-                accent="amber"
+                accent="green"
               />
               <QuickActionTile
                 href="/ficha-publica"

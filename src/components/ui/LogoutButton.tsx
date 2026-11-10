@@ -6,7 +6,20 @@ async function cerrarSesion() {
   await signOut({ redirectTo: "/login" });
 }
 
-export function LogoutButton() {
+export function LogoutButton({ variant = "icon" }: { variant?: "icon" | "text" }) {
+  if (variant === "text") {
+    return (
+      <form action={cerrarSesion}>
+        <button
+          type="submit"
+          className="block text-body-secondary text-danger transition hover:text-danger-text"
+        >
+          Cerrar sesión
+        </button>
+      </form>
+    );
+  }
+
   return (
     <form action={cerrarSesion}>
       <button

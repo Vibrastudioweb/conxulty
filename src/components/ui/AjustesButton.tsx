@@ -8,7 +8,18 @@ import { Settings } from "lucide-react";
  * real que configurar — ver Topbar.tsx. Esta vez sí hay algo real detrás
  * (Plan Pro, pago), así que no debería repetirse ese problema.
  */
-export function AjustesButton() {
+export function AjustesButton({ variant = "icon" }: { variant?: "icon" | "text" }) {
+  if (variant === "text") {
+    return (
+      <Link
+        href="/ajustes"
+        className="block text-body-secondary text-text-secondary transition hover:text-text-primary"
+      >
+        Configuración
+      </Link>
+    );
+  }
+
   return (
     <Link
       href="/ajustes"
