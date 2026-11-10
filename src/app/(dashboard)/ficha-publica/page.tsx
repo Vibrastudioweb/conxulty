@@ -11,7 +11,7 @@ export const metadata = { title: "Mi ficha pública — CONXULTY" };
 export default async function FichaPublicaPage() {
   const { session, medico } = await requireMedicoSesion();
 
-  const [organizacion, sedes] = await Promise.all([
+  const [organizacion, sedes, medicoCompleto] = await Promise.all([
     prisma.organizacion.findUniqueOrThrow({
       where: { id: session.user.organizacionId },
       select: { fichaDirectorioId: true, fichaDirectorioSlug: true, fichaDirectorioSincronizada: true },
@@ -20,6 +20,21 @@ export default async function FichaPublicaPage() {
       where: { medicoId: medico.id },
       select: { id: true, municipio: true, direccion: true },
       orderBy: { createdAt: "asc" },
+    }),
+    // 10-nov-2026: cédula, MPPS, colegiado, especialidades secundarias y
+    // zonas de cobertura se sacaron del registro ("menos pasos") — ahora se
+    // llenan/editan acá, ver FichaPublicaForm.tsx.
+    prisma.medico.findUniqueOrThrow({
+      where: { id: medico.id },
+      select: {
+        profesion: true,
+        cedula: true,
+        numeroMpps: true,
+        numeroColegiado: true,
+        especialidadesSecundarias: true,
+        modalidades: true,
+        zonasCobertura: true,
+      },
     }),
   ]);
 
@@ -91,6 +106,13 @@ export default async function FichaPublicaPage() {
           ciudades={directorio.ok ? directorio.ciudades : []}
           sedesDirectorio={directorio.ok ? directorio.sedes : []}
           sedesOs={sedes}
+          profesion={medicoCompleto.profesion}
+          cedula={medicoCompleto.cedula}
+          numeroMpps={medicoCompleto.numeroMpps}
+          numeroColegiado={medicoCompleto.numeroColegiado}
+          especialidadesSecundarias={medicoCompleto.especialidadesSecundarias}
+          atiendeDomicilio={medicoCompleto.modalidades.includes("DOMICILIO")}
+          zonasCobertura={medicoCompleto.zonasCobertura}
         />
       </div>
     </div>

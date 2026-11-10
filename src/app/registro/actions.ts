@@ -10,12 +10,10 @@ import {
   ProfesionOtraTextoRequeridoError,
   ModalidadRequeridaError,
   SedeRequeridaError,
-  ZonaCoberturaRequeridaError,
 } from "@/modules/onboarding/registro";
 import { EmailYaRegistradoError } from "@/modules/acceso/solicitudes";
 import { PROFESIONES } from "@/modules/onboarding/profesiones";
 import { MODALIDADES_ATENCION } from "@/modules/onboarding/modalidades";
-import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import { leerHorarioSedeDeFormData, type HorarioDia } from "@/modules/onboarding/horarioSede";
 import { sincronizarFichaDirectorio } from "@/modules/directorio/sincronizacion";
 
@@ -79,15 +77,12 @@ export async function registrarMedicoAction(formData: FormData) {
     (m) => formData.get(`modalidad_${m}`) === "on",
   );
 
-  const zonasCobertura = formData
-    .getAll("zonasCobertura")
-    .map(String)
-    .filter((z) => (MUNICIPIOS_TRUJILLO as readonly string[]).includes(z));
-
-  const especialidadesSecundarias = [
-    leerTexto(formData, "especialidadSecundaria1"),
-    leerTexto(formData, "especialidadSecundaria2"),
-  ].filter((v): v is string => !!v);
+  // 10-nov-2026: zonasCobertura, especialidadSecundaria1/2, cédula, MPPS y
+  // colegiado se sacaron del formulario de registro ("menos pasos") — ya
+  // no llegan en formData, quedan en null/[] y se completan después en
+  // "Mi ficha pública" (ver FichaPublicaForm.tsx y su action).
+  const zonasCobertura: string[] = [];
+  const especialidadesSecundarias: string[] = [];
 
   // Catálogo cerrado solo para MEDICO (punto 37); las demás profesiones
   // siguen en texto libre (punto 38) — nunca se mezclan los dos campos.
@@ -104,9 +99,11 @@ export async function registrarMedicoAction(formData: FormData) {
       password: parseo.data.password,
       profesion: parseo.data.profesion,
       profesionOtraTexto: leerTexto(formData, "profesionOtraTexto"),
-      cedula: leerTexto(formData, "cedula"),
-      numeroColegiado: leerTexto(formData, "numeroColegiado"),
-      numeroMpps: leerTexto(formData, "numeroMpps"),
+      // 10-nov-2026: cédula, MPPS y colegiado se sacaron del registro —
+      // se completan después en "Mi ficha pública".
+      cedula: null,
+      numeroColegiado: null,
+      numeroMpps: null,
       especialidad,
       especialidadesSecundarias,
       modalidades,
@@ -127,9 +124,6 @@ export async function registrarMedicoAction(formData: FormData) {
     }
     if (err instanceof SedeRequeridaError) {
       redirect("/registro?error=sede_requerida");
-    }
-    if (err instanceof ZonaCoberturaRequeridaError) {
-      redirect("/registro?error=zona_requerida");
     }
     throw err;
   }

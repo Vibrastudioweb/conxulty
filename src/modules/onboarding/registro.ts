@@ -27,13 +27,6 @@ export class SedeRequeridaError extends Error {
   }
 }
 
-export class ZonaCoberturaRequeridaError extends Error {
-  constructor() {
-    super("Elige al menos un municipio de cobertura para la modalidad a domicilio.");
-    this.name = "ZonaCoberturaRequeridaError";
-  }
-}
-
 export interface SedeInput {
   municipio: string;
   direccion: string;
@@ -87,9 +80,11 @@ export async function registrarMedico(
   if (input.modalidades.includes("PRESENCIAL") && input.sedes.length === 0) {
     throw new SedeRequeridaError();
   }
-  if (input.modalidades.includes("DOMICILIO") && (input.zonasCobertura ?? []).length === 0) {
-    throw new ZonaCoberturaRequeridaError();
-  }
+  // 10-nov-2026, pedido del usuario ("quiero que el onboarding sea menos
+  // pasos"): zonas de cobertura dejó de ser obligatoria para marcar
+  // DOMICILIO — antes bloqueaba el registro acá (ZonaCoberturaRequeridaError,
+  // eliminado). Igual se puede marcar la modalidad y agendar/recibir citas
+  // sin zonas; se completan después en "Mi ficha pública".
 
   const planFinal: "FICHA" | "PRO" =
     input.planElegido === "PRO" && esProfesionElegiblePro(input.profesion) ? "PRO" : "FICHA";

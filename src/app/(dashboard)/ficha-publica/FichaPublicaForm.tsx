@@ -15,6 +15,8 @@ import { AseguradorasForm } from "@/components/ui/AseguradorasForm";
 import { guardarFichaPublicaAction, type GuardarFichaPublicaResultado } from "./actions";
 import { agregarFotoGaleriaMedicoAction, quitarFotoGaleriaMedicoAction } from "./galeriaActions";
 import type { CiudadDirectorio, FichaDirectorio, SedeDirectorio } from "@/modules/directorio/sincronizacion";
+import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
+import type { ProfesionId } from "@/modules/onboarding/profesiones";
 
 // Leaflet necesita `window` al cargar — sin esto, Next intenta renderizar
 // el mapa en el servidor y rompe. `ssr: false` lo deja solo para el cliente.
@@ -36,11 +38,25 @@ export function FichaPublicaForm({
   ciudades,
   sedesDirectorio,
   sedesOs,
+  profesion,
+  cedula,
+  numeroMpps,
+  numeroColegiado,
+  especialidadesSecundarias,
+  atiendeDomicilio,
+  zonasCobertura,
 }: {
   ficha: FichaDirectorio | null;
   ciudades: CiudadDirectorio[];
   sedesDirectorio: SedeDirectorio[];
   sedesOs: { id: string; municipio: string; direccion: string }[];
+  profesion: ProfesionId;
+  cedula: string | null;
+  numeroMpps: string | null;
+  numeroColegiado: string | null;
+  especialidadesSecundarias: string[];
+  atiendeDomicilio: boolean;
+  zonasCobertura: string[];
 }) {
   const [resultado, accion, pendiente] = useActionState<GuardarFichaPublicaResultado, FormData>(
     guardarFichaPublicaAction,
@@ -169,6 +185,45 @@ export function FichaPublicaForm({
           </label>
           <Input id="domicilioFiscal" name="domicilioFiscal" defaultValue={ficha?.domicilio_fiscal ?? ""} />
         </div>
+
+        {/* 10-nov-2026: cédula, MPPS, colegiado y especialidad secundaria se
+            sacaron del registro ("menos pasos") — se llenan/editan acá. */}
+        <div className="border-t border-border pt-4">
+          <p className={LABEL}>Credenciales</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={LABEL} htmlFor="cedula">
+                Cédula
+              </label>
+              <Input id="cedula" name="cedula" defaultValue={cedula ?? ""} />
+            </div>
+            {profesion === "MEDICO" && (
+              <div>
+                <label className={LABEL} htmlFor="numeroMpps">
+                  N.º de MPPS
+                </label>
+                <Input id="numeroMpps" name="numeroMpps" defaultValue={numeroMpps ?? ""} />
+                <p className="mt-1 text-caption text-text-faint">No se publica en tu ficha.</p>
+              </div>
+            )}
+            <div>
+              <label className={LABEL} htmlFor="numeroColegiado">
+                N.º de colegiado
+              </label>
+              <Input id="numeroColegiado" name="numeroColegiado" defaultValue={numeroColegiado ?? ""} />
+            </div>
+            <div>
+              <label className={LABEL} htmlFor="especialidadSecundaria1">
+                Especialidad secundaria
+              </label>
+              <Input
+                id="especialidadSecundaria1"
+                name="especialidadSecundaria1"
+                defaultValue={especialidadesSecundarias[0] ?? ""}
+              />
+            </div>
+          </div>
+        </div>
       </Card>
 
       <Card padding="spacious" className="space-y-4">
@@ -213,7 +268,32 @@ export function FichaPublicaForm({
           </fieldset>
         )}
 
-        <div className={sedesOs.length > 0 ? "border-t border-border pt-4" : ""}>
+        {atiendeDomicilio && (
+          <div className={sedesOs.length > 0 ? "border-t border-border pt-4" : ""}>
+            <label className={LABEL} htmlFor="zonasCobertura">
+              Zonas de cobertura a domicilio
+            </label>
+            <select
+              id="zonasCobertura"
+              name="zonasCobertura"
+              multiple
+              size={8}
+              defaultValue={zonasCobertura}
+              className={SELECT_CLASES}
+            >
+              {MUNICIPIOS_TRUJILLO.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-caption text-text-faint">
+              Mantén Ctrl (o Cmd) presionado para elegir varios.
+            </p>
+          </div>
+        )}
+
+        <div className="border-t border-border pt-4">
           <label className={LABEL} htmlFor="disponibilidad">
             Disponibilidad (si atiendes a domicilio)
           </label>

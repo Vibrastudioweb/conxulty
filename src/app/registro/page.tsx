@@ -17,7 +17,6 @@ const MENSAJES_ERROR: Record<string, string> = {
   profesion_otra_requerida: 'Falta especificar tu profesión cuando eliges "Otra".',
   modalidad_requerida: "Marca al menos una forma en la que atiendes (presencial, a domicilio u online).",
   sede_requerida: "Agrega al menos una sede si atiendes de forma presencial.",
-  zona_requerida: "Elige al menos un municipio de cobertura si atiendes a domicilio.",
 };
 
 /**
@@ -201,35 +200,10 @@ export default async function RegistroPage({
                 <Input id="especialidadOtra" name="especialidadOtra" placeholder="Ej.: Ortodoncia" />
               </div>
             </div>
-            <div>
-              <label htmlFor="especialidadSecundaria1" className="mb-1 block text-sm text-text-primary">
-                Especialidad secundaria (opcional)
-              </label>
-              <Input id="especialidadSecundaria1" name="especialidadSecundaria1" />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label htmlFor="cedula" className="mb-1 block text-sm text-text-primary">
-                  Cédula
-                </label>
-                <Input id="cedula" name="cedula" />
-              </div>
-              <div>
-                <label htmlFor="numeroMpps" className="mb-1 block text-sm text-text-primary">
-                  N.º de MPPS
-                </label>
-                <Input id="numeroMpps" name="numeroMpps" />
-                <p className="mt-1 text-caption text-text-faint">
-                  Solo si eres Médico. No se publica en tu ficha, solo lo usa el equipo para verificar tu matrícula.
-                </p>
-              </div>
-              <div>
-                <label htmlFor="numeroColegiado" className="mb-1 block text-sm text-text-primary">
-                  N.º de colegiado
-                </label>
-                <Input id="numeroColegiado" name="numeroColegiado" />
-              </div>
-            </div>
+            {/* 10-nov-2026, pedido del usuario ("quiero que el onboarding sea
+                menos pasos"): especialidad secundaria, cédula, MPPS y
+                colegiado se sacaron de acá — se llenan después en "Mi ficha
+                pública" (FichaPublicaForm.tsx), no bloquean crear la cuenta. */}
           </div>
         </Card>
 
@@ -270,43 +244,12 @@ export default async function RegistroPage({
             Llena al menos la Sede 1 si marcaste &quot;Presencial en consultorio&quot;.
           </p>
 
-          <div className="mt-4">
-            <label htmlFor="zonasCobertura" className="mb-1 block text-sm text-text-primary">
-              Zonas de cobertura a domicilio (si marcaste &quot;A domicilio&quot;)
-            </label>
-            <select
-              id="zonasCobertura"
-              name="zonasCobertura"
-              multiple
-              size={8}
-              className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            >
-              {MUNICIPIOS_TRUJILLO.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-caption text-text-faint">
-              Mantén Ctrl (o Cmd) presionado para elegir varios.
-            </p>
-          </div>
-
-          {/* 10-nov-2026: faltaba acá — se pedían zonas de cobertura para
-              domicilio pero nunca la disponibilidad, así que quedaba
-              huérfana hasta que el médico entraba manualmente a "Mi ficha
-              pública" a completarla (mismo campo, ver FichaPublicaForm.tsx).
-              Opcional, igual que ahí. */}
-          <div className="mt-4">
-            <label htmlFor="disponibilidad" className="mb-1 block text-sm text-text-primary">
-              Disponibilidad (si marcaste &quot;A domicilio&quot;)
-            </label>
-            <Input
-              id="disponibilidad"
-              name="disponibilidad"
-              placeholder="Ej.: lunes a viernes, tardes"
-            />
-          </div>
+          {/* 10-nov-2026, pedido del usuario: zonas de cobertura y
+              disponibilidad se sacaron de acá — marcar "A domicilio" ya
+              deja agendar y aparecer pendiente en la agenda del OS igual;
+              el detalle de zonas/disponibilidad se completa después en "Mi
+              ficha pública" (antes esto bloqueaba el registro si no se
+              llenaba zonas — ya no, changelog punto 98). */}
         </Card>
 
         <Card padding="spacious">

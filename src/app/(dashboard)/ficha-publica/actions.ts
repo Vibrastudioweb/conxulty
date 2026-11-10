@@ -8,6 +8,7 @@ import {
   subirFotoDirectorio,
   obtenerFichaDirectorio,
 } from "@/modules/directorio/sincronizacion";
+import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 
 const fichaPublicaSchema = z.object({
   descripcion: z.string().trim().max(2000).optional(),
@@ -17,6 +18,12 @@ const fichaPublicaSchema = z.object({
   rif: z.string().trim().max(40).optional(),
   domicilioFiscal: z.string().trim().max(300).optional(),
   disponibilidad: z.string().trim().max(500).optional(),
+  // 10-nov-2026: se sacaron del registro ("menos pasos") — ahora se
+  // editan acá y se persisten en `Medico`, no solo se sincronizan.
+  cedula: z.string().trim().max(40).optional(),
+  numeroColegiado: z.string().trim().max(40).optional(),
+  numeroMpps: z.string().trim().max(40).optional(),
+  especialidadSecundaria1: z.string().trim().max(160).optional(),
 });
 
 // Task #13: el médico edita la lista con ServiciosPreciosForm.tsx, que
@@ -88,6 +95,10 @@ export async function guardarFichaPublicaAction(
     rif: vacio(formData.get("rif")),
     domicilioFiscal: vacio(formData.get("domicilioFiscal")),
     disponibilidad: vacio(formData.get("disponibilidad")),
+    cedula: vacio(formData.get("cedula")),
+    numeroColegiado: vacio(formData.get("numeroColegiado")),
+    numeroMpps: vacio(formData.get("numeroMpps")),
+    especialidadSecundaria1: vacio(formData.get("especialidadSecundaria1")),
   });
   if (!parseo.success) {
     return { ok: false, error: "Revisa los campos marcados — alguno quedó demasiado largo." };
@@ -95,6 +106,10 @@ export async function guardarFichaPublicaAction(
 
   const servicios = leerServiciosDeFormData(formData);
   const aseguradoras = leerAseguradorasDeFormData(formData);
+  const zonasCoberturaForm = formData
+    .getAll("zonasCobertura")
+    .map(String)
+    .filter((z) => (MUNICIPIOS_TRUJILLO as readonly string[]).includes(z));
 
   const [organizacion, medicoCompleto, sedes] = await Promise.all([
     prisma.organizacion.findUniqueOrThrow({
@@ -118,6 +133,28 @@ export async function guardarFichaPublicaAction(
   const atiendePresencial = medicoCompleto.modalidades.includes("PRESENCIAL");
   const atiendeDomicilio = medicoCompleto.modalidades.includes("DOMICILIO");
   const atiendeOnline = medicoCompleto.modalidades.includes("ONLINE");
+
+  // 10-nov-2026: cédula, MPPS, colegiado, especialidad secundaria y zonas
+  // de cobertura ya no se piden en el registro — este formulario es ahora
+  // la única pantalla donde se persisten en `Medico` (antes acá solo se
+  // LEÍAN de `medicoCompleto` para sincronizar, nunca se escribían).
+  const numeroMppsNuevo =
+    medicoCompleto.profesion === "MEDICO" ? parseo.data.numeroMpps ?? null : null;
+  const zonasCoberturaNuevas = atiendeDomicilio ? zonasCoberturaForm : [];
+  const especialidadesSecundariasNuevas = parseo.data.especialidadSecundaria1
+    ? [parseo.data.especialidadSecundaria1]
+    : [];
+
+  await prisma.medico.update({
+    where: { id: medico.id },
+    data: {
+      cedula: parseo.data.cedula ?? null,
+      numeroColegiado: parseo.data.numeroColegiado ?? null,
+      numeroMpps: numeroMppsNuevo,
+      especialidadesSecundarias: especialidadesSecundariasNuevas,
+      zonasCobertura: zonasCoberturaNuevas,
+    },
+  });
 
   // Cada sede necesita una ciudad REAL del Directorio (catálogo distinto al
   // municipio de Trujillo que ya tiene cada Sede — ver sincronizacion.ts).
@@ -177,12 +214,12 @@ export async function guardarFichaPublicaAction(
     fichaDirectorioId: organizacion.fichaDirectorioId,
     nombre: organizacion.nombre,
     profesion: medicoCompleto.profesion,
-    numeroMpps: medicoCompleto.numeroMpps,
-    numeroColegiado: medicoCompleto.numeroColegiado,
+    numeroMpps: numeroMppsNuevo,
+    numeroColegiado: parseo.data.numeroColegiado ?? null,
     atiendePresencial,
     atiendeDomicilio,
     atiendeOnline,
-    zonasCobertura: medicoCompleto.zonasCobertura,
+    zonasCobertura: zonasCoberturaNuevas,
     sedes: sedesConCiudad,
     fotoUrl: fotoUrlActual,
     descripcion: parseo.data.descripcion ?? null,
