@@ -45,6 +45,7 @@
 
 ALTER TABLE public.organizaciones          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.usuarios                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.entidades               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.medicos                 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sedes                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pacientes               ENABLE ROW LEVEL SECURITY;
@@ -57,6 +58,8 @@ ALTER TABLE public.cajas                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.movimientos_caja        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.gastos                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.registros_trazabilidad  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.suscripciones           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pagos                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.solicitudes_acceso      ENABLE ROW LEVEL SECURITY;
 
 -- No es una tabla del modelo de datos de la app — es la tabla interna que
