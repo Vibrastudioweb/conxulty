@@ -121,6 +121,30 @@ function SedeNuevaFields({ numero }: { numero: number }) {
   );
 }
 
+/** Igual que el anidado de `/registro` ("+ Agregar sede" → dentro
+ *  "+ Agregar otra sede" → …): muestra UNA tarjeta de sede nueva y, si
+ *  quedan cupos, un `<details>` anidado para revelar la siguiente recién
+ *  cuando se pide — en vez de mostrar las `espaciosNuevaSede` juntas de
+ *  una (lo que hacía antes). */
+function SedeNuevasAnidadas({ restantes, numero }: { restantes: number; numero: number }) {
+  if (restantes <= 0) return null;
+  return (
+    <>
+      <SedeNuevaFields numero={numero} />
+      {restantes > 1 && (
+        <details className="group rounded-input border border-dashed border-border p-3">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-button border border-brand-primary px-4 py-2 text-body-secondary font-semibold text-brand-primary hover:bg-brand-primary-soft [&::-webkit-details-marker]:hidden">
+            + Agregar otra sede
+          </summary>
+          <div className="mt-3 space-y-3">
+            <SedeNuevasAnidadas restantes={restantes - 1} numero={numero + 1} />
+          </div>
+        </details>
+      )}
+    </>
+  );
+}
+
 // Leaflet necesita `window` al cargar — sin esto, Next intenta renderizar
 // el mapa en el servidor y rompe. `ssr: false` lo deja solo para el cliente.
 const MapaSede = dynamic(() => import("@/components/ui/MapaSede").then((m) => m.MapaSede), {
@@ -543,9 +567,10 @@ export function FichaPublicaForm({
               + Agregar sede
             </summary>
             <div className="mt-3 space-y-3">
-              {Array.from({ length: espaciosNuevaSede }, (_, i) => (
-                <SedeNuevaFields key={i} numero={i + 1} />
-              ))}
+              {/* Una tarjeta a la vez (igual que /registro: "+ Agregar
+                  otra sede" anidado) — antes salían las 3 juntas apenas
+                  se tocaba "+ Agregar sede". */}
+              <SedeNuevasAnidadas restantes={espaciosNuevaSede} numero={1} />
             </div>
           </details>
         )}
