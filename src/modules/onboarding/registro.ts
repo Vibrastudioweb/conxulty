@@ -13,20 +13,6 @@ export class ProfesionOtraTextoRequeridoError extends Error {
   }
 }
 
-export class ModalidadRequeridaError extends Error {
-  constructor() {
-    super("Debes marcar al menos una modalidad de atención.");
-    this.name = "ModalidadRequeridaError";
-  }
-}
-
-export class SedeRequeridaError extends Error {
-  constructor() {
-    super("Agrega al menos una sede (dirección) para la modalidad presencial.");
-    this.name = "SedeRequeridaError";
-  }
-}
-
 export interface SedeInput {
   municipio: string;
   direccion: string;
@@ -62,11 +48,20 @@ export interface RegistrarMedicoInput {
  * SolicitudAcceso/superadmin (que sigue existiendo para altas con
  * contacto directo — no se tocó ni se eliminó).
  *
- * Validaciones de negocio (sede/zona obligatorias según modalidad, motivo
- * de "Otra" profesión) — el shape/formato de los campos se valida antes,
- * en la Server Action. El choque de horario entre sedes (changelog punto
- * 33) es una ADVERTENCIA, no bloquea el registro — se devuelve en el
- * resultado para mostrarla después de crear la cuenta.
+ * Validaciones de negocio: solo el motivo de "Otra" profesión bloquea acá
+ * — el shape/formato de los campos se valida antes, en la Server Action.
+ * El choque de horario entre sedes (changelog punto 33) es una
+ * ADVERTENCIA, no bloquea el registro — se devuelve en el resultado para
+ * mostrarla después de crear la cuenta.
+ *
+ * 10-nov-2026, pedido del usuario ("quiero hacer súper sencillo el
+ * registro inicial y poner todo lo demás en mi ficha"): modalidad,
+ * especialidad, sedes/horario y zonas de cobertura ya NO son obligatorias
+ * acá (antes `ModalidadRequeridaError`/`SedeRequeridaError` bloqueaban
+ * crear la cuenta) — todo eso se completa después en "Mi ficha pública",
+ * que ya tiene su propia validación antes de publicar (ver
+ * `guardarFichaPublicaAction`). Una cuenta nueva puede quedar con
+ * `modalidades: []` y sin sedes hasta que el médico entre ahí.
  */
 export async function registrarMedico(
   input: RegistrarMedicoInput,
@@ -74,17 +69,6 @@ export async function registrarMedico(
   if (input.profesion === "OTRA" && !input.profesionOtraTexto?.trim()) {
     throw new ProfesionOtraTextoRequeridoError();
   }
-  if (input.modalidades.length === 0) {
-    throw new ModalidadRequeridaError();
-  }
-  if (input.modalidades.includes("PRESENCIAL") && input.sedes.length === 0) {
-    throw new SedeRequeridaError();
-  }
-  // 10-nov-2026, pedido del usuario ("quiero que el onboarding sea menos
-  // pasos"): zonas de cobertura dejó de ser obligatoria para marcar
-  // DOMICILIO — antes bloqueaba el registro acá (ZonaCoberturaRequeridaError,
-  // eliminado). Igual se puede marcar la modalidad y agendar/recibir citas
-  // sin zonas; se completan después en "Mi ficha pública".
 
   const planFinal: "FICHA" | "PRO" =
     input.planElegido === "PRO" && esProfesionElegiblePro(input.profesion) ? "PRO" : "FICHA";

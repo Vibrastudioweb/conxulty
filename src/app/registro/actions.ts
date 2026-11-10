@@ -4,22 +4,9 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { z } from "zod";
 import { signIn } from "@/auth";
-import { prisma } from "@/db/client";
-import {
-  registrarMedico,
-  ProfesionOtraTextoRequeridoError,
-  ModalidadRequeridaError,
-  SedeRequeridaError,
-} from "@/modules/onboarding/registro";
+import { registrarMedico, ProfesionOtraTextoRequeridoError } from "@/modules/onboarding/registro";
 import { EmailYaRegistradoError } from "@/modules/acceso/solicitudes";
 import { PROFESIONES } from "@/modules/onboarding/profesiones";
-import { MODALIDADES_ATENCION } from "@/modules/onboarding/modalidades";
-import { leerHorarioSedeDeFormData, type HorarioDia } from "@/modules/onboarding/horarioSede";
-import {
-  sincronizarFichaDirectorio,
-  obtenerFichaDirectorio,
-  resolverEspecialidadId,
-} from "@/modules/directorio/sincronizacion";
 
 const registroSchema = z.object({
   nombre: z.string().trim().min(2).max(120),
@@ -29,46 +16,11 @@ const registroSchema = z.object({
   planElegido: z.enum(["FICHA", "PRO"]),
 });
 
-const SEDES_MAX = 3;
-
 function leerTexto(formData: FormData, campo: string): string | null {
   const valor = formData.get(campo);
   if (valor === null) return null;
   const texto = String(valor).trim();
   return texto === "" ? null : texto;
-}
-
-function leerSedes(formData: FormData): Array<{
-  municipio: string;
-  direccion: string;
-  referencia: string | null;
-  telefono: string | null;
-  horario: HorarioDia[];
-}> {
-  const sedes: Array<{
-    municipio: string;
-    direccion: string;
-    referencia: string | null;
-    telefono: string | null;
-    horario: HorarioDia[];
-  }> = [];
-
-  for (let i = 1; i <= SEDES_MAX; i++) {
-    const prefijo = `sede${i}`;
-    const municipio = leerTexto(formData, `${prefijo}_municipio`);
-    const direccion = leerTexto(formData, `${prefijo}_direccion`);
-    if (!municipio || !direccion) continue; // slot sin usar
-
-    sedes.push({
-      municipio,
-      direccion,
-      referencia: leerTexto(formData, `${prefijo}_referencia`),
-      telefono: leerTexto(formData, `${prefijo}_telefono`),
-      horario: leerHorarioSedeDeFormData(formData, prefijo),
-    });
-  }
-
-  return sedes;
 }
 
 export async function registrarMedicoAction(formData: FormData) {
@@ -77,45 +29,31 @@ export async function registrarMedicoAction(formData: FormData) {
     redirect("/registro?error=datos_invalidos");
   }
 
-  const modalidades = MODALIDADES_ATENCION.filter(
-    (m) => formData.get(`modalidad_${m}`) === "on",
-  );
-
-  // 10-nov-2026: zonasCobertura, especialidadSecundaria1/2, cédula, MPPS y
-  // colegiado se sacaron del formulario de registro ("menos pasos") — ya
-  // no llegan en formData, quedan en null/[] y se completan después en
-  // "Mi ficha pública" (ver FichaPublicaForm.tsx y su action).
-  const zonasCobertura: string[] = [];
-  const especialidadesSecundarias: string[] = [];
-
-  // Catálogo cerrado solo para MEDICO (punto 37); las demás profesiones
-  // siguen en texto libre (punto 38) — nunca se mezclan los dos campos.
-  const especialidad =
-    parseo.data.profesion === "MEDICO"
-      ? leerTexto(formData, "especialidadMedico")
-      : leerTexto(formData, "especialidadOtra");
-
-  let organizacionId: string;
+  // 10-nov-2026, pedido del usuario ("quiero hacer súper sencillo el
+  // registro inicial y poner todo lo demás en mi ficha"): especialidad,
+  // modalidad, sedes/horario, zonas de cobertura, cédula, MPPS y
+  // colegiado ya no se piden acá — el registro solo crea la cuenta
+  // (nombre, correo, contraseña, profesión, plan). Todo eso se completa
+  // después en "Mi ficha pública" (ver FichaPublicaForm.tsx y su action),
+  // que ya exige al menos una modalidad antes de guardar/publicar — ese
+  // candado ya no hace falta acá.
   try {
-    const resultado = await registrarMedico({
+    await registrarMedico({
       nombre: parseo.data.nombre,
       email: parseo.data.email,
       password: parseo.data.password,
       profesion: parseo.data.profesion,
       profesionOtraTexto: leerTexto(formData, "profesionOtraTexto"),
-      // 10-nov-2026: cédula, MPPS y colegiado se sacaron del registro —
-      // se completan después en "Mi ficha pública".
       cedula: null,
       numeroColegiado: null,
       numeroMpps: null,
-      especialidad,
-      especialidadesSecundarias,
-      modalidades,
-      zonasCobertura,
-      sedes: leerSedes(formData),
+      especialidad: null,
+      especialidadesSecundarias: [],
+      modalidades: [],
+      zonasCobertura: [],
+      sedes: [],
       planElegido: parseo.data.planElegido,
     });
-    organizacionId = resultado.organizacionId;
   } catch (err) {
     if (err instanceof EmailYaRegistradoError) {
       redirect("/registro?error=email_registrado");
@@ -123,65 +61,17 @@ export async function registrarMedicoAction(formData: FormData) {
     if (err instanceof ProfesionOtraTextoRequeridoError) {
       redirect("/registro?error=profesion_otra_requerida");
     }
-    if (err instanceof ModalidadRequeridaError) {
-      redirect("/registro?error=modalidad_requerida");
-    }
-    if (err instanceof SedeRequeridaError) {
-      redirect("/registro?error=sede_requerida");
-    }
     throw err;
   }
 
-  // NOT NOW: mostrar el detalle de choques de horario (`resultado.choques`)
-  // en una pantalla propia tras el registro — requeriría que /hoy acepte
-  // searchParams, que hoy no toca. El choque queda guardado en `Sede.horario`
-  // igual, solo no se avisa todavía justo después de crear la cuenta.
-
-  // Sincronización con el Directorio (changelog punto 75/76) — BEST EFFORT:
-  // si el Directorio está caído o no configurado, el registro NO se
-  // bloquea ni se revierte (la cuenta y la Organizacion ya existen). Queda
-  // `fichaDirectorioSincronizada = false` y "Mi ficha pública" ofrece
-  // reintentar manualmente. Sin sedes todavía (el registro no pide ciudad
-  // del Directorio, ver sincronizacion.ts) — se completan ahí mismo.
-  // changelog punto 87: ya no hace falta mapear/validar la modalidad acá —
-  // las tres booleanas viajan tal cual, cualquier combinación (incluida
-  // solo ONLINE) es representable del lado del Directorio.
-  // 10-nov-2026 (pedido del usuario: "debería sincronizarse con la
-  // especialidad que el médico escoja en el onboarding"): se resuelve acá
-  // mismo, por texto, contra el catálogo real del Directorio — nunca se le
-  // vuelve a pedir al médico (ver `resolverEspecialidadId`). Si no hay
-  // catálogo disponible todavía (Directorio caído) o no hay match, queda
-  // simplemente sin especialidad — no bloquea el registro.
-  const catalogoEspecialidades = await obtenerFichaDirectorio(null);
-  const resultadoSync = await sincronizarFichaDirectorio({
-    nombre: parseo.data.nombre,
-    profesion: parseo.data.profesion,
-    numeroMpps: leerTexto(formData, "numeroMpps"),
-    numeroColegiado: leerTexto(formData, "numeroColegiado"),
-    atiendePresencial: modalidades.includes("PRESENCIAL"),
-    atiendeDomicilio: modalidades.includes("DOMICILIO"),
-    atiendeOnline: modalidades.includes("ONLINE"),
-    zonasCobertura,
-    sedes: [],
-    especialidadId: resolverEspecialidadId(
-      especialidad,
-      catalogoEspecialidades.ok ? catalogoEspecialidades.especialidades : [],
-    ),
-  });
-  if (resultadoSync.ok) {
-    await prisma.organizacion.update({
-      where: { id: organizacionId },
-      data: {
-        fichaDirectorioId: resultadoSync.id,
-        fichaDirectorioSlug: resultadoSync.slug,
-        fichaDirectorioSincronizada: true,
-      },
-    });
-  }
-  // Si falló (incluida profesión "OTRA", que el Directorio rechaza a
-  // propósito): no se registra el error en ningún lado todavía — queda
-  // simplemente sincronizada=false. NOT NOW: loguear esto en
-  // RegistroTrazabilidad para poder auditar fallos silenciosos.
+  // 10-nov-2026: la sincronización con el Directorio YA NO se intenta acá
+  // — sin modalidad ni especialidad elegidas en este formulario, esa
+  // llamada iba a fallar el 100% de las veces ("marca al menos una
+  // modalidad"), puro ruido. Queda para cuando el médico entra a "Mi
+  // ficha pública" por primera vez y guarda: ese mismo action crea la
+  // ficha en el Directorio si todavía no existe (ver
+  // `sincronizarFichaDirectorio` — funciona igual con `fichaDirectorioId`
+  // en null que actualizando una ya creada).
 
   try {
     await signIn("credentials", {

@@ -6,107 +6,27 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { registrarMedicoAction } from "@/app/registro/actions";
 import { PROFESIONES, LABEL_PROFESION } from "@/modules/onboarding/profesiones";
-import { ESPECIALIDADES_MEDICAS } from "@/modules/consultas/plantillasEspecialidad";
-import { MODALIDADES_ATENCION, LABEL_MODALIDAD } from "@/modules/onboarding/modalidades";
-import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
-import { DIAS_SEMANA } from "@/modules/onboarding/horarioSede";
 
 const MENSAJES_ERROR: Record<string, string> = {
   datos_invalidos: "Revisa los datos: hay campos vacíos o inválidos (la contraseña necesita al menos 8 caracteres).",
   email_registrado: "Ya existe una cuenta con ese correo.",
   profesion_otra_requerida: 'Falta especificar tu profesión cuando eliges "Otra".',
-  modalidad_requerida: "Marca al menos una forma en la que atiendes (presencial, a domicilio u online).",
-  sede_requerida: "Agrega al menos una sede si atiendes de forma presencial.",
 };
 
 /**
  * Registro self-service (ver changelog punto 49, Bloque 3): una sola
  * página, sin JavaScript de cliente — mismo criterio que el resto de la
- * app (ver `CamposDescuento` en /caja). Las secciones condicionales
- * (MPPS solo si profesión = Médico, sedes solo si presencial, zonas solo
- * si domicilio) se explican con una nota en vez de ocultarse con JS: la
- * validación real vive en el servidor (`registrarMedico`).
+ * app (ver `CamposDescuento` en /caja).
+ *
+ * 10-nov-2026, pedido del usuario ("quiero hacer súper sencillo el
+ * registro inicial y poner todo lo demás en mi ficha"): especialidad,
+ * modalidad (cómo atiendes) y sedes/horario se sacaron de esta pantalla
+ * — antes vivían acá (con "Presencial" bloqueando sin al menos una sede
+ * cargada) y ahora se completan después en "Mi ficha pública"
+ * (FichaPublicaForm.tsx), que ya tiene su propio CRUD para todo eso y su
+ * propia validación antes de publicar. El registro queda en lo mínimo
+ * para tener cuenta: quién sos, con qué entrás, tu profesión y tu plan.
  */
-function HorarioSedeFields({ prefijoSede }: { prefijoSede: string }) {
-  return (
-    <details className="rounded-input border border-border px-3 py-2">
-      <summary className="cursor-pointer text-sm text-text-secondary">
-        + Horario de atención (opcional)
-      </summary>
-      <div className="mt-3 space-y-2">
-        {DIAS_SEMANA.map((dia) => (
-          <div key={dia} className="grid grid-cols-[auto_1fr_1fr] items-center gap-2 text-sm">
-            <label className="flex items-center gap-1.5 text-text-primary">
-              <input type="checkbox" name={`${prefijoSede}_${dia}_atiende`} />
-              {dia}
-            </label>
-            <input
-              type="time"
-              name={`${prefijoSede}_${dia}_horaInicio`}
-              className="rounded-input border border-border bg-surface px-2 py-1 text-sm"
-            />
-            <input
-              type="time"
-              name={`${prefijoSede}_${dia}_horaFin`}
-              className="rounded-input border border-border bg-surface px-2 py-1 text-sm"
-            />
-          </div>
-        ))}
-      </div>
-    </details>
-  );
-}
-
-function SedeFields({ numero, requerida }: { numero: number; requerida?: boolean }) {
-  const prefijo = `sede${numero}`;
-  return (
-    <div className="space-y-3 rounded-input border border-border p-3">
-      <p className="text-sm font-semibold text-text-primary">
-        Sede {numero}
-        {!requerida && <span className="ml-1 text-text-faint">(opcional)</span>}
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label htmlFor={`${prefijo}_municipio`} className="mb-1 block text-sm text-text-primary">
-            Municipio
-          </label>
-          <select
-            id={`${prefijo}_municipio`}
-            name={`${prefijo}_municipio`}
-            className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <option value="">— Selecciona —</option>
-            {MUNICIPIOS_TRUJILLO.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor={`${prefijo}_telefono`} className="mb-1 block text-sm text-text-primary">
-            Teléfono (opcional)
-          </label>
-          <Input id={`${prefijo}_telefono`} name={`${prefijo}_telefono`} />
-        </div>
-      </div>
-      <div>
-        <label htmlFor={`${prefijo}_direccion`} className="mb-1 block text-sm text-text-primary">
-          Dirección
-        </label>
-        <Input id={`${prefijo}_direccion`} name={`${prefijo}_direccion`} />
-      </div>
-      <div>
-        <label htmlFor={`${prefijo}_referencia`} className="mb-1 block text-sm text-text-primary">
-          Referencia (opcional)
-        </label>
-        <Input id={`${prefijo}_referencia`} name={`${prefijo}_referencia`} />
-      </div>
-      <HorarioSedeFields prefijoSede={prefijo} />
-    </div>
-  );
-}
-
 export default async function RegistroPage({
   searchParams,
 }: {
@@ -174,82 +94,13 @@ export default async function RegistroPage({
               </label>
               <Input id="profesionOtraTexto" name="profesionOtraTexto" />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label htmlFor="especialidadMedico" className="mb-1 block text-sm text-text-primary">
-                  Especialidad (si eres Médico)
-                </label>
-                <select
-                  id="especialidadMedico"
-                  name="especialidadMedico"
-                  defaultValue=""
-                  className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                >
-                  <option value="">— Selecciona —</option>
-                  {ESPECIALIDADES_MEDICAS.map((e) => (
-                    <option key={e} value={e}>
-                      {e}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="especialidadOtra" className="mb-1 block text-sm text-text-primary">
-                  Especialidad (si eres Odontólogo, Psicólogo u Otra)
-                </label>
-                <Input id="especialidadOtra" name="especialidadOtra" placeholder="Ej.: Ortodoncia" />
-              </div>
-            </div>
-            {/* 10-nov-2026, pedido del usuario ("quiero que el onboarding sea
-                menos pasos"): especialidad secundaria, cédula, MPPS y
-                colegiado se sacaron de acá — se llenan después en "Mi ficha
-                pública" (FichaPublicaForm.tsx), no bloquean crear la cuenta. */}
+            {/* 10-nov-2026, pedido del usuario ("quiero hacer súper sencillo el
+                registro inicial y poner todo lo demás en mi ficha"):
+                especialidad, especialidad secundaria, cédula, MPPS, colegiado,
+                modalidad y sedes/horario se sacaron de acá — se llenan
+                después en "Mi ficha pública" (FichaPublicaForm.tsx), no
+                bloquean crear la cuenta. */}
           </div>
-        </Card>
-
-        <Card padding="spacious">
-          <h2 className="text-sm font-semibold text-text-primary">¿Cómo atiendes?</h2>
-          <p className="mt-1 text-caption text-text-secondary">
-            Marca todas las que apliquen.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-4">
-            {MODALIDADES_ATENCION.map((m) => (
-              <label key={m} className="flex items-center gap-2 text-sm text-text-primary">
-                <input type="checkbox" name={`modalidad_${m}`} />
-                {LABEL_MODALIDAD[m]}
-              </label>
-            ))}
-          </div>
-
-          <div className="mt-4 space-y-3">
-            <SedeFields numero={1} requerida />
-            <details className="group rounded-input border border-dashed border-border p-3">
-              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-button border border-brand-primary px-4 py-2 text-body-secondary font-semibold text-brand-primary hover:bg-brand-primary-soft [&::-webkit-details-marker]:hidden">
-                + Agregar sede
-              </summary>
-              <div className="mt-3 space-y-3">
-                <SedeFields numero={2} />
-                <details className="group rounded-input border border-dashed border-border p-3">
-                  <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-button border border-brand-primary px-4 py-2 text-body-secondary font-semibold text-brand-primary hover:bg-brand-primary-soft [&::-webkit-details-marker]:hidden">
-                    + Agregar otra sede
-                  </summary>
-                  <div className="mt-3">
-                    <SedeFields numero={3} />
-                  </div>
-                </details>
-              </div>
-            </details>
-          </div>
-          <p className="mt-2 text-caption text-text-faint">
-            Llena al menos la Sede 1 si marcaste &quot;Presencial en consultorio&quot;.
-          </p>
-
-          {/* 10-nov-2026, pedido del usuario: zonas de cobertura y
-              disponibilidad se sacaron de acá — marcar "A domicilio" ya
-              deja agendar y aparecer pendiente en la agenda del OS igual;
-              el detalle de zonas/disponibilidad se completa después en "Mi
-              ficha pública" (antes esto bloqueaba el registro si no se
-              llenaba zonas — ya no, changelog punto 98). */}
         </Card>
 
         <Card padding="spacious">
