@@ -10,8 +10,7 @@ import { Card } from "@/components/ui/Card";
 import {
   abrirCajaAction,
   cerrarCajaAction,
-  registrarCobroConConsultaAction,
-  registrarCobroRapidoAction,
+  registrarCobroAction,
   registrarGastoAction,
 } from "./actions";
 
@@ -176,16 +175,84 @@ export default async function CajaPage({
       {cajaAbierta ? (
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
           <Card padding="compact" className="lg:col-span-2">
-            <h2 className="text-sm font-semibold text-text-primary">
-              Registrar cobro con consulta
-            </h2>
-            <form action={registrarCobroConConsultaAction} className="mt-3 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Registrar cobro</h2>
+            <form action={registrarCobroAction} className="mt-3 space-y-3">
+              {/* Selector de tipo (10-nov-2026: antes eran dos tarjetas
+                  separadas — "aca no deberia haber dos cuadros de cobro uno
+                  solo y seleccionar concepto"). Toggle con radios + CSS
+                  puro (mismo criterio sin-JS que CamposDescuento con
+                  <details>). Los dos radios, las etiquetas visuales y los
+                  dos bloques de campos son TODOS hermanos directos de este
+                  mismo div — `peer-checked/nombre` de Tailwind depende de
+                  eso (selector de hermano general, no sirve si el radio
+                  queda anidado dentro de su propia label). Esconder un
+                  bloque con display:none alcanza para que el navegador deje
+                  de exigirle su `required`: no hace falta deshabilitarlo. */}
               <div>
-                <label htmlFor="consultaId" className="mb-1 block text-sm text-text-primary">
-                  ID de la consulta (debe estar CERRADA)
-                </label>
-                <Input id="consultaId" name="consultaId" required />
+                <span className="mb-1 block text-sm text-text-primary">Tipo de cobro</span>
+                <input
+                  type="radio"
+                  id="tipoConsulta"
+                  name="tipo"
+                  value="consulta"
+                  defaultChecked
+                  className="peer/consulta sr-only"
+                />
+                <input
+                  type="radio"
+                  id="tipoDirecto"
+                  name="tipo"
+                  value="directo"
+                  className="peer/directo sr-only"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <label
+                    htmlFor="tipoConsulta"
+                    className="flex cursor-pointer items-center justify-center rounded-input border border-border px-3 py-2 text-center text-sm text-text-secondary transition peer-checked/consulta:border-brand-primary peer-checked/consulta:bg-brand-primary-soft peer-checked/consulta:font-medium peer-checked/consulta:text-brand-primary"
+                  >
+                    Con consulta
+                  </label>
+                  <label
+                    htmlFor="tipoDirecto"
+                    className="flex cursor-pointer items-center justify-center rounded-input border border-border px-3 py-2 text-center text-sm text-text-secondary transition peer-checked/directo:border-brand-primary peer-checked/directo:bg-brand-primary-soft peer-checked/directo:font-medium peer-checked/directo:text-brand-primary"
+                  >
+                    Cobro directo
+                  </label>
+                </div>
+
+                {/* Campos de "con consulta" — visibles salvo que "directo" esté marcado. */}
+                <div className="mt-3 space-y-3 peer-checked/directo:hidden">
+                  <div>
+                    <label htmlFor="consultaId" className="mb-1 block text-sm text-text-primary">
+                      ID de la consulta (debe estar CERRADA)
+                    </label>
+                    <Input id="consultaId" name="consultaId" />
+                  </div>
+                  <div>
+                    <label htmlFor="conceptoConsulta" className="mb-1 block text-sm text-text-primary">
+                      Concepto (opcional)
+                    </label>
+                    <Input id="conceptoConsulta" name="conceptoConsulta" />
+                  </div>
+                </div>
+
+                {/* Campos de "cobro directo" — ocultos salvo que "directo" esté marcado. */}
+                <div className="mt-3 hidden space-y-3 peer-checked/directo:block">
+                  <div>
+                    <label htmlFor="pacienteId" className="mb-1 block text-sm text-text-primary">
+                      ID del paciente
+                    </label>
+                    <Input id="pacienteId" name="pacienteId" defaultValue={pacienteId} />
+                  </div>
+                  <div>
+                    <label htmlFor="conceptoDirecto" className="mb-1 block text-sm text-text-primary">
+                      Concepto (obligatorio)
+                    </label>
+                    <Input id="conceptoDirecto" name="conceptoDirecto" />
+                  </div>
+                </div>
               </div>
+
               <div>
                 <label htmlFor="monto1" className="mb-1 block text-sm text-text-primary">
                   Monto (subtotal, antes de descuento)
@@ -198,54 +265,7 @@ export default async function CajaPage({
                 </label>
                 <SelectMetodoPago id="metodoPago1" name="metodoPago" />
               </div>
-              <div>
-                <label htmlFor="concepto1" className="mb-1 block text-sm text-text-primary">
-                  Concepto (opcional)
-                </label>
-                <Input id="concepto1" name="concepto" />
-              </div>
               <CamposDescuento sufijo="1" />
-              <Button type="submit" fullWidth variant="secondary">
-                Registrar cobro
-              </Button>
-            </form>
-          </Card>
-
-          <Card padding="compact">
-            <h2 className="text-sm font-semibold text-text-primary">
-              Cobro rápido (sin consulta)
-            </h2>
-            <form action={registrarCobroRapidoAction} className="mt-3 space-y-3">
-              <div>
-                <label htmlFor="pacienteId" className="mb-1 block text-sm text-text-primary">
-                  ID del paciente
-                </label>
-                <Input
-                  id="pacienteId"
-                  name="pacienteId"
-                  defaultValue={pacienteId}
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="concepto2" className="mb-1 block text-sm text-text-primary">
-                  Concepto (obligatorio)
-                </label>
-                <Input id="concepto2" name="concepto" required />
-              </div>
-              <div>
-                <label htmlFor="monto2" className="mb-1 block text-sm text-text-primary">
-                  Monto (subtotal, antes de descuento)
-                </label>
-                <Input id="monto2" name="monto" type="number" step="0.01" min="0.01" required />
-              </div>
-              <div>
-                <label htmlFor="metodoPago2" className="mb-1 block text-sm text-text-primary">
-                  Método de pago
-                </label>
-                <SelectMetodoPago id="metodoPago2" name="metodoPago" />
-              </div>
-              <CamposDescuento sufijo="2" />
               <Button type="submit" fullWidth variant="secondary">
                 Registrar cobro
               </Button>

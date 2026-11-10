@@ -129,28 +129,83 @@ export async function cerrarCajaAction(formData: FormData) {
   redirect(`/caja?${params.toString()}`);
 }
 
-export async function registrarCobroConConsultaAction(formData: FormData) {
+const tipoCobroSchema = z.enum(["consulta", "directo"]);
+
+/**
+ * Un solo formulario de "Registrar cobro" (antes eran dos tarjetas
+ * separadas — ver nota del usuario 10-nov-2026: "aca no deberia haber dos
+ * cuadros de cobro uno solo y seleccionar concepto"). El selector "Tipo de
+ * cobro" decide qué campos se leen, pero ambas ramas siguen llamando a la
+ * misma `registrarCobro()` de siempre — no se duplica ninguna regla de
+ * negocio, solo se unifica la UI que ya apuntaba a la misma función.
+ */
+export async function registrarCobroAction(formData: FormData) {
   const session = await requireSesion();
 
-  const consultaId = leerTexto(formData, "consultaId");
+  const parseoTipo = tipoCobroSchema.safeParse(formData.get("tipo"));
   const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));
   const parseoMetodo = metodoPagoSchema.safeParse(formData.get("metodoPago"));
-  if (!consultaId || !parseoMonto.success || !parseoMetodo.success) {
+  if (!parseoTipo.success || !parseoMonto.success || !parseoMetodo.success) {
     redirect("/caja?error=monto_invalido");
   }
 
+  const base = {
+    organizacionId: session.user.organizacionId,
+    actorId: session.user.id,
+    monto: parseoMonto.data,
+    metodoPago: parseoMetodo.data as MetodoPagoId,
+    descuentoMonto: leerDescuento(formData),
+    descuentoMotivo: leerTexto(formData, "descuentoMotivo"),
+  };
+
   let resultado: { cobroId: string };
   try {
-    resultado = await registrarCobro({
-      organizacionId: session.user.organizacionId,
-      actorId: session.user.id,
-      consultaId,
-      concepto: leerTexto(formData, "concepto"),
-      monto: parseoMonto.data,
-      metodoPago: parseoMetodo.data as MetodoPagoId,
-      descuentoMonto: leerDescuento(formData),
-      descuentoMotivo: leerTexto(formData, "descuentoMotivo"),
-    });
+    if (parseoTipo.data === "consulta") {
+      const consultaId = leerTexto(formData, "consultaId");
+      if (!consultaId) {
+        redirect("/caja?error=monto_invalido");
+      }
+      resultado = await registrarCobro({
+        ...base,
+        consultaId,
+        concepto: leerTexto(formData, "conceptoConsulta"),
+      });
+    } else {
+      const pacienteId = leerTexto(formData, "pacienteId");
+      const concepto = leerTexto(formData, "conceptoDirecto");
+      if (!pacienteId) {
+        redirect("/caja?error=monto_invalido");
+      }
+      if (!concepto) {
+        redirect("/caja?error=concepto_requerido");
+      }
+
+      // 29-oct-2026: CONXULTY es de un médico por organización (HECHO
+      // confirmado por el usuario) — el médico ya no se escribe a mano, se
+      // deriva siempre de la organización, igual que ocurre cuando el
+      // cobro viene con consultaId (ahí lo deriva registrarCobro() de la
+      // propia Consulta).
+      let medicoId: string;
+      try {
+        medicoId = (
+          await obtenerMedicoDeOrganizacion({
+            organizacionId: session.user.organizacionId,
+          })
+        ).id;
+      } catch (err) {
+        if (err instanceof MedicoNoEncontradoError) {
+          redirect("/caja?error=sin_medico");
+        }
+        throw err;
+      }
+
+      resultado = await registrarCobro({
+        ...base,
+        pacienteId,
+        medicoId,
+        concepto,
+      });
+    }
   } catch (err) {
     if (err instanceof CajaNoAbiertaError) {
       redirect("/caja?error=caja_cerrada");
@@ -160,6 +215,9 @@ export async function registrarCobroConConsultaAction(formData: FormData) {
     }
     if (err instanceof ConsultaNoCerradaError) {
       redirect("/caja?error=consulta_no_cerrada");
+    }
+    if (err instanceof ConceptoRequeridoError) {
+      redirect("/caja?error=concepto_requerido");
     }
     if (err instanceof DescuentoMotivoRequeridoError) {
       redirect("/caja?error=descuento_motivo_requerido");
@@ -199,64 +257,3 @@ export async function registrarGastoAction(formData: FormData) {
   redirect("/caja?gasto=1");
 }
 
-export async function registrarCobroRapidoAction(formData: FormData) {
-  const session = await requireSesion();
-
-  const pacienteId = leerTexto(formData, "pacienteId");
-  const concepto = leerTexto(formData, "concepto");
-  const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));
-  const parseoMetodo = metodoPagoSchema.safeParse(formData.get("metodoPago"));
-
-  if (!pacienteId || !parseoMonto.success || !parseoMetodo.success) {
-    redirect("/caja?error=monto_invalido");
-  }
-  if (!concepto) {
-    redirect("/caja?error=concepto_requerido");
-  }
-
-  // 29-oct-2026: CONXULTY es de un médico por organización (HECHO
-  // confirmado por el usuario) — el médico ya no se escribe a mano, se
-  // deriva siempre de la organización, igual que ya ocurre cuando el
-  // cobro viene con consultaId (ver registrarCobroConConsultaAction).
-  let medicoId: string;
-  try {
-    medicoId = (
-      await obtenerMedicoDeOrganizacion({
-        organizacionId: session.user.organizacionId,
-      })
-    ).id;
-  } catch (err) {
-    if (err instanceof MedicoNoEncontradoError) {
-      redirect("/caja?error=sin_medico");
-    }
-    throw err;
-  }
-
-  let resultado: { cobroId: string };
-  try {
-    resultado = await registrarCobro({
-      organizacionId: session.user.organizacionId,
-      actorId: session.user.id,
-      pacienteId,
-      medicoId,
-      concepto,
-      monto: parseoMonto.data,
-      metodoPago: parseoMetodo.data as MetodoPagoId,
-      descuentoMonto: leerDescuento(formData),
-      descuentoMotivo: leerTexto(formData, "descuentoMotivo"),
-    });
-  } catch (err) {
-    if (err instanceof CajaNoAbiertaError) {
-      redirect("/caja?error=caja_cerrada");
-    }
-    if (err instanceof ConceptoRequeridoError) {
-      redirect("/caja?error=concepto_requerido");
-    }
-    if (err instanceof DescuentoMotivoRequeridoError) {
-      redirect("/caja?error=descuento_motivo_requerido");
-    }
-    throw err;
-  }
-
-  redirect(`/caja/comprobante/${resultado.cobroId}`);
-}
