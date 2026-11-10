@@ -76,7 +76,11 @@ export async function registrarPagoRealizado(
         plan,
         montoCentavos: PRECIO_CENTAVOS_USD[plan],
         estado: "PENDIENTE",
-        comprobante: comprobante?.bytes,
+        // Prisma 7 tipa `Bytes` como Uint8Array<ArrayBuffer>, y un Buffer de
+        // Node es Uint8Array<ArrayBufferLike> (admite SharedArrayBuffer) —
+        // TS lo rechaza aunque en runtime un Buffer siempre funciona acá.
+        // new Uint8Array(...) copia a un ArrayBuffer plano y satisface el tipo.
+        comprobante: comprobante ? new Uint8Array(comprobante.bytes) : undefined,
         comprobanteTipo: comprobante?.tipo,
       },
     });
