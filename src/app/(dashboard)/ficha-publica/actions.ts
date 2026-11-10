@@ -8,6 +8,7 @@ import {
   sincronizarFichaDirectorio,
   subirFotoDirectorio,
   obtenerFichaDirectorio,
+  resolverEspecialidadId,
 } from "@/modules/directorio/sincronizacion";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import { MODALIDADES_ATENCION, type ModalidadAtencionId } from "@/modules/onboarding/modalidades";
@@ -60,9 +61,11 @@ const fichaPublicaSchema = z.object({
   numeroColegiado: z.string().trim().max(40).optional(),
   numeroMpps: z.string().trim().max(40).optional(),
   especialidadSecundaria1: z.string().trim().max(160).optional(),
-  // 10-nov-2026: el médico elige del catálogo real del Directorio (un
-  // uuid), nunca se manda texto libre — ver nota en sincronizacion.ts.
-  especialidadId: z.string().trim().max(60).optional(),
+  // 10-nov-2026: ya NO se pide acá (antes era un <select> manual) —
+  // pedido del usuario ("debería sincronizarse con la especialidad que el
+  // médico escoja en el onboarding"). El id real del catálogo del
+  // Directorio se resuelve solo, por texto, con `resolverEspecialidadId`
+  // (ver sincronizacion.ts) a partir de `Medico.especialidad`.
 });
 
 // Task #13: el médico edita la lista con ServiciosPreciosForm.tsx, que
@@ -150,7 +153,6 @@ export async function guardarFichaPublicaAction(
     numeroColegiado: vacio(formData.get("numeroColegiado")),
     numeroMpps: vacio(formData.get("numeroMpps")),
     especialidadSecundaria1: vacio(formData.get("especialidadSecundaria1")),
-    especialidadId: vacio(formData.get("especialidadId")),
   });
   if (!parseo.success) {
     return { ok: false, error: "Revisa los campos marcados — alguno quedó demasiado largo." };
@@ -180,7 +182,7 @@ export async function guardarFichaPublicaAction(
     }),
     prisma.medico.findUniqueOrThrow({
       where: { id: medico.id },
-      select: { profesion: true, numeroMpps: true, numeroColegiado: true },
+      select: { profesion: true, numeroMpps: true, numeroColegiado: true, especialidad: true },
     }),
     prisma.sede.findMany({
       where: { medicoId: medico.id },
@@ -376,7 +378,13 @@ export async function guardarFichaPublicaAction(
     domicilioFiscal: parseo.data.domicilioFiscal ?? null,
     servicios,
     aseguradoras,
-    especialidadId: parseo.data.especialidadId ?? null,
+    // 10-nov-2026: ya no lo elige el médico en esta pantalla — se resuelve
+    // solo a partir de lo que ya eligió en /registro (ver nota en el
+    // schema de arriba y en `resolverEspecialidadId`).
+    especialidadId: resolverEspecialidadId(
+      medicoCompleto.especialidad,
+      directorioActual.ok ? directorioActual.especialidades : [],
+    ),
   });
 
   if (!resultado.ok) {

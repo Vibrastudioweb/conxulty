@@ -14,12 +14,7 @@ import { ServiciosPreciosForm } from "@/components/ui/ServiciosPreciosForm";
 import { AseguradorasForm } from "@/components/ui/AseguradorasForm";
 import { guardarFichaPublicaAction, type GuardarFichaPublicaResultado } from "./actions";
 import { agregarFotoGaleriaMedicoAction, quitarFotoGaleriaMedicoAction } from "./galeriaActions";
-import type {
-  CiudadDirectorio,
-  EspecialidadDirectorio,
-  FichaDirectorio,
-  SedeDirectorio,
-} from "@/modules/directorio/sincronizacion";
+import type { CiudadDirectorio, FichaDirectorio, SedeDirectorio } from "@/modules/directorio/sincronizacion";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import { MODALIDADES_ATENCION, LABEL_MODALIDAD, type ModalidadAtencionId } from "@/modules/onboarding/modalidades";
 import { DIAS_SEMANA, type HorarioDia } from "@/modules/onboarding/horarioSede";
@@ -173,8 +168,6 @@ export function FichaPublicaForm({
   numeroColegiado,
   especialidadesSecundarias,
   zonasCobertura,
-  especialidades,
-  especialidadId,
 }: {
   ficha: FichaDirectorio | null;
   ciudades: CiudadDirectorio[];
@@ -197,8 +190,6 @@ export function FichaPublicaForm({
   numeroColegiado: string | null;
   especialidadesSecundarias: string[];
   zonasCobertura: string[];
-  especialidades: EspecialidadDirectorio[];
-  especialidadId: string | null;
 }) {
   const [resultado, accion, pendiente] = useActionState<GuardarFichaPublicaResultado, FormData>(
     guardarFichaPublicaAction,
@@ -236,15 +227,6 @@ export function FichaPublicaForm({
   // columnas nuevas del lado del Directorio, antes el OS no las capturaba.
   const consultorioPorDireccion = new Map(sedesDirectorio.map((s) => [s.direccion, s.consultorio]));
   const sectorPorDireccion = new Map(sedesDirectorio.map((s) => [s.direccion, s.sector]));
-
-  // Agrupa el catálogo de especialidades por `grupo` para el <select> —
-  // mismo criterio visual que usa el propio Directorio, sin inventar
-  // agrupaciones nuevas.
-  const especialidadesPorGrupo = new Map<string, EspecialidadDirectorio[]>();
-  for (const e of especialidades) {
-    const clave = e.grupo ?? "Otras";
-    especialidadesPorGrupo.set(clave, [...(especialidadesPorGrupo.get(clave) ?? []), e]);
-  }
 
   return (
     <form action={accion} className="space-y-6">
@@ -353,32 +335,16 @@ export function FichaPublicaForm({
           <Input id="domicilioFiscal" name="domicilioFiscal" defaultValue={ficha?.domicilio_fiscal ?? ""} />
         </div>
 
-        {/* 10-nov-2026: antes esto no existía — el OS guarda `especialidad`
-            como texto libre y el Directorio usa catálogo cerrado, mapear a
-            ciegas generaba coincidencias falsas. Acá el médico ELIGE la
-            suya del catálogo real (nunca se adivina ni se guarda sola:
-            recién al tocar "Guardar y publicar"). Si el texto que ya tenía
-            coincidía exacto con una opción, viene preseleccionada. */}
-        <div className="border-t border-border pt-4">
-          <label className={LABEL} htmlFor="especialidadId">
-            Especialidad (como aparece en el Directorio)
-          </label>
-          <select id="especialidadId" name="especialidadId" defaultValue={especialidadId ?? ""} className={SELECT_CLASES}>
-            <option value="">— Sin elegir —</option>
-            {[...especialidadesPorGrupo.entries()].map(([grupo, lista]) => (
-              <optgroup key={grupo} label={grupo}>
-                {lista.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nombre}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          <p className="mt-1 text-caption text-text-faint">
-            Es la que ve el paciente en tu ficha — distinta de la que elegiste al registrarte, que es solo interna.
-          </p>
-        </div>
+        {/* 10-nov-2026: antes había acá un <select> manual para elegir la
+            especialidad del Directorio (el OS guardaba `especialidad` como
+            texto libre y el Directorio usa catálogo cerrado). Pedido del
+            usuario ("debería sincronizarse con la especialidad que el
+            médico escoja en el onboarding"): ya no se vuelve a pedir — se
+            resuelve sola, por texto, a partir de la que eligió en
+            /registro (ver `resolverEspecialidadId` en sincronizacion.ts).
+            Si el texto no tiene match exacto en el catálogo del Directorio,
+            la ficha queda sin especialidad ahí (no rompe nada, no bloquea
+            guardar). */}
 
         {/* 10-nov-2026: cédula, MPPS, colegiado y especialidad secundaria se
             sacaron del registro ("menos pasos") — se llenan/editan acá. */}

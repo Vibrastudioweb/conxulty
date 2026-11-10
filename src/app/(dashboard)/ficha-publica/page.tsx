@@ -38,7 +38,6 @@ export default async function FichaPublicaPage() {
       where: { id: medico.id },
       select: {
         profesion: true,
-        especialidad: true,
         cedula: true,
         numeroMpps: true,
         numeroColegiado: true,
@@ -51,30 +50,12 @@ export default async function FichaPublicaPage() {
 
   const directorio = await obtenerFichaDirectorio(organizacion.fichaDirectorioId);
 
-  // 10-nov-2026: antes esto no se sincronizaba — el OS guarda `especialidad`
-  // como texto libre y el Directorio usa catálogo cerrado, mapear a ciegas
-  // generaba coincidencias falsas (ver nota de alcance del endpoint en
-  // vitalud). Ahora el médico ELIGE del catálogo real en un <select>; esto
-  // solo PRESELECCIONA esa opción cuando el texto que ya tiene guardado
-  // coincide exacto (sin mayúsculas/acentos) con una del catálogo — nunca
-  // se guarda nada hasta que el médico mismo confirme con "Guardar y
-  // publicar". Si ya había una especialidad elegida antes en el
-  // Directorio (`ficha.especialidad_id`), ESA gana siempre sobre la
-  // sugerencia por texto.
-  function normalizar(texto: string): string {
-    return texto
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "");
-  }
-  const especialidadesCatalogo = directorio.ok ? directorio.especialidades : [];
-  const especialidadIdGuardada = directorio.ok ? (directorio.ficha?.especialidad_id ?? null) : null;
-  const especialidadIdSugerida =
-    !especialidadIdGuardada && medicoCompleto.especialidad
-      ? (especialidadesCatalogo.find((e) => normalizar(e.nombre) === normalizar(medicoCompleto.especialidad!))
-          ?.id ?? null)
-      : null;
+  // 10-nov-2026: la especialidad ya NO se elige acá (antes había un
+  // <select> manual) — pedido del usuario ("debería sincronizarse con la
+  // especialidad que el médico escoja en el onboarding"). El id real del
+  // catálogo del Directorio se resuelve solo, por texto, al momento de
+  // guardar (ver `resolverEspecialidadId` y `guardarFichaPublicaAction` en
+  // actions.ts) — esta pantalla no necesita el catálogo para nada.
   const publicada = organizacion.fichaDirectorioSincronizada && Boolean(organizacion.fichaDirectorioSlug);
   const urlPublica = publicada ? `https://conxulty.com/medico/${organizacion.fichaDirectorioSlug}` : null;
 
@@ -150,8 +131,6 @@ export default async function FichaPublicaPage() {
           numeroColegiado={medicoCompleto.numeroColegiado}
           especialidadesSecundarias={medicoCompleto.especialidadesSecundarias}
           zonasCobertura={medicoCompleto.zonasCobertura}
-          especialidades={especialidadesCatalogo}
-          especialidadId={especialidadIdGuardada ?? especialidadIdSugerida}
         />
       </div>
     </div>

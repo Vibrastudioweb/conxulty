@@ -15,7 +15,11 @@ import { EmailYaRegistradoError } from "@/modules/acceso/solicitudes";
 import { PROFESIONES } from "@/modules/onboarding/profesiones";
 import { MODALIDADES_ATENCION } from "@/modules/onboarding/modalidades";
 import { leerHorarioSedeDeFormData, type HorarioDia } from "@/modules/onboarding/horarioSede";
-import { sincronizarFichaDirectorio } from "@/modules/directorio/sincronizacion";
+import {
+  sincronizarFichaDirectorio,
+  obtenerFichaDirectorio,
+  resolverEspecialidadId,
+} from "@/modules/directorio/sincronizacion";
 
 const registroSchema = z.object({
   nombre: z.string().trim().min(2).max(120),
@@ -142,6 +146,13 @@ export async function registrarMedicoAction(formData: FormData) {
   // changelog punto 87: ya no hace falta mapear/validar la modalidad acá —
   // las tres booleanas viajan tal cual, cualquier combinación (incluida
   // solo ONLINE) es representable del lado del Directorio.
+  // 10-nov-2026 (pedido del usuario: "debería sincronizarse con la
+  // especialidad que el médico escoja en el onboarding"): se resuelve acá
+  // mismo, por texto, contra el catálogo real del Directorio — nunca se le
+  // vuelve a pedir al médico (ver `resolverEspecialidadId`). Si no hay
+  // catálogo disponible todavía (Directorio caído) o no hay match, queda
+  // simplemente sin especialidad — no bloquea el registro.
+  const catalogoEspecialidades = await obtenerFichaDirectorio(null);
   const resultadoSync = await sincronizarFichaDirectorio({
     nombre: parseo.data.nombre,
     profesion: parseo.data.profesion,
@@ -152,6 +163,10 @@ export async function registrarMedicoAction(formData: FormData) {
     atiendeOnline: modalidades.includes("ONLINE"),
     zonasCobertura,
     sedes: [],
+    especialidadId: resolverEspecialidadId(
+      especialidad,
+      catalogoEspecialidades.ok ? catalogoEspecialidades.especialidades : [],
+    ),
   });
   if (resultadoSync.ok) {
     await prisma.organizacion.update({

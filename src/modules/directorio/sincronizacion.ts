@@ -75,13 +75,11 @@ export interface DatosFichaDirectorio {
   /** Task #14 — texto libre, sin catálogo cerrado (ver AseguradorasForm.tsx). */
   aseguradoras?: string[];
   /**
-   * 10-nov-2026 — RESUELTO: antes esto no existía porque el OS guarda
-   * `especialidad` como texto libre y el Directorio usa un catálogo
-   * cerrado (`especialidades.id`) — mapear uno a otro a ciegas generaría
-   * coincidencias falsas (nota de alcance original del endpoint del
-   * lado de vitalud). En vez de adivinar, el médico ELIGE acá el id real
-   * del catálogo del Directorio (ver `especialidades` en
-   * `ResultadoConsultaFicha` — lo manda el GET para armar el selector).
+   * Id real del catálogo cerrado de especialidades del Directorio
+   * (`especialidades.id`), o null si no hay. Nunca lo elige el médico a
+   * mano — se resuelve con `resolverEspecialidadId` a partir del texto
+   * que ya escogió en /registro, tanto ahí mismo como al guardar "Mi
+   * ficha pública" (10-nov-2026, ver esa función para el porqué).
    */
   especialidadId?: string | null;
 }
@@ -259,4 +257,36 @@ export async function obtenerFichaDirectorio(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Error de red al contactar el Directorio." };
   }
+}
+
+function normalizarTextoEspecialidad(texto: string): string {
+  return texto
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+/**
+ * 10-nov-2026 (pedido del usuario: "debería sincronizarse con la
+ * especialidad que el médico escoja en el onboarding" — antes esto era un
+ * <select> manual en "Mi ficha pública"): resuelve el id real del catálogo
+ * del Directorio a partir del texto de especialidad que el médico YA
+ * eligió en /registro. Para "Médico" ese texto sale de una lista cerrada
+ * (`ESPECIALIDADES_MEDICAS`, ver plantillasEspecialidad.ts) — no es texto
+ * libre salvo que haya elegido "Otra" (Odontólogo, Psicólogo, etc.), caso
+ * en el que lo normal es que no haya match y listo.
+ *
+ * Compara normalizado (sin mayúsculas/acentos). Si no hay coincidencia
+ * exacta no inventa nada — vuelve null y la ficha queda sin especialidad
+ * en el Directorio hasta que su catálogo tenga ese nombre (nunca se
+ * fuerza una coincidencia parcial que podría ser otra especialidad).
+ */
+export function resolverEspecialidadId(
+  especialidad: string | null | undefined,
+  catalogo: EspecialidadDirectorio[],
+): string | null {
+  if (!especialidad) return null;
+  const buscado = normalizarTextoEspecialidad(especialidad);
+  return catalogo.find((e) => normalizarTextoEspecialidad(e.nombre) === buscado)?.id ?? null;
 }
