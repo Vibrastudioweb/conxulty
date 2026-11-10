@@ -2,11 +2,16 @@ import { Eye } from "lucide-react";
 import { prisma } from "@/db/client";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
 import { obtenerFichaDirectorio } from "@/modules/directorio/sincronizacion";
+import { type HorarioDia } from "@/modules/onboarding/horarioSede";
 import { Alert } from "@/components/ui/Alert";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FichaPublicaForm } from "./FichaPublicaForm";
 
 export const metadata = { title: "Mi ficha pública — CONXULTY" };
+
+// Mismo límite que /registro (`SEDES_MAX` en registro/actions.ts) — una
+// sede nueva de más acá tampoco tendría sentido del lado del Directorio.
+const SEDES_MAX = 3;
 
 export default async function FichaPublicaPage() {
   const { session, medico } = await requireMedicoSesion();
@@ -16,9 +21,14 @@ export default async function FichaPublicaPage() {
       where: { id: session.user.organizacionId },
       select: { fichaDirectorioId: true, fichaDirectorioSlug: true, fichaDirectorioSincronizada: true },
     }),
+    // 10-nov-2026: antes solo se traía `municipio`/`direccion` (lo mínimo
+    // para emparejar con el Directorio) — ahora se trae todo porque esta
+    // misma pantalla edita la sede real del OS ("donde edita un medico
+    // sedes horarios y ubicaciones y modalidad de consultas" — antes no
+    // existía esa pantalla en ningún lado, ver FichaPublicaForm.tsx).
     prisma.sede.findMany({
       where: { medicoId: medico.id },
-      select: { id: true, municipio: true, direccion: true },
+      select: { id: true, municipio: true, direccion: true, referencia: true, telefono: true, horario: true },
       orderBy: { createdAt: "asc" },
     }),
     // 10-nov-2026: cédula, MPPS, colegiado, especialidades secundarias y
@@ -72,7 +82,7 @@ export default async function FichaPublicaPage() {
     <div className="mx-auto max-w-2xl px-4 py-6 lg:px-8">
       <PageHeader
         title="Mi ficha pública"
-        description="Lo que ve cualquier persona en el Directorio CONXULTY, y lo que lee un médico de otro consultorio cuando escaneas tu código. Tus pacientes y tu agenda no se tocan desde acá — esto es solo tu presencia pública."
+        description="Lo que ve cualquier persona en el Directorio CONXULTY, y lo que lee un médico de otro consultorio cuando escaneas tu código. Tus pacientes no se tocan desde acá, pero las sedes y modalidades sí son las mismas que usa tu agenda — un cambio acá se refleja ahí también."
         secondaryActions={
           urlPublica ? (
             <a
@@ -131,13 +141,14 @@ export default async function FichaPublicaPage() {
           ficha={directorio.ok ? directorio.ficha : null}
           ciudades={directorio.ok ? directorio.ciudades : []}
           sedesDirectorio={directorio.ok ? directorio.sedes : []}
-          sedesOs={sedes}
+          sedesOs={sedes.map((s) => ({ ...s, horario: s.horario as unknown as HorarioDia[] }))}
+          espaciosNuevaSede={Math.max(0, SEDES_MAX - sedes.length)}
+          modalidadesActuales={medicoCompleto.modalidades}
           profesion={medicoCompleto.profesion}
           cedula={medicoCompleto.cedula}
           numeroMpps={medicoCompleto.numeroMpps}
           numeroColegiado={medicoCompleto.numeroColegiado}
           especialidadesSecundarias={medicoCompleto.especialidadesSecundarias}
-          atiendeDomicilio={medicoCompleto.modalidades.includes("DOMICILIO")}
           zonasCobertura={medicoCompleto.zonasCobertura}
           especialidades={especialidadesCatalogo}
           especialidadId={especialidadIdGuardada ?? especialidadIdSugerida}

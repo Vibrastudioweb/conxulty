@@ -21,7 +21,105 @@ import type {
   SedeDirectorio,
 } from "@/modules/directorio/sincronizacion";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
+import { MODALIDADES_ATENCION, LABEL_MODALIDAD, type ModalidadAtencionId } from "@/modules/onboarding/modalidades";
+import { DIAS_SEMANA, type HorarioDia } from "@/modules/onboarding/horarioSede";
 import type { ProfesionId } from "@/modules/onboarding/profesiones";
+
+/** Mismo componente que `HorarioSedeFields` de /registro (page.tsx) — se
+ *  copia en vez de compartirse porque ese vive en un Server Component y
+ *  este archivo es "use client"; no usa hooks, así que no hay diferencia
+ *  real salvo precargar el horario que la sede ya tenga guardado. */
+function HorarioSedeFields({
+  prefijoSede,
+  horarioActual,
+}: {
+  prefijoSede: string;
+  horarioActual?: HorarioDia[];
+}) {
+  const porDia = new Map((horarioActual ?? []).map((h) => [h.dia, h]));
+  return (
+    <details className="rounded-input border border-border px-3 py-2">
+      <summary className="cursor-pointer text-sm text-text-secondary">
+        + Horario de atención (opcional)
+      </summary>
+      <div className="mt-3 space-y-2">
+        {DIAS_SEMANA.map((dia) => {
+          const h = porDia.get(dia);
+          return (
+            <div key={dia} className="grid grid-cols-[auto_1fr_1fr] items-center gap-2 text-sm">
+              <label className="flex items-center gap-1.5 text-text-primary">
+                <input type="checkbox" name={`${prefijoSede}_${dia}_atiende`} defaultChecked={h?.atiende ?? false} />
+                {dia}
+              </label>
+              <input
+                type="time"
+                name={`${prefijoSede}_${dia}_horaInicio`}
+                defaultValue={h?.horaInicio ?? ""}
+                className="rounded-input border border-border bg-surface px-2 py-1 text-sm"
+              />
+              <input
+                type="time"
+                name={`${prefijoSede}_${dia}_horaFin`}
+                defaultValue={h?.horaFin ?? ""}
+                className="rounded-input border border-border bg-surface px-2 py-1 text-sm"
+              />
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+/** Mismos campos (municipio/dirección/teléfono/referencia/horario) para
+ *  una sede nueva — igual que `SedeFields` de /registro, sin ciudad del
+ *  Directorio ni mapa todavía (eso se elige recién cuando ya tenga un
+ *  `id` real, en el próximo guardado). */
+function SedeNuevaFields({ numero }: { numero: number }) {
+  const prefijo = `sedeNueva${numero}`;
+  return (
+    <div className="space-y-3 rounded-input border border-dashed border-border p-3">
+      <p className="text-sm font-semibold text-text-primary">Sede nueva</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className={LABEL} htmlFor={`${prefijo}_municipio`}>
+            Municipio
+          </label>
+          <select id={`${prefijo}_municipio`} name={`${prefijo}_municipio`} defaultValue="" className={SELECT_CLASES}>
+            <option value="">— Selecciona —</option>
+            {MUNICIPIOS_TRUJILLO.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={LABEL} htmlFor={`${prefijo}_telefono`}>
+            Teléfono (opcional)
+          </label>
+          <Input id={`${prefijo}_telefono`} name={`${prefijo}_telefono`} />
+        </div>
+      </div>
+      <div>
+        <label className={LABEL} htmlFor={`${prefijo}_direccion`}>
+          Dirección
+        </label>
+        <Input id={`${prefijo}_direccion`} name={`${prefijo}_direccion`} />
+      </div>
+      <div>
+        <label className={LABEL} htmlFor={`${prefijo}_referencia`}>
+          Referencia (opcional)
+        </label>
+        <Input id={`${prefijo}_referencia`} name={`${prefijo}_referencia`} />
+      </div>
+      <HorarioSedeFields prefijoSede={prefijo} />
+      <p className="text-caption text-text-faint">
+        La ciudad del Directorio, consultorio/sector y el punto en el mapa se eligen después de guardar esta, cuando ya tenga su propio registro.
+      </p>
+    </div>
+  );
+}
 
 // Leaflet necesita `window` al cargar — sin esto, Next intenta renderizar
 // el mapa en el servidor y rompe. `ssr: false` lo deja solo para el cliente.
@@ -43,12 +141,13 @@ export function FichaPublicaForm({
   ciudades,
   sedesDirectorio,
   sedesOs,
+  espaciosNuevaSede,
+  modalidadesActuales,
   profesion,
   cedula,
   numeroMpps,
   numeroColegiado,
   especialidadesSecundarias,
-  atiendeDomicilio,
   zonasCobertura,
   especialidades,
   especialidadId,
@@ -56,13 +155,23 @@ export function FichaPublicaForm({
   ficha: FichaDirectorio | null;
   ciudades: CiudadDirectorio[];
   sedesDirectorio: SedeDirectorio[];
-  sedesOs: { id: string; municipio: string; direccion: string }[];
+  sedesOs: {
+    id: string;
+    municipio: string;
+    direccion: string;
+    referencia: string | null;
+    telefono: string | null;
+    horario: HorarioDia[];
+  }[];
+  /** Cupos libres para "+ Agregar sede" — `SEDES_MAX` menos las que ya
+   *  existen (ver page.tsx). */
+  espaciosNuevaSede: number;
+  modalidadesActuales: ModalidadAtencionId[];
   profesion: ProfesionId;
   cedula: string | null;
   numeroMpps: string | null;
   numeroColegiado: string | null;
   especialidadesSecundarias: string[];
-  atiendeDomicilio: boolean;
   zonasCobertura: string[];
   especialidades: EspecialidadDirectorio[];
   especialidadId: string | null;
@@ -117,6 +226,11 @@ export function FichaPublicaForm({
       {resultado?.ok === true && resultado.advertenciaFoto && (
         <Alert tone="warning" title="La foto no se pudo actualizar">
           {resultado.advertenciaFoto} El resto de los cambios sí se guardó.
+        </Alert>
+      )}
+      {resultado?.ok === true && resultado.advertenciaChoques && (
+        <Alert tone="warning" title="Choque de horario entre tus sedes">
+          {resultado.advertenciaChoques} No bloquea el guardado — pero revisa si es un error.
         </Alert>
       )}
 
@@ -276,99 +390,188 @@ export function FichaPublicaForm({
       </Card>
 
       <Card padding="spacious" className="space-y-4">
-        <SectionLabel>Sedes y zonas de cobertura</SectionLabel>
+        <SectionLabel>Cómo atiendes</SectionLabel>
+        {/* 10-nov-2026, pedido del usuario ("donde edita un medico sedes
+            horarios y ubicaciones y modalidad de consultas"): antes esto
+            solo se fijaba una vez en /registro y no había forma de
+            cambiarlo después. Mismos checkboxes, mismos nombres de campo
+            (`modalidad_<ID>`) que ese formulario. */}
+        <div className="flex flex-wrap gap-4">
+          {MODALIDADES_ATENCION.map((m) => (
+            <label key={m} className="flex items-center gap-2 text-sm text-text-primary">
+              <input type="checkbox" name={`modalidad_${m}`} defaultChecked={modalidadesActuales.includes(m)} />
+              {LABEL_MODALIDAD[m]}
+            </label>
+          ))}
+        </div>
+        <p className="text-caption text-text-faint">
+          Si desmarcas &quot;Presencial en consultorio&quot;, tus sedes dejan de usarse para agendar (pero no se borran).
+        </p>
+      </Card>
+
+      <Card padding="spacious" className="space-y-4">
+        <SectionLabel>Sedes</SectionLabel>
 
         {sedesOs.length > 0 && (
-          <fieldset className="space-y-4">
-            <legend className="sr-only">Ciudad de cada sede (para el Directorio)</legend>
+          <div className="space-y-4">
             <p className="text-caption text-text-secondary">
-              El municipio que usás para tu agenda y la ciudad del Directorio
-              son catálogos distintos — elegí acá la ciudad real donde aparece
-              cada sede en conxulty.com.
+              Esto es lo mismo que usa tu agenda — un cambio acá se refleja
+              ahí también. El municipio que usás para agendar y la ciudad
+              del Directorio son catálogos distintos, por eso hay dos
+              selectores de ubicación por sede.
             </p>
             {sedesOs.map((sede) => (
-              <div key={sede.id} className="rounded-input border border-border p-3">
-                <label className={LABEL} htmlFor={`ciudadSede_${sede.id}`}>
-                  {sede.direccion} <span className="text-text-faint">({sede.municipio})</span>
-                </label>
-                <select
-                  id={`ciudadSede_${sede.id}`}
-                  name={`ciudadSede_${sede.id}`}
-                  defaultValue={ciudadPorDireccion.get(sede.direccion) ?? ""}
-                  className={SELECT_CLASES}
-                >
-                  <option value="">Sin elegir — no aparece en el Directorio</option>
-                  {ciudades.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
+              <fieldset key={sede.id} className="space-y-3 rounded-input border border-border p-3">
+                <legend className="sr-only">Sede en {sede.direccion}</legend>
 
-                {/* 10-nov-2026: antes el Directorio no tenía de dónde sacar
-                    esto — la ficha caía a mostrar solo la dirección. */}
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className={LABEL} htmlFor={`consultorioSede_${sede.id}`}>
-                      Piso / consultorio (opcional)
+                    <label className={LABEL} htmlFor={`sedeOs_${sede.id}_municipio`}>
+                      Municipio
                     </label>
-                    <Input
-                      id={`consultorioSede_${sede.id}`}
-                      name={`consultorioSede_${sede.id}`}
-                      placeholder="Ej.: Piso 3, consultorio 302"
-                      defaultValue={consultorioPorDireccion.get(sede.direccion) ?? ""}
-                    />
+                    <select
+                      id={`sedeOs_${sede.id}_municipio`}
+                      name={`sedeOs_${sede.id}_municipio`}
+                      defaultValue={sede.municipio}
+                      className={SELECT_CLASES}
+                    >
+                      {MUNICIPIOS_TRUJILLO.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className={LABEL} htmlFor={`sectorSede_${sede.id}`}>
-                      Sector (opcional)
+                    <label className={LABEL} htmlFor={`sedeOs_${sede.id}_telefono`}>
+                      Teléfono (opcional)
                     </label>
                     <Input
-                      id={`sectorSede_${sede.id}`}
-                      name={`sectorSede_${sede.id}`}
-                      placeholder="Ej.: Las Acacias"
-                      defaultValue={sectorPorDireccion.get(sede.direccion) ?? ""}
+                      id={`sedeOs_${sede.id}_telefono`}
+                      name={`sedeOs_${sede.id}_telefono`}
+                      defaultValue={sede.telefono ?? ""}
                     />
                   </div>
                 </div>
-
-                <div className="mt-3">
-                  <MapaSede
-                    sedeId={sede.id}
-                    etiqueta={sede.direccion}
-                    lat={puntoPorDireccion.get(sede.direccion)?.lat ?? null}
-                    lng={puntoPorDireccion.get(sede.direccion)?.lng ?? null}
+                <div>
+                  <label className={LABEL} htmlFor={`sedeOs_${sede.id}_direccion`}>
+                    Dirección
+                  </label>
+                  <Input
+                    id={`sedeOs_${sede.id}_direccion`}
+                    name={`sedeOs_${sede.id}_direccion`}
+                    defaultValue={sede.direccion}
                   />
                 </div>
-              </div>
-            ))}
-          </fieldset>
-        )}
+                <div>
+                  <label className={LABEL} htmlFor={`sedeOs_${sede.id}_referencia`}>
+                    Referencia (opcional)
+                  </label>
+                  <Input
+                    id={`sedeOs_${sede.id}_referencia`}
+                    name={`sedeOs_${sede.id}_referencia`}
+                    defaultValue={sede.referencia ?? ""}
+                  />
+                </div>
+                <HorarioSedeFields prefijoSede={`sedeOs_${sede.id}`} horarioActual={sede.horario} />
 
-        {atiendeDomicilio && (
-          <div className={sedesOs.length > 0 ? "border-t border-border pt-4" : ""}>
-            <label className={LABEL} htmlFor="zonasCobertura">
-              Zonas de cobertura a domicilio
-            </label>
-            <select
-              id="zonasCobertura"
-              name="zonasCobertura"
-              multiple
-              size={8}
-              defaultValue={zonasCobertura}
-              className={SELECT_CLASES}
-            >
-              {MUNICIPIOS_TRUJILLO.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-caption text-text-faint">
-              Mantén Ctrl (o Cmd) presionado para elegir varios.
-            </p>
+                <div className="border-t border-border pt-3">
+                  <label className={LABEL} htmlFor={`ciudadSede_${sede.id}`}>
+                    Ciudad en el Directorio (conxulty.com)
+                  </label>
+                  <select
+                    id={`ciudadSede_${sede.id}`}
+                    name={`ciudadSede_${sede.id}`}
+                    defaultValue={ciudadPorDireccion.get(sede.direccion) ?? ""}
+                    className={SELECT_CLASES}
+                  >
+                    <option value="">Sin elegir — no aparece en el Directorio</option>
+                    {ciudades.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className={LABEL} htmlFor={`consultorioSede_${sede.id}`}>
+                        Piso / consultorio (opcional)
+                      </label>
+                      <Input
+                        id={`consultorioSede_${sede.id}`}
+                        name={`consultorioSede_${sede.id}`}
+                        placeholder="Ej.: Piso 3, consultorio 302"
+                        defaultValue={consultorioPorDireccion.get(sede.direccion) ?? ""}
+                      />
+                    </div>
+                    <div>
+                      <label className={LABEL} htmlFor={`sectorSede_${sede.id}`}>
+                        Sector (opcional)
+                      </label>
+                      <Input
+                        id={`sectorSede_${sede.id}`}
+                        name={`sectorSede_${sede.id}`}
+                        placeholder="Ej.: Las Acacias"
+                        defaultValue={sectorPorDireccion.get(sede.direccion) ?? ""}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <MapaSede
+                      sedeId={sede.id}
+                      etiqueta={sede.direccion}
+                      lat={puntoPorDireccion.get(sede.direccion)?.lat ?? null}
+                      lng={puntoPorDireccion.get(sede.direccion)?.lng ?? null}
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 border-t border-border pt-3 text-sm text-danger-text">
+                  <input type="checkbox" name={`sedeOs_${sede.id}_eliminar`} />
+                  Eliminar esta sede
+                </label>
+              </fieldset>
+            ))}
           </div>
         )}
+
+        {espaciosNuevaSede > 0 && (
+          <details className="group rounded-input border border-dashed border-border p-3">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-button border border-brand-primary px-4 py-2 text-body-secondary font-semibold text-brand-primary hover:bg-brand-primary-soft [&::-webkit-details-marker]:hidden">
+              + Agregar sede
+            </summary>
+            <div className="mt-3 space-y-3">
+              {Array.from({ length: espaciosNuevaSede }, (_, i) => (
+                <SedeNuevaFields key={i} numero={i + 1} />
+              ))}
+            </div>
+          </details>
+        )}
+
+        <div className="border-t border-border pt-4">
+          <label className={LABEL} htmlFor="zonasCobertura">
+            Zonas de cobertura a domicilio
+          </label>
+          <select
+            id="zonasCobertura"
+            name="zonasCobertura"
+            multiple
+            size={8}
+            defaultValue={zonasCobertura}
+            className={SELECT_CLASES}
+          >
+            {MUNICIPIOS_TRUJILLO.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-caption text-text-faint">
+            Solo se usa si marcaste &quot;A domicilio&quot; arriba. Mantén Ctrl (o Cmd) presionado para elegir varias.
+          </p>
+        </div>
         {/* 10-nov-2026: "Disponibilidad" se saca de acá — pedido del
             usuario tras confirmar que esa columna nunca se imprime en
             ningún lado de la ficha pública (medico/[slug]/+page.svelte,

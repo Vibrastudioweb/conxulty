@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
 import {
@@ -9,6 +10,39 @@ import {
   obtenerFichaDirectorio,
 } from "@/modules/directorio/sincronizacion";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
+import { MODALIDADES_ATENCION, type ModalidadAtencionId } from "@/modules/onboarding/modalidades";
+import {
+  leerHorarioSedeDeFormData,
+  detectarChoquesHorarioSedes,
+  type HorarioDia,
+  type ChoqueHorario,
+} from "@/modules/onboarding/horarioSede";
+
+// 10-nov-2026, pedido del usuario ("donde edita un medico sedes horarios y
+// ubicaciones y modalidad de consultas"): hasta ahora NO HABÍA pantalla
+// para esto — `Sede` solo se creaba una vez en /registro (nunca se
+// actualizaba ni se borraba) y `Medico.modalidades` tampoco se tocaba
+// después. Esta pantalla ("Mi ficha pública") ya editaba lo que el
+// Directorio necesita de cada sede (ciudad, consultorio/sector, mapa);
+// ahora también edita la sede real del OS — mismo patrón de campos y
+// límite que /registro (SEDES_MAX, horario por día, choque de horario).
+const SEDES_MAX = 3;
+
+function leerSedeDeFormData(
+  formData: FormData,
+  prefijo: string,
+): { municipio: string; direccion: string; referencia: string | null; telefono: string | null; horario: HorarioDia[] } | null {
+  const municipio = vacio(formData.get(`${prefijo}_municipio`));
+  const direccion = vacio(formData.get(`${prefijo}_direccion`));
+  if (!municipio || !direccion) return null;
+  return {
+    municipio,
+    direccion,
+    referencia: vacio(formData.get(`${prefijo}_referencia`)) ?? null,
+    telefono: vacio(formData.get(`${prefijo}_telefono`)) ?? null,
+    horario: leerHorarioSedeDeFormData(formData, prefijo),
+  };
+}
 
 const fichaPublicaSchema = z.object({
   descripcion: z.string().trim().max(2000).optional(),
@@ -70,9 +104,22 @@ function leerAseguradorasDeFormData(formData: FormData): string[] {
 }
 
 export type GuardarFichaPublicaResultado =
-  | { ok: true; slug: string; advertenciaFoto?: string }
+  | { ok: true; slug: string; advertenciaFoto?: string; advertenciaChoques?: string }
   | { ok: false; error: string }
   | null;
+
+/** Mismo criterio que `detectarChoquesHorarioSedes` en /registro — es una
+ *  ADVERTENCIA (no bloquea guardar), solo que acá sí se le avisa al
+ *  médico (en /registro quedó como "NOT NOW" por falta de pantalla donde
+ *  mostrarla después de crear la cuenta; acá esta misma pantalla ya tiene
+ *  un slot de Alert para advertencias, ver advertenciaFoto). */
+function mensajeChoques(choques: ChoqueHorario[]): string | undefined {
+  if (choques.length === 0) return undefined;
+  const primero = choques[0];
+  const resto = choques.length - 1;
+  const base = `${primero.sedeA} y ${primero.sedeB} se solapan el ${primero.dia} (${primero.horaInicioA}–${primero.horaFinA} vs. ${primero.horaInicioB}–${primero.horaFinB}).`;
+  return resto > 0 ? `${base} Hay ${resto} choque(s) más entre tus sedes.` : base;
+}
 
 function vacio(valor: FormDataEntryValue | null): string | undefined {
   const texto = valor?.toString().trim();
@@ -116,14 +163,24 @@ export async function guardarFichaPublicaAction(
     .map(String)
     .filter((z) => (MUNICIPIOS_TRUJILLO as readonly string[]).includes(z));
 
-  const [organizacion, medicoCompleto, sedes] = await Promise.all([
+  // 10-nov-2026: las modalidades ahora se editan en esta misma pantalla
+  // (antes solo se fijaban una vez en /registro y nunca más se tocaban) —
+  // vienen del form, no de lo que ya tenía guardado `Medico`.
+  const modalidadesNuevas: ModalidadAtencionId[] = MODALIDADES_ATENCION.filter(
+    (m) => formData.get(`modalidad_${m}`) === "on",
+  );
+  if (modalidadesNuevas.length === 0) {
+    return { ok: false, error: "Marca al menos una forma en la que atiendes (presencial, a domicilio u online)." };
+  }
+
+  const [organizacion, medicoCompleto, sedesActuales] = await Promise.all([
     prisma.organizacion.findUniqueOrThrow({
       where: { id: session.user.organizacionId },
       select: { id: true, nombre: true, fichaDirectorioId: true },
     }),
     prisma.medico.findUniqueOrThrow({
       where: { id: medico.id },
-      select: { profesion: true, numeroMpps: true, numeroColegiado: true, modalidades: true, zonasCobertura: true },
+      select: { profesion: true, numeroMpps: true, numeroColegiado: true },
     }),
     prisma.sede.findMany({
       where: { medicoId: medico.id },
@@ -135,9 +192,85 @@ export async function guardarFichaPublicaAction(
   // changelog punto 87: ya no hace falta mapear/validar la modalidad acá —
   // las tres booleanas viajan tal cual, cualquier combinación (incluida
   // solo ONLINE) es representable del lado del Directorio.
-  const atiendePresencial = medicoCompleto.modalidades.includes("PRESENCIAL");
-  const atiendeDomicilio = medicoCompleto.modalidades.includes("DOMICILIO");
-  const atiendeOnline = medicoCompleto.modalidades.includes("ONLINE");
+  const atiendePresencial = modalidadesNuevas.includes("PRESENCIAL");
+  const atiendeDomicilio = modalidadesNuevas.includes("DOMICILIO");
+  const atiendeOnline = modalidadesNuevas.includes("ONLINE");
+
+  // 10-nov-2026 — mismo pedido ("donde edita un medico sedes horarios y
+  // ubicaciones y modalidad de consultas"): cada sede ya creada se puede
+  // editar o eliminar (`sedeOs_<id>_eliminar`), y se pueden agregar nuevas
+  // (`sedeNueva1.._municipio` etc., hasta SEDES_MAX) — mismos nombres de
+  // campo y misma validación que /registro, para reusar `leerSedeDeFormData`.
+  const idsAEliminar = sedesActuales
+    .filter((s) => formData.get(`sedeOs_${s.id}_eliminar`) === "on")
+    .map((s) => s.id);
+  const sedesMantenidas = sedesActuales.filter((s) => !idsAEliminar.includes(s.id));
+
+  for (const sede of sedesMantenidas) {
+    const editada = leerSedeDeFormData(formData, `sedeOs_${sede.id}`);
+    if (!editada) {
+      return { ok: false, error: "Completa municipio y dirección de todas tus sedes (o elimínalas)." };
+    }
+  }
+
+  const espacioDisponible = Math.max(0, SEDES_MAX - sedesMantenidas.length);
+  const sedesNuevas: ReturnType<typeof leerSedeDeFormData>[] = [];
+  for (let i = 1; i <= SEDES_MAX && sedesNuevas.length < espacioDisponible; i++) {
+    const nueva = leerSedeDeFormData(formData, `sedeNueva${i}`);
+    if (nueva) sedesNuevas.push(nueva);
+  }
+
+  if (atiendePresencial && sedesMantenidas.length === 0 && sedesNuevas.length === 0) {
+    return { ok: false, error: "Agrega al menos una sede para la modalidad presencial (o desmarca esa modalidad)." };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (idsAEliminar.length > 0) {
+      await tx.sede.deleteMany({ where: { id: { in: idsAEliminar }, medicoId: medico.id } });
+    }
+    for (const sede of sedesMantenidas) {
+      const editada = leerSedeDeFormData(formData, `sedeOs_${sede.id}`)!;
+      await tx.sede.update({
+        where: { id: sede.id },
+        data: {
+          municipio: editada.municipio,
+          direccion: editada.direccion,
+          referencia: editada.referencia,
+          telefono: editada.telefono,
+          horario: editada.horario as unknown as Prisma.InputJsonValue,
+        },
+      });
+    }
+    for (const nueva of sedesNuevas) {
+      await tx.sede.create({
+        data: {
+          medicoId: medico.id,
+          organizacionId: organizacion.id,
+          municipio: nueva!.municipio,
+          direccion: nueva!.direccion,
+          referencia: nueva!.referencia,
+          telefono: nueva!.telefono,
+          horario: nueva!.horario as unknown as Prisma.InputJsonValue,
+        },
+      });
+    }
+  });
+
+  // Se recarga completa (no se arma a mano con lo de arriba) porque las
+  // sedes nuevas recién ahí consiguen su `id` real — hace falta para
+  // emparejar `ciudadSede_<id>` más abajo y para pintar la pantalla si
+  // esto se re-renderizara sin recargar.
+  const sedesFinal = await prisma.sede.findMany({
+    where: { medicoId: medico.id },
+    select: { id: true, direccion: true, referencia: true, telefono: true, horario: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const advertenciaChoques = mensajeChoques(
+    detectarChoquesHorarioSedes(
+      sedesFinal.map((s) => ({ nombre: s.direccion, horario: s.horario as unknown as HorarioDia[] })),
+    ),
+  );
 
   // 10-nov-2026: cédula, MPPS, colegiado, especialidad secundaria y zonas
   // de cobertura ya no se piden en el registro — este formulario es ahora
@@ -158,6 +291,7 @@ export async function guardarFichaPublicaAction(
       numeroMpps: numeroMppsNuevo,
       especialidadesSecundarias: especialidadesSecundariasNuevas,
       zonasCobertura: zonasCoberturaNuevas,
+      modalidades: modalidadesNuevas,
     },
   });
 
@@ -189,7 +323,7 @@ export async function guardarFichaPublicaAction(
     return Number.isFinite(numero) ? numero : null;
   }
 
-  const sedesConCiudad = sedes
+  const sedesConCiudad = sedesFinal
     .map((sede: SedeOs): SedeConCiudad | null => {
       const ciudadId = vacio(formData.get(`ciudadSede_${sede.id}`));
       if (!ciudadId) return null;
@@ -206,7 +340,7 @@ export async function guardarFichaPublicaAction(
     })
     .filter((s: SedeConCiudad | null): s is SedeConCiudad => s !== null);
 
-  if (atiendePresencial && sedesConCiudad.length === 0 && sedes.length > 0) {
+  if (atiendePresencial && sedesConCiudad.length === 0 && sedesFinal.length > 0) {
     return {
       ok: false,
       error: "Elige la ciudad del Directorio para al menos una de tus sedes antes de guardar.",
@@ -269,5 +403,5 @@ export async function guardarFichaPublicaAction(
     if (!subida.ok) advertenciaFoto = subida.error;
   }
 
-  return { ok: true, slug: resultado.slug, advertenciaFoto };
+  return { ok: true, slug: resultado.slug, advertenciaFoto, advertenciaChoques };
 }
