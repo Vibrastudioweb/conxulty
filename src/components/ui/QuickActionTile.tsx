@@ -7,21 +7,20 @@ import { ChevronRight } from "lucide-react";
  * 54) — reemplaza el botón de texto plano `QuickAction` solo en /hoy, que
  * era el único lugar que lo usaba. Es un `Link`, no un botón de acción:
  * navega, no ejecuta un formulario.
+ *
+ * Fondo sólido (10-nov-2026, "colores mas solidos y llamativos aca") —
+ * reemplaza el tinte suave *-soft, que en la fila de 3 tarjetas se veía
+ * apagado/casi sin color. Con fondo sólido, icono/título/subtítulo pasan a
+ * blanco (o casi) para mantener contraste; la flecha baja de opacidad en
+ * vez de usar text-faint, que no se lee sobre un fondo de marca.
  */
 export type QuickActionAccent = "indigo" | "green" | "amber" | "sky";
 
 const ACCENT_BG: Record<QuickActionAccent, string> = {
-  indigo: "bg-brand-primary-soft",
-  green: "bg-success-soft",
-  amber: "bg-warning-soft",
-  sky: "bg-info-soft",
-};
-
-const ACCENT_TEXT: Record<QuickActionAccent, string> = {
-  indigo: "text-brand-primary",
-  green: "text-success-text",
-  amber: "text-warning-text",
-  sky: "text-info-text",
+  indigo: "bg-brand-primary",
+  green: "bg-success",
+  amber: "bg-warning",
+  sky: "bg-info",
 };
 
 export function QuickActionTile({
@@ -40,16 +39,16 @@ export function QuickActionTile({
   return (
     <Link
       href={href}
-      className={`flex items-start justify-between gap-2 rounded-card px-4 py-3.5 transition hover:brightness-[0.97] focus:outline-none focus:ring-2 focus:ring-brand-primary ${ACCENT_BG[accent]}`}
+      className={`flex items-start justify-between gap-2 rounded-card px-4 py-3.5 text-white transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary ${ACCENT_BG[accent]}`}
     >
       <div className="flex items-start gap-3">
-        <Icon size={18} className={`mt-0.5 shrink-0 ${ACCENT_TEXT[accent]}`} aria-hidden="true" />
+        <Icon size={18} className="mt-0.5 shrink-0 text-white" aria-hidden="true" />
         <div>
-          <p className="text-body-secondary font-semibold text-text-primary">{title}</p>
-          <p className="mt-0.5 text-caption text-text-secondary">{subtitle}</p>
+          <p className="text-body-secondary font-semibold text-white">{title}</p>
+          <p className="mt-0.5 text-caption text-white/80">{subtitle}</p>
         </div>
       </div>
-      <ChevronRight size={16} className="mt-1 shrink-0 text-text-faint" aria-hidden="true" />
+      <ChevronRight size={16} className="mt-1 shrink-0 text-white/70" aria-hidden="true" />
     </Link>
   );
 }
