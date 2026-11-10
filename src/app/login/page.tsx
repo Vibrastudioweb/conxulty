@@ -28,9 +28,9 @@ async function autenticar(formData: FormData) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; creada?: string }>;
+  searchParams: Promise<{ error?: string; creada?: string; restablecida?: string }>;
 }) {
-  const { error, creada } = await searchParams;
+  const { error, creada, restablecida } = await searchParams;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
@@ -45,6 +45,11 @@ export default async function LoginPage({
             <Alert tone="success">
               Tu cuenta se creó correctamente — inicia sesión con tu correo y contraseña.
             </Alert>
+          </div>
+        )}
+        {restablecida && (
+          <div className="mt-4">
+            <Alert tone="success">Tu contraseña quedó actualizada — inicia sesión con la nueva.</Alert>
           </div>
         )}
 
@@ -75,6 +80,16 @@ export default async function LoginPage({
             Iniciar sesión
           </Button>
         </form>
+
+        {/* 10-nov-2026, pedido del usuario ("falta olvide usuario y olvide
+            contraseña"): el login es por correo — no hay un "usuario"
+            aparte que se pueda olvidar (ver Usuario.email @unique), así
+            que solo se agrega recuperación de contraseña. */}
+        <p className="mt-3 text-center text-sm">
+          <a href="/recuperar" className="text-brand-primary">
+            ¿Olvidaste tu contraseña?
+          </a>
+        </p>
       </Card>
 
       <p className="mt-4 text-center text-sm text-text-secondary">

@@ -68,9 +68,31 @@ model Usuario {
   movimientosRegistrados    MovimientoCaja[]         @relation("MovimientoRegistradoPor")
   registrosTrazabilidad     RegistroTrazabilidad[]   @relation("TrazabilidadActor")
   organizacion              Organizacion             @relation(fields: [organizacionId], references: [id])
+  tokensRecuperacion        TokenRecuperacion[]
 
   @@index([organizacionId])
   @@map("usuarios")
+}
+
+/// "Olvidé mi contraseña" (10-nov-2026, pedido del usuario: "falta olvide
+/// usuario y olvide contraseña" — el login es por correo, no hay un
+/// "usuario" separado que recuperar, así que esto cubre solo contraseña).
+/// Token de un solo uso, vida corta — igual que `tokenResena` en `Cita`
+/// (campo único, se consulta por igualdad; no se guarda hasheado porque
+/// vive poco y de un solo uso, mismo criterio que ese otro token). Se
+/// reemplaza/borra por completo en cada pedido nuevo del mismo usuario, no
+/// se acumulan tokens viejos sin usar.
+model TokenRecuperacion {
+  id         String   @id @default(cuid())
+  usuarioId  String
+  token      String   @unique
+  expiraEn   DateTime
+  usado      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("tokens_recuperacion")
 }
 
 /// Perfil de clínica o farmacia (changelog punto 90/92) — equivalente de
