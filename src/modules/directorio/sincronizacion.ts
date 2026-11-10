@@ -65,7 +65,11 @@ export interface DatosFichaDirectorio {
   sitioWeb?: string | null;
   rif?: string | null;
   domicilioFiscal?: string | null;
-  disponibilidad?: string | null;
+  // 10-nov-2026: `disponibilidad` se saca de acá — nunca se imprimía en
+  // la ficha pública (medico/[slug]/+page.svelte, vitalud, nunca la lee),
+  // así que era un campo que se mandaba sin ningún destino. La columna
+  // sigue existiendo del lado del Directorio (datos viejos intactos), ya
+  // no la escribe nadie.
   /** Task #13 — ver ServicioPrecioSincronizacion. */
   servicios?: ServicioPrecioSincronizacion[];
   /** Task #14 — texto libre, sin catálogo cerrado (ver AseguradorasForm.tsx). */

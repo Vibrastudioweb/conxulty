@@ -276,7 +276,7 @@ export function FichaPublicaForm({
       </Card>
 
       <Card padding="spacious" className="space-y-4">
-        <SectionLabel>Sedes y disponibilidad</SectionLabel>
+        <SectionLabel>Sedes y zonas de cobertura</SectionLabel>
 
         {sedesOs.length > 0 && (
           <fieldset className="space-y-4">
@@ -369,18 +369,12 @@ export function FichaPublicaForm({
             </p>
           </div>
         )}
-
-        <div className="border-t border-border pt-4">
-          <label className={LABEL} htmlFor="disponibilidad">
-            Disponibilidad (si atiendes a domicilio)
-          </label>
-          <Input
-            id="disponibilidad"
-            name="disponibilidad"
-            placeholder="Ej.: lunes a viernes, tardes"
-            defaultValue={ficha?.disponibilidad ?? ""}
-          />
-        </div>
+        {/* 10-nov-2026: "Disponibilidad" se saca de acá — pedido del
+            usuario tras confirmar que esa columna nunca se imprime en
+            ningún lado de la ficha pública (medico/[slug]/+page.svelte,
+            vitalud, nunca la lee), así que era un campo que se guardaba
+            sin ningún destino. Mismo cambio del lado de vitalud
+            (fichaProfesional.js, CAMPOS_SIMPLES). */}
       </Card>
 
       <Button type="submit" loading={pendiente} fullWidth size="lg">

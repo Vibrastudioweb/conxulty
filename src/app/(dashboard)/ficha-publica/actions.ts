@@ -17,7 +17,9 @@ const fichaPublicaSchema = z.object({
   sitioWeb: z.string().trim().max(500).optional(),
   rif: z.string().trim().max(40).optional(),
   domicilioFiscal: z.string().trim().max(300).optional(),
-  disponibilidad: z.string().trim().max(500).optional(),
+  // 10-nov-2026: "disponibilidad" se saca de acá y del formulario — nunca
+  // se imprimía en la ficha pública (confirmado en el código de vitalud),
+  // era un campo que se guardaba sin ningún destino.
   // 10-nov-2026: se sacaron del registro ("menos pasos") — ahora se
   // editan acá y se persisten en `Medico`, no solo se sincronizan.
   cedula: z.string().trim().max(40).optional(),
@@ -97,7 +99,6 @@ export async function guardarFichaPublicaAction(
     sitioWeb: vacio(formData.get("sitioWeb")),
     rif: vacio(formData.get("rif")),
     domicilioFiscal: vacio(formData.get("domicilioFiscal")),
-    disponibilidad: vacio(formData.get("disponibilidad")),
     cedula: vacio(formData.get("cedula")),
     numeroColegiado: vacio(formData.get("numeroColegiado")),
     numeroMpps: vacio(formData.get("numeroMpps")),
@@ -239,7 +240,6 @@ export async function guardarFichaPublicaAction(
     sitioWeb: parseo.data.sitioWeb ?? null,
     rif: parseo.data.rif ?? null,
     domicilioFiscal: parseo.data.domicilioFiscal ?? null,
-    disponibilidad: parseo.data.disponibilidad ?? null,
     servicios,
     aseguradoras,
     especialidadId: parseo.data.especialidadId ?? null,

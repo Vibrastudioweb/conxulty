@@ -151,7 +151,6 @@ export async function registrarMedicoAction(formData: FormData) {
     atiendeDomicilio: modalidades.includes("DOMICILIO"),
     atiendeOnline: modalidades.includes("ONLINE"),
     zonasCobertura,
-    disponibilidad: leerTexto(formData, "disponibilidad"),
     sedes: [],
   });
   if (resultadoSync.ok) {
