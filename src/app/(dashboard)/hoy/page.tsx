@@ -370,7 +370,13 @@ export default async function HoyPage() {
        * otras semanas, que el boceto no tenía; /agenda sigue sirviendo
        * para eso).
        */}
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
+      {/* Sin `lg:items-start`: las 3 columnas se estiran a la altura de la
+          más alta (grid por defecto), y la última tarjeta de cada una
+          lleva `flex-1` para absorber el resto — así ninguna columna deja
+          lienzo gris debajo, tenga los datos que tenga (ver cambio
+          10-nov-2026: con 0 citas las columnas quedaban de alturas muy
+          distintas y el fondo gris se notaba debajo de las más cortas). */}
+      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* Izquierda: accesos rápidos + cobros + reseñas recientes. */}
         <div className="lg:col-span-3 flex flex-col gap-5">
           <section>
@@ -400,7 +406,9 @@ export default async function HoyPage() {
             </div>
           </section>
 
-          <section className="rounded-card border border-border bg-surface px-4 py-3">
+          <section
+            className={`rounded-card border border-border bg-surface px-4 py-3 ${!resenas?.ok ? "flex flex-1 flex-col" : ""}`}
+          >
             <SectionLabel>Cobros</SectionLabel>
             <div className="mt-2">
               <p className="font-display text-page-title font-semibold text-text-primary">
@@ -423,7 +431,7 @@ export default async function HoyPage() {
           </section>
 
           {resenas?.ok && (
-            <section className="rounded-card border border-border bg-surface px-4 py-3">
+            <section className="flex flex-1 flex-col rounded-card border border-border bg-surface px-4 py-3">
               <div className="flex items-center justify-between">
                 <SectionLabel>Reseñas recientes</SectionLabel>
                 {resenas.promedio !== null && (
@@ -519,7 +527,7 @@ export default async function HoyPage() {
 
           <section
             id="actividad-del-mes"
-            className="rounded-card border border-border bg-surface px-4 py-3"
+            className="flex flex-1 flex-col rounded-card border border-border bg-surface px-4 py-3"
           >
             <SectionLabel>Actividad del mes</SectionLabel>
             <p className="mt-0.5 text-body-secondary text-text-faint">
@@ -527,7 +535,7 @@ export default async function HoyPage() {
               {citasDelMes.length === 1 ? "cita" : "citas"} en{" "}
               {ahora.toLocaleDateString("es", { month: "long" })}
             </p>
-            <div className="mt-2">
+            <div className="mt-2 flex flex-1 flex-col justify-center">
               <ActividadMensualChart datos={actividadDelMes} />
             </div>
           </section>
@@ -553,9 +561,9 @@ export default async function HoyPage() {
             </Link>
           </section>
 
-          <section className="rounded-card border border-border bg-surface px-4 py-3">
+          <section className="flex flex-1 flex-col rounded-card border border-border bg-surface px-4 py-3">
             <SectionLabel>Resumen de hoy</SectionLabel>
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid flex-1 grid-cols-2 content-center gap-3">
               <KpiCard
                 icon={CalendarDays}
                 label="Citas de hoy"
