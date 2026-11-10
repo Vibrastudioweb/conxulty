@@ -56,6 +56,12 @@ const cuerpoSchema = z.object({
   telefonoPaciente: z.string().trim().min(5).max(40),
   fechaHoraIso: z.string().min(1),
   motivo: z.string().trim().max(500).optional().nullable(),
+  // 10-nov-2026: antes el chip de modalidad elegido en AgendaCita.svelte
+  // viajaba metido en `motivo` porque este endpoint no tenía campo propio
+  // — la Cita siempre quedaba "PRESENCIAL" sin importar lo elegido. Ahora
+  // viaja aparte y `crearCitaPublicaPorFicha` la valida contra lo que el
+  // médico tiene activo (ver citasPublicas.ts).
+  modalidad: z.string().trim().max(20).optional().nullable(),
 });
 
 export async function POST(request: Request) {
@@ -82,6 +88,7 @@ export async function POST(request: Request) {
       telefonoPaciente: parseo.data.telefonoPaciente,
       fechaHora,
       motivo: parseo.data.motivo,
+      modalidad: parseo.data.modalidad,
     });
     return NextResponse.json({ ok: true, citaId: resultado.citaId, tokenResena: resultado.tokenResena });
   } catch (err) {

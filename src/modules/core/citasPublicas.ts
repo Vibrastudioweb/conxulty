@@ -1,8 +1,53 @@
 import crypto from "node:crypto";
+import type { ModalidadAtencion, ModalidadCita } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 import { crearPaciente } from "@/modules/core/pacientes";
 import { hayConflictoHorario, DURACION_MINUTOS_DEFECTO, CitaConflictoHorarioError } from "@/modules/core/citas";
+
+/**
+ * 10-nov-2026, pedido del usuario ("las modalidades que se activan en la
+ * ficha del médico son las que el médico active como disponibles con las
+ * que él trabaja"): hasta ahora `crearCitaPublicaPorFicha` fijaba
+ * `modalidad: "PRESENCIAL"` para TODA reserva del Directorio, sin
+ * importar si el paciente eligió "A domicilio" u "Online" en
+ * AgendaCita.svelte (ese valor se mandaba como `motivo`, nunca como la
+ * modalidad real de la Cita — ver comentario en ese componente, vitalud).
+ * Ahora la modalidad elegida viaja de verdad, mapeada al enum de Cita
+ * (`ModalidadCita` usa VIDEOCONSULTA donde el catálogo de atención del
+ * médico usa ONLINE — mismo concepto, nombre distinto en cada esquema) y
+ * SIEMPRE validada contra `Medico.modalidades` acá en el servidor: el
+ * Directorio ya solo muestra como chip las modalidades que el médico
+ * activó (ver `modalidadesDisponibles` en +page.svelte), pero nunca hay
+ * que confiar en lo que mande el cliente sin repetir ese chequeo del lado
+ * de adentro.
+ */
+const MODALIDAD_MEDICO_A_CITA: Record<ModalidadAtencion, ModalidadCita> = {
+  PRESENCIAL: "PRESENCIAL",
+  DOMICILIO: "DOMICILIO",
+  ONLINE: "VIDEOCONSULTA",
+};
+const MODALIDAD_PUBLICA_A_MEDICO: Record<string, ModalidadAtencion> = {
+  presencial: "PRESENCIAL",
+  domicilio: "DOMICILIO",
+  online: "ONLINE",
+};
+
+function resolverModalidadCita(
+  valorPublico: string | null | undefined,
+  modalidadesMedico: ModalidadAtencion[],
+): ModalidadCita {
+  const pedida = valorPublico ? MODALIDAD_PUBLICA_A_MEDICO[valorPublico.trim().toLowerCase()] : undefined;
+  const modalidadValida =
+    pedida && modalidadesMedico.includes(pedida)
+      ? pedida
+      : // Lo que mandaron no vino, no se reconoce, o el médico no lo tiene
+        // activo (desincronizado con lo que vio en la ficha, o manipulado)
+        // — se cae a la primera modalidad que el médico sí ofrece, nunca a
+        // PRESENCIAL a ciegas si ni siquiera la tiene marcada.
+        modalidadesMedico[0];
+  return MODALIDAD_MEDICO_A_CITA[modalidadValida ?? "PRESENCIAL"];
+}
 
 /**
  * Reserva pública de citas (Task #15, changelog punto 91/97) — la ÚNICA
@@ -49,13 +94,22 @@ async function resolverMedicoPorFicha(fichaDirectorioId: string) {
     where: { fichaDirectorioId },
     select: {
       id: true,
-      medicos: { select: { id: true, usuarioId: true }, take: 1, orderBy: { createdAt: "asc" } },
+      medicos: {
+        select: { id: true, usuarioId: true, modalidades: true },
+        take: 1,
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
   if (!organizacion) throw new FichaNoEncontradaError();
   const medico = organizacion.medicos[0];
   if (!medico) throw new FichaSinMedicoError();
-  return { organizacionId: organizacion.id, medicoId: medico.id, actorId: medico.usuarioId };
+  return {
+    organizacionId: organizacion.id,
+    medicoId: medico.id,
+    actorId: medico.usuarioId,
+    modalidades: medico.modalidades,
+  };
 }
 
 /**
@@ -101,8 +155,14 @@ export async function crearCitaPublicaPorFicha(input: {
   telefonoPaciente: string;
   fechaHora: Date;
   motivo?: string | null;
+  /** 'presencial' | 'domicilio' | 'online' — el `valor` que ya manda
+   *  AgendaCita.svelte (vitalud) para el chip de modalidad elegido, nunca
+   *  el enum de Prisma directo (ese vocabulario es interno del OS). */
+  modalidad?: string | null;
 }): Promise<{ citaId: string; tokenResena: string }> {
-  const { organizacionId, medicoId, actorId } = await resolverMedicoPorFicha(input.fichaDirectorioId);
+  const { organizacionId, medicoId, actorId, modalidades } = await resolverMedicoPorFicha(
+    input.fichaDirectorioId,
+  );
 
   const conflicto = await hayConflictoHorario({
     organizacionId,
@@ -120,6 +180,7 @@ export async function crearCitaPublicaPorFicha(input: {
   });
 
   const tokenResena = crypto.randomUUID();
+  const modalidad = resolverModalidadCita(input.modalidad, modalidades);
 
   const cita = await prisma.cita.create({
     data: {
@@ -128,7 +189,7 @@ export async function crearCitaPublicaPorFicha(input: {
       medicoId,
       fechaHora: input.fechaHora,
       duracionMinutos: DURACION_MINUTOS_DEFECTO,
-      modalidad: "PRESENCIAL",
+      modalidad,
       estado: "PENDIENTE",
       origen: "DIRECTORIO",
       motivo: input.motivo?.trim() || null,
