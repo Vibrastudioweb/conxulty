@@ -193,7 +193,7 @@ export function CitaCard({
   const contenidoCard = (
     <>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium text-text-primary">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
           {formatearRangoHora(cita.fechaHora, cita.duracionMinutos)} —{" "}
           {cita.paciente.nombre} {cita.paciente.apellido}
         </span>
