@@ -16,7 +16,8 @@ const ETIQUETA_PLAN: Record<"FICHA" | "PRO", string> = {
 /**
  * Cuenta personal en SPIDI, sin API ni webhook (changelog punto 89): esta
  * pantalla ES la confirmación de pago — se revisa el comprobante que el
- * médico mandó por WhatsApp contra lo que diga mispidi.com/consulta, y se
+ * médico adjuntó en /ajustes (10-nov-2026: ya no por WhatsApp, "no por
+ * whatsapp aca dentro") contra lo que diga mispidi.com/consulta, y se
  * confirma o rechaza acá a mano.
  */
 export default async function PagosPendientesPage() {
@@ -28,7 +29,7 @@ export default async function PagosPendientesPage() {
       <PageHeader
         eyebrow="Súper-admin"
         title="Pagos pendientes"
-        description="Confirma contra el comprobante que te mandaron por WhatsApp y lo que diga mispidi.com/consulta."
+        description="Confirma contra el comprobante adjunto y lo que diga mispidi.com/consulta."
       />
 
       {pagos.length === 0 ? (
@@ -59,6 +60,22 @@ export default async function PagosPendientesPage() {
                   <p className="font-semibold text-text-primary">
                     ${(p.montoCentavos / 100).toFixed(0)} · Plan {ETIQUETA_PLAN[p.plan]}
                   </p>
+                </div>
+
+                <div className="mt-3">
+                  {p.comprobanteDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- imagen inline (data: URI desde bytea), no un asset estático que next/image pueda optimizar.
+                    <img
+                      src={p.comprobanteDataUrl}
+                      alt={`Comprobante de pago de ${p.nombreOrganizacion}`}
+                      className="max-h-80 rounded-input border border-border object-contain"
+                    />
+                  ) : (
+                    <p className="text-caption text-text-faint">
+                      Sin comprobante adjunto (pago de antes de este cambio, o el médico no
+                      pudo subirlo).
+                    </p>
+                  )}
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">

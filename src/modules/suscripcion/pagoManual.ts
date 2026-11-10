@@ -17,17 +17,41 @@ export class YaHayPagoPendienteError extends Error {
   }
 }
 
+/** Tipos de imagen aceptados para el comprobante — capturas de pantalla
+ *  normales de un teléfono o de SPIDI en el navegador, nada más. */
+const TIPOS_COMPROBANTE_ACEPTADOS = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+]);
+
+export class ComprobanteInvalidoError extends Error {
+  constructor() {
+    super("El comprobante debe ser una imagen (PNG, JPG o WEBP).");
+    this.name = "ComprobanteInvalidoError";
+  }
+}
+
 /**
- * El médico confirma "ya pagué" después de pasar por SPIDI_LINK_PAGO. No
- * valida que el pago haya ocurrido de verdad — eso lo hace una persona en
- * /superadmin/pagos, viendo el comprobante que el médico manda aparte
- * (WhatsApp). Esto solo dispara ese flujo: crea el `Pago` en PENDIENTE y
- * deja la `Suscripcion` en PENDIENTE_CONFIRMACION.
+ * El médico confirma "ya pagué" después de pasar por SPIDI_LINK_PAGO,
+ * adjuntando la captura del comprobante en el mismo formulario (ver
+ * changelog 10-nov-2026 — antes se mandaba aparte por WhatsApp, pedido
+ * explícito del usuario: "no por whatsapp aca dentro"). No valida que el
+ * pago haya ocurrido de verdad — eso lo sigue haciendo una persona en
+ * /superadmin/pagos, ahora viendo el comprobante directo ahí en vez de en
+ * WhatsApp. Esto solo dispara ese flujo: crea el `Pago` en PENDIENTE
+ * (con el comprobante adjunto) y deja la `Suscripcion` en
+ * PENDIENTE_CONFIRMACION.
  */
 export async function registrarPagoRealizado(
   organizacionId: string,
   plan: "FICHA" | "PRO",
+  comprobante: { bytes: Buffer; tipo: string } | null,
 ) {
+  if (comprobante && !TIPOS_COMPROBANTE_ACEPTADOS.has(comprobante.tipo)) {
+    throw new ComprobanteInvalidoError();
+  }
+
   const suscripcion = await prisma.suscripcion.findUnique({
     where: { organizacionId },
     select: { id: true, estado: true },
@@ -52,6 +76,8 @@ export async function registrarPagoRealizado(
         plan,
         montoCentavos: PRECIO_CENTAVOS_USD[plan],
         estado: "PENDIENTE",
+        comprobante: comprobante?.bytes,
+        comprobanteTipo: comprobante?.tipo,
       },
     });
   });
@@ -66,6 +92,10 @@ export interface PagoPendienteVista {
   plan: "FICHA" | "PRO";
   montoCentavos: number;
   fecha: Date;
+  /** data: URI listo para <img src>, o null si el médico no adjuntó nada
+   *  (quedan algunos pagos viejos de antes de este campo, o alguien pudo
+   *  seguir mandándolo por WhatsApp si el upload le falló). */
+  comprobanteDataUrl: string | null;
 }
 
 export async function listarPagosPendientes(): Promise<PagoPendienteVista[]> {
@@ -78,6 +108,8 @@ export async function listarPagosPendientes(): Promise<PagoPendienteVista[]> {
       plan: true,
       montoCentavos: true,
       fecha: true,
+      comprobante: true,
+      comprobanteTipo: true,
       organizacion: {
         select: {
           nombre: true,
@@ -96,6 +128,10 @@ export async function listarPagosPendientes(): Promise<PagoPendienteVista[]> {
     organizacionId: p.organizacionId,
     nombreOrganizacion: p.organizacion.nombre,
     medicoNombre: p.organizacion.usuarios[0]?.nombre ?? null,
+    comprobanteDataUrl:
+      p.comprobante && p.comprobanteTipo
+        ? `data:${p.comprobanteTipo};base64,${Buffer.from(p.comprobante).toString("base64")}`
+        : null,
     medicoEmail: p.organizacion.usuarios[0]?.email ?? null,
     plan: p.plan,
     montoCentavos: p.montoCentavos,

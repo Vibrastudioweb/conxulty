@@ -778,6 +778,18 @@ model Pago {
   fecha          DateTime     @default(now())
   organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
   suscripcion    Suscripcion  @relation(fields: [suscripcionId], references: [id])
+  // 10-nov-2026: antes el médico mandaba la captura del comprobante por
+  // WhatsApp aparte ("no por whatsapp aca dentro" — pedido explícito del
+  // usuario). Ahora se adjunta en el mismo formulario de "Ya pagué" y
+  // queda guardada acá para que /superadmin/pagos la muestre directo, sin
+  // depender de un canal externo. Bytes en la propia fila (no un bucket
+  // de storage aparte): el volumen es bajo (un comprobante por pago,
+  // revisado a mano una sola vez) y evita sumar infraestructura nueva para
+  // esto. `comprobanteTipo` guarda el content-type real del archivo que
+  // subió el médico (image/png, image/jpeg, etc.) para poder re-servirlo
+  // con el tipo correcto.
+  comprobante     Bytes?
+  comprobanteTipo String?
 
   @@index([organizacionId, fecha])
   @@map("pagos")

@@ -17,9 +17,20 @@ const ETIQUETA_PLAN: Record<"FICHA" | "PRO", string> = {
   PRO: "Pro",
 };
 
-export default async function AjustesPage() {
+const MENSAJES_ERROR_COMPROBANTE: Record<string, string> = {
+  falta: "Adjunta la captura del comprobante antes de confirmar que pagaste.",
+  muy_grande: "La imagen pesa demasiado — máximo 3MB. Prueba con una captura de pantalla normal (no una foto de alta resolución).",
+  tipo_invalido: "El comprobante debe ser una imagen (PNG, JPG o WEBP).",
+};
+
+export default async function AjustesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ errorComprobante?: string }>;
+}) {
   const session = await requireMedico();
   const organizacionId = session.user.organizacionId;
+  const { errorComprobante } = await searchParams;
 
   const [suscripcion, medico, pagos] = await Promise.all([
     obtenerEstadoSuscripcion(organizacionId),
@@ -90,12 +101,17 @@ export default async function AjustesPage() {
       {suscripcion.planActual === "FICHA" && (
         <section className="mt-6">
           <h2 className="text-sm font-semibold text-text-primary">Subir a Pro</h2>
-          <div className="mt-3">
+          <div className="mt-3 space-y-3">
+            {errorComprobante && (
+              <Alert tone="danger">
+                {MENSAJES_ERROR_COMPROBANTE[errorComprobante] ?? "No se pudo registrar el pago."}
+              </Alert>
+            )}
+
             {suscripcion.estado === "PENDIENTE_CONFIRMACION" ? (
               <Alert tone="info" title="Revisando tu pago">
-                Nos avisaste que ya pagaste — en cuanto el equipo lo confirme
-                vas a quedar en Pro. Si no mandaste el comprobante todavía,
-                hazlo por WhatsApp para que no se demore.
+                Nos avisaste que ya pagaste y quedó tu comprobante guardado —
+                en cuanto el equipo lo confirme vas a quedar en Pro.
               </Alert>
             ) : !elegiblePro ? (
               <Card padding="spacious">
@@ -108,7 +124,8 @@ export default async function AjustesPage() {
                 <p className="text-body-secondary text-text-primary">
                   Paga <strong>{precioFormateado("PRO")}</strong> en SPIDI y
                   confirma acá abajo — todavía no hay cobro automático, así
-                  que el equipo revisa cada pago a mano.
+                  que el equipo revisa cada pago a mano contra el comprobante
+                  que adjuntes.
                 </p>
                 <ol className="mt-3 list-decimal space-y-1 pl-5 text-body-secondary text-text-secondary">
                   <li>
@@ -123,11 +140,26 @@ export default async function AjustesPage() {
                     </a>{" "}
                     y paga exactamente {precioFormateado("PRO")}.
                   </li>
-                  <li>Manda el comprobante por WhatsApp (botón de Soporte, abajo en el menú).</li>
-                  <li>Confirma acá que ya pagaste.</li>
+                  <li>Adjunta abajo la captura del comprobante y confirma.</li>
                 </ol>
-                <form action={confirmarPagoRealizadoAction} className="mt-4">
+                <form action={confirmarPagoRealizadoAction} className="mt-4 space-y-3">
                   <input type="hidden" name="plan" value="PRO" />
+                  <div>
+                    <label
+                      htmlFor="comprobante"
+                      className="mb-1 block text-sm font-medium text-text-primary"
+                    >
+                      Captura del comprobante
+                    </label>
+                    <input
+                      id="comprobante"
+                      name="comprobante"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      required
+                      className="block w-full text-sm text-text-secondary file:mr-3 file:rounded-button file:border file:border-brand-primary file:bg-transparent file:px-3 file:py-1.5 file:text-caption file:font-semibold file:text-brand-primary hover:file:bg-brand-primary-soft"
+                    />
+                  </div>
                   <Button type="submit" size="sm">
                     Ya pagué {precioFormateado("PRO")}
                   </Button>
