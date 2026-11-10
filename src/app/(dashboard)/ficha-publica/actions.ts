@@ -129,6 +129,17 @@ function vacio(valor: FormDataEntryValue | null): string | undefined {
   return texto ? texto : undefined;
 }
 
+// 10-nov-2026 (pedido del usuario: "si yo escribo vibra.ink eso debería
+// bastar, no ser bloqueante"): el médico normalmente escribe solo el
+// dominio (vibra.ink, www.vibra.ink) — anteponerle https:// acá es lo que
+// hace que el enlace sea clicable en la ficha pública (vitalud lo imprime
+// tal cual en un href). Si ya trae un protocolo (http:// o https://) se
+// deja igual, nunca se lo duplica.
+function normalizarSitioWeb(valor: string | undefined): string | null {
+  if (!valor) return null;
+  return /^https?:\/\//i.test(valor) ? valor : `https://${valor}`;
+}
+
 /**
  * Guarda los campos editables de "Mi ficha pública" y sincroniza TODO el
  * estado actual (no solo lo que cambió) con el Directorio — ver changelog
@@ -373,7 +384,7 @@ export async function guardarFichaPublicaAction(
     descripcion: parseo.data.descripcion ?? null,
     instagram: parseo.data.instagram ?? null,
     correo: parseo.data.correo ?? null,
-    sitioWeb: parseo.data.sitioWeb ?? null,
+    sitioWeb: normalizarSitioWeb(parseo.data.sitioWeb),
     rif: parseo.data.rif ?? null,
     domicilioFiscal: parseo.data.domicilioFiscal ?? null,
     servicios,
