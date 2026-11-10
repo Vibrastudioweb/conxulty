@@ -291,6 +291,22 @@ export default async function RegistroPage({
               Mantén Ctrl (o Cmd) presionado para elegir varios.
             </p>
           </div>
+
+          {/* 10-nov-2026: faltaba acá — se pedían zonas de cobertura para
+              domicilio pero nunca la disponibilidad, así que quedaba
+              huérfana hasta que el médico entraba manualmente a "Mi ficha
+              pública" a completarla (mismo campo, ver FichaPublicaForm.tsx).
+              Opcional, igual que ahí. */}
+          <div className="mt-4">
+            <label htmlFor="disponibilidad" className="mb-1 block text-sm text-text-primary">
+              Disponibilidad (si marcaste &quot;A domicilio&quot;)
+            </label>
+            <Input
+              id="disponibilidad"
+              name="disponibilidad"
+              placeholder="Ej.: lunes a viernes, tardes"
+            />
+          </div>
         </Card>
 
         <Card padding="spacious">
