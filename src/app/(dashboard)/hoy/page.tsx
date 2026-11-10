@@ -347,49 +347,46 @@ export default async function HoyPage({
             </section>
           )}
 
-          {hayCitas ? (
-            <section className="rounded-card border border-border bg-surface px-4 py-3">
-              <div className="flex items-baseline justify-between">
-                <SectionLabel>Agenda de hoy</SectionLabel>
-                <span className="text-caption text-text-faint">
-                  {citas.length} {citas.length === 1 ? "cita" : "citas"}
-                </span>
-              </div>
-              <ListaCitasSeleccionable
-                citas={citas.slice(0, 5)}
-                variant="row"
-                className="mt-2 divide-y divide-border"
-              />
-              {citas.length > 5 && (
+          {/* Misma tarjeta siempre (mismo tamaño, con o sin citas) — el
+              usuario pidió explícitamente que no cambie de forma según
+              haya o no citas, solo su contenido interno. */}
+          <section className="flex min-h-[220px] flex-col rounded-card border border-border bg-surface px-4 py-3">
+            <div className="flex items-baseline justify-between">
+              <SectionLabel>Agenda de hoy</SectionLabel>
+              <span className="text-caption text-text-faint">
+                {citas.length} {citas.length === 1 ? "cita" : "citas"}
+              </span>
+            </div>
+            {hayCitas ? (
+              <>
+                <ListaCitasSeleccionable
+                  citas={citas.slice(0, 5)}
+                  variant="row"
+                  className="mt-2 divide-y divide-border"
+                />
+                {citas.length > 5 && (
+                  <Link
+                    href="/agenda"
+                    className="mt-2 block rounded-button border border-border px-3 py-2 text-center text-caption font-semibold text-brand-primary transition hover:border-brand-primary hover:bg-brand-primary-soft"
+                  >
+                    Ver todas ({citas.length}) →
+                  </Link>
+                )}
+              </>
+            ) : (
+              <div className="mt-2 flex flex-1 flex-col items-center justify-center text-center">
+                <p className="text-body-secondary font-medium text-text-secondary">
+                  Sin consultas programadas para hoy.
+                </p>
                 <Link
-                  href="/agenda"
-                  className="mt-2 block rounded-button border border-border px-3 py-2 text-center text-caption font-semibold text-brand-primary transition hover:border-brand-primary hover:bg-brand-primary-soft"
+                  href="/pacientes/nuevo"
+                  className="mt-3 rounded-button border border-border px-4 py-2 text-caption font-semibold text-brand-primary transition hover:border-brand-primary hover:bg-brand-primary-soft"
                 >
-                  Ver todas ({citas.length}) →
+                  Registrar una consulta
                 </Link>
-              )}
-            </section>
-          ) : (
-            /* Estado vacío con presencia real (no una línea de texto suelta
-               en una caja delgada — ver changelog, regresión corregida el
-               mismo 10-nov-2026): esta es la sección que más espacio deja
-               cuando no hay citas, así que es la que más necesita llenar
-               bien ese espacio, con una acción real en vez de solo avisar. */
-            <section className="flex min-h-[220px] flex-col items-center justify-center rounded-card bg-brand-primary-soft px-6 py-8 text-center">
-              <p className="text-section-title font-semibold text-text-primary">
-                Tu agenda está despejada
-              </p>
-              <p className="mt-1 text-body-secondary text-text-secondary">
-                Hoy no tienes consultas programadas.
-              </p>
-              <Link
-                href="/pacientes/nuevo"
-                className="mt-4 rounded-button bg-brand-primary px-4 py-2 text-body-secondary font-semibold text-white transition hover:bg-brand-primary-hover"
-              >
-                Registrar una consulta
-              </Link>
-            </section>
-          )}
+              </div>
+            )}
+          </section>
 
           <section className="rounded-card border border-border bg-surface px-4 py-3">
             <SectionLabel>Actividad del mes</SectionLabel>
