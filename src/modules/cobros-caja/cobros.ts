@@ -201,3 +201,33 @@ export async function obtenerTotalCobradoDelDia(input: {
     total: Number(fila._sum.monto ?? 0),
   }));
 }
+
+/**
+ * Igual que `obtenerTotalCobradoDelDia`, pero en un rango arbitrario de
+ * fechas (10-nov-2026) — usado por "Cobros" en /hoy para el acumulado del
+ * mes en curso. Misma consulta, mismo criterio de exclusión de ANULADO,
+ * solo que el rango lo da quien llama en vez de calcularse como "el día
+ * de `fecha`".
+ */
+export async function obtenerTotalCobradoEnRango(input: {
+  organizacionId: string;
+  medicoId: string;
+  inicio: Date;
+  fin: Date;
+}): Promise<Array<{ moneda: string; total: number }>> {
+  const agrupado = await prisma.cobro.groupBy({
+    by: ["moneda"],
+    where: {
+      organizacionId: input.organizacionId,
+      medicoId: input.medicoId,
+      estado: { not: "ANULADO" },
+      fecha: { gte: input.inicio, lt: input.fin },
+    },
+    _sum: { monto: true },
+  });
+
+  return agrupado.map((fila) => ({
+    moneda: fila.moneda,
+    total: Number(fila._sum.monto ?? 0),
+  }));
+}

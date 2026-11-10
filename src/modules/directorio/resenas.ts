@@ -20,6 +20,18 @@ export type ResultadoResenasPendientes =
   | { ok: true; pendientes: ResenaPendiente[] }
   | { ok: false; error: string };
 
+export interface ResenaPublicada {
+  id: string;
+  nombre: string;
+  estrellas: number;
+  comentario: string | null;
+  created_at: string;
+}
+
+export type ResultadoResenasPublicadas =
+  | { ok: true; resenas: ResenaPublicada[]; promedio: number | null; total: number }
+  | { ok: false; error: string };
+
 export type ResultadoModerarResena = { ok: true } | { ok: false; error: string };
 
 function configuracion(): { base: string; secreto: string } | null {
@@ -48,6 +60,41 @@ export async function listarResenasPendientes(
     if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
     if (!cuerpo.ok) return { ok: false, error: cuerpo.error ?? "Error desconocido del Directorio." };
     return { ok: true, pendientes: cuerpo.pendientes ?? [] };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Error de red al contactar el Directorio." };
+  }
+}
+
+/**
+ * Últimas reseñas YA publicadas de una ficha, para "Reseñas recientes" en
+ * /hoy (10-nov-2026) — análoga a `listarResenasPendientes`, mismo patrón
+ * de llamada al Directorio vía secreto compartido, pero contra
+ * /api/resenas-publicadas en vez de /api/resenas-pendientes.
+ */
+export async function listarResenasPublicadas(
+  fichaDirectorioId: string,
+): Promise<ResultadoResenasPublicadas> {
+  const config = configuracion();
+  if (!config) {
+    return { ok: false, error: "DIRECTORIO_API_URL / CONXULTY_SYNC_SECRET no configurados en este entorno." };
+  }
+
+  try {
+    const url = new URL(`${config.base}/api/resenas-publicadas`);
+    url.searchParams.set("id", fichaDirectorioId);
+    const respuesta = await fetch(url, {
+      headers: { "x-conxulty-secret": config.secreto },
+      cache: "no-store",
+    });
+    const cuerpo = await respuesta.json().catch(() => null);
+    if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
+    if (!cuerpo.ok) return { ok: false, error: cuerpo.error ?? "Error desconocido del Directorio." };
+    return {
+      ok: true,
+      resenas: cuerpo.resenas ?? [],
+      promedio: cuerpo.promedio ?? null,
+      total: cuerpo.total ?? 0,
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Error de red al contactar el Directorio." };
   }

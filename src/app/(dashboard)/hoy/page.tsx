@@ -5,26 +5,31 @@ import {
   CalendarCheck2,
   CircleDollarSign,
   IdCard,
-  Star,
+  Plus,
   UserCheck,
-  UserPlus,
   Wallet,
 } from "lucide-react";
 import { auth } from "@/auth";
+import { prisma } from "@/db/client";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
 import {
   listarCitasDelDia,
   listarCitasDelDiaConDetalle,
   listarCitasEnRango,
 } from "@/modules/core/citas";
-import { obtenerTotalCobradoDelDia } from "@/modules/cobros-caja/cobros";
+import {
+  obtenerTotalCobradoDelDia,
+  obtenerTotalCobradoEnRango,
+} from "@/modules/cobros-caja/cobros";
+import { listarResenasPublicadas } from "@/modules/directorio/resenas";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { KpiCard, type KpiDelta } from "@/components/ui/KpiCard";
 import { QuickActionTile } from "@/components/ui/QuickActionTile";
 import { ActividadMensualChart } from "@/components/ui/ActividadMensualChart";
+import { CalendarioMes } from "@/components/ui/CalendarioMes";
+import { EstaSemanaBarras } from "@/components/ui/EstaSemanaBarras";
 import { CitaCard } from "@/components/citas/CitaCard";
 import { ListaCitasSeleccionable } from "@/components/citas/ListaCitasSeleccionable";
-import { TiraDiasSemana } from "@/components/citas/TiraDiasSemana";
 
 /** Títulos profesionales que anteceden al nombre real en `Usuario.nombre`
  *  (p.ej. "Dr. Demo Odontólogo", "Dra. Carolina Pérez") — si no se
@@ -44,7 +49,11 @@ function primerNombre(nombreCompleto: string | null | undefined): string {
   return primera ?? palabras[0] ?? "";
 }
 
-function formatearCobrosDelDia(
+/** Formatea un total de cobros (agrupado por moneda) a texto — se usa
+ *  tanto para el total del día como para el acumulado del mes, por eso el
+ *  nombre genérico (antes se llamaba `formatearCobrosDelDia`, pero ya no
+ *  es solo del día — ver changelog 10-nov-2026, tarjeta "Cobros"). */
+function formatearTotalesCobro(
   totales: Array<{ moneda: string; total: number }>,
 ): { value: string; hint?: string } {
   if (totales.length === 0) {
@@ -90,6 +99,53 @@ function agruparCitasPorDiaDelMes(
   });
 }
 
+const DIAS_UNA_LETRA = ["L", "M", "X", "J", "V", "S", "D"];
+
+function inicioDeSemana(fecha: Date): Date {
+  const copia = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // getDay(): 0=domingo..6=sábado — la semana empieza en lunes.
+  const diferencia = (copia.getDay() + 6) % 7;
+  copia.setDate(copia.getDate() - diferencia);
+  return copia;
+}
+
+/**
+ * Agrupa citas por día de ESTA semana (lunes a domingo) para "Esta
+ * semana" en barras (10-nov-2026) — mismo criterio que
+ * `agruparCitasPorDiaDelMes`, pero para 7 días en vez de todo el mes.
+ */
+function agruparCitasPorDiaDeSemana(
+  citas: Array<{ fechaHora: Date }>,
+  hoy: Date,
+): Array<{ letra: string; total: number; esHoy: boolean }> {
+  const inicio = inicioDeSemana(hoy);
+  const totalesPorDia = new Array(7).fill(0) as number[];
+  for (const cita of citas) {
+    const diferenciaDias = Math.floor(
+      (new Date(
+        cita.fechaHora.getFullYear(),
+        cita.fechaHora.getMonth(),
+        cita.fechaHora.getDate(),
+      ).getTime() -
+        inicio.getTime()) /
+        86_400_000,
+    );
+    if (diferenciaDias >= 0 && diferenciaDias < 7) {
+      totalesPorDia[diferenciaDias] += 1;
+    }
+  }
+
+  return DIAS_UNA_LETRA.map((letra, i) => {
+    const dia = new Date(inicio);
+    dia.setDate(inicio.getDate() + i);
+    return {
+      letra,
+      total: totalesPorDia[i],
+      esHoy: dia.toDateString() === hoy.toDateString(),
+    };
+  });
+}
+
 function formatearFechaLarga(fecha: Date): string {
   const texto = fecha.toLocaleDateString("es", {
     weekday: "long",
@@ -115,7 +171,7 @@ function calcularDelta(actual: number, anterior: number): KpiDelta {
 /** Delta de cobros contra ayer — usa únicamente la PRIMERA moneda que
  *  aparezca (hoy, o si hoy no cobró nada, la de ayer), para no mezclar
  *  monedas en una sola cifra ni inventar matemática multi-moneda (ver
- *  nota de `formatearCobrosDelDia` / punto 54: simplificación deliberada,
+ *  nota de `formatearTotalesCobro` / punto 54: simplificación deliberada,
  *  "sin complicarlo"). Si ninguno de los dos días tiene cobros, no hay
  *  moneda de referencia y el delta queda "Igual que ayer". */
 function calcularDeltaCobros(
@@ -139,11 +195,7 @@ function calcularDeltaCobros(
   };
 }
 
-export default async function HoyPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ semana?: string }>;
-}) {
+export default async function HoyPage() {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
@@ -179,66 +231,91 @@ export default async function HoyPage({
     ahora.getMonth() + 1,
     1,
   );
+  const inicioSemana = inicioDeSemana(ahora);
+  const inicioSemanaSiguiente = new Date(inicioSemana);
+  inicioSemanaSiguiente.setDate(inicioSemanaSiguiente.getDate() + 7);
 
-  // Paginación de "Esta semana" (ver changelog punto 54, TiraDiasSemana):
-  // solo cambia qué semana se dibuja en la tira lateral, no la agenda de
-  // abajo, que sigue siendo siempre la de "hoy".
-  const paramsBusqueda = await searchParams;
-  const offsetSemana = Number.parseInt(paramsBusqueda.semana ?? "0", 10) || 0;
-  const fechaReferenciaSemana = new Date(ahora);
-  fechaReferenciaSemana.setDate(
-    fechaReferenciaSemana.getDate() + offsetSemana * 7,
-  );
+  const organizacion = await prisma.organizacion.findUniqueOrThrow({
+    where: { id: session.user.organizacionId },
+    select: { fichaDirectorioId: true },
+  });
 
-  const [citas, cobrosDelDia, citasDelMes, citasAyer, cobrosAyer] =
-    await Promise.all([
-      listarCitasDelDiaConDetalle({
-        organizacionId: session.user.organizacionId,
-        medicoId: medico.id,
-        fecha: ahora,
-      }),
-      obtenerTotalCobradoDelDia({
-        organizacionId: session.user.organizacionId,
-        medicoId: medico.id,
-        fecha: ahora,
-      }),
-      listarCitasEnRango({
-        organizacionId: session.user.organizacionId,
-        medicoId: medico.id,
-        inicio: inicioMes,
-        fin: inicioMesSiguiente,
-      }),
-      listarCitasDelDia({
-        organizacionId: session.user.organizacionId,
-        medicoId: medico.id,
-        fecha: ayer,
-      }),
-      obtenerTotalCobradoDelDia({
-        organizacionId: session.user.organizacionId,
-        medicoId: medico.id,
-        fecha: ayer,
-      }),
-    ]);
+  const [
+    citas,
+    cobrosDelDia,
+    cobrosDelMes,
+    citasDelMes,
+    citasDeLaSemana,
+    citasAyer,
+    cobrosAyer,
+    resenas,
+  ] = await Promise.all([
+    listarCitasDelDiaConDetalle({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      fecha: ahora,
+    }),
+    obtenerTotalCobradoDelDia({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      fecha: ahora,
+    }),
+    obtenerTotalCobradoEnRango({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      inicio: inicioMes,
+      fin: inicioMesSiguiente,
+    }),
+    listarCitasEnRango({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      inicio: inicioMes,
+      fin: inicioMesSiguiente,
+    }),
+    listarCitasEnRango({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      inicio: inicioSemana,
+      fin: inicioSemanaSiguiente,
+    }),
+    listarCitasDelDia({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      fecha: ayer,
+    }),
+    obtenerTotalCobradoDelDia({
+      organizacionId: session.user.organizacionId,
+      medicoId: medico.id,
+      fecha: ayer,
+    }),
+    // "Reseñas recientes" (10-nov-2026): solo se pide al Directorio si ya
+    // hay ficha pública — sin fichaDirectorioId no hay nada que traer, y
+    // evita una llamada de red condenada a fallar.
+    organizacion.fichaDirectorioId
+      ? listarResenasPublicadas(organizacion.fichaDirectorioId)
+      : Promise.resolve(null),
+  ]);
 
   const actividadDelMes = agruparCitasPorDiaDelMes(
     citasDelMes,
     inicioMes,
     ahora.getDate(),
   );
+  const actividadDeLaSemana = agruparCitasPorDiaDeSemana(
+    citasDeLaSemana,
+    ahora,
+  );
 
   const proxima = citas.find(
     (cita) => cita.estado === "PENDIENTE" || cita.estado === "CONFIRMADA",
   );
-  // "Próximas citas" como sección propia desapareció en el rediseño
-  // 10-nov-2026: su contenido (lo que falta por pasar hoy) ya está
-  // cubierto por "Agenda de hoy", que ahora vive en la columna central
-  // en vez del panel lateral.
   const atendidas = citas.filter((cita) => cita.estado === "ATENDIDA").length;
   const pendientesConfirmar = citas.filter(
     (cita) => cita.estado === "PENDIENTE",
   ).length;
   const hayCitas = citas.length > 0;
-  const cobrosHoy = formatearCobrosDelDia(cobrosDelDia);
+  const cobrosHoy = formatearTotalesCobro(cobrosDelDia);
+  const cobrosMes = formatearTotalesCobro(cobrosDelMes);
 
   const atendidasAyer = citasAyer.filter(
     (cita) => cita.estado === "ATENDIDA",
@@ -255,83 +332,135 @@ export default async function HoyPage({
     pendientesConfirmarAyer,
   );
 
-  // "Nueva consulta sin cita" va directo a /pacientes/nuevo, no a
-  // /pacientes (punto 57): el usuario pidió un acceso DIRECTO desde /hoy,
-  // y aterrizar en la lista de pacientes todavía exigía un clic más
-  // ("+ Nuevo paciente") para llegar a donde la tile dice que lleva.
-  const accionesRapidas = (
-    <>
-      <QuickActionTile
-        href="/agenda"
-        icon={CalendarDays}
-        title="Ver agenda"
-        subtitle="Toda la semana"
-        accent="indigo"
-      />
-      <QuickActionTile
-        href="/pacientes/nuevo"
-        icon={UserPlus}
-        title="Nueva consulta sin cita"
-        subtitle="Registra un paciente ahora"
-        accent="green"
-      />
-      <QuickActionTile
-        href="/caja"
-        icon={Wallet}
-        title="Registrar cobro"
-        subtitle="Cobros y caja del día"
-        accent="amber"
-      />
-      <QuickActionTile
-        href="/ficha-publica"
-        icon={IdCard}
-        title="Mi ficha pública"
-        subtitle="Cómo te ven tus pacientes"
-        accent="sky"
-      />
-      <QuickActionTile
-        href="/resenas"
-        icon={Star}
-        title="Reseñas"
-        subtitle="Ver y moderar reseñas"
-        accent="indigo"
-      />
-    </>
-  );
-
   return (
     <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 lg:max-w-6xl lg:px-10 lg:py-12">
-      <header>
-        <h1 className="font-display text-page-title font-semibold tracking-tight text-text-primary lg:text-display">
-          {session.user.name
-            ? `Hola, ${primerNombre(session.user.name)}`
-            : "Hoy"}
-        </h1>
-        <p className="mt-1 text-body-secondary font-medium text-text-secondary lg:text-body">
-          {formatearFechaLarga(ahora)}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-page-title font-semibold tracking-tight text-text-primary lg:text-display">
+            {session.user.name
+              ? `Hola, ${primerNombre(session.user.name)}`
+              : "Hoy"}
+          </h1>
+          <p className="mt-1 text-body-secondary font-medium text-text-secondary lg:text-body">
+            {formatearFechaLarga(ahora)}
+          </p>
+        </div>
+        {/* "Nueva consulta sin cita" arriba en vez de ser una tile más de
+            accesos rápidos (10-nov-2026, ver boceto) — va directo a
+            /pacientes/nuevo, no a /pacientes (punto 57): el usuario pidió
+            un acceso DIRECTO desde /hoy. */}
+        <Link
+          href="/pacientes/nuevo"
+          className="inline-flex items-center gap-2 rounded-button bg-brand-primary px-4 py-2.5 text-body-secondary font-semibold text-white transition hover:bg-brand-primary-hover"
+        >
+          <Plus size={16} aria-hidden="true" />
+          Nueva consulta sin cita
+        </Link>
       </header>
 
       {/*
-       * Rediseño 10-nov-2026 (ver changelog): grid de 3 columnas en vez de
-       * fila de KPIs + fila gráfico/CTA + grid de acciones + sidebar
-       * aparte. Objetivo explícito del usuario: aprovechar el 100% de la
-       * pantalla sin espacios vacíos. No agrega NINGÚN dato ni consulta
-       * nueva — es la misma información de siempre (KPIs, agenda del día,
-       * actividad del mes, próxima consulta, tira de la semana, accesos
-       * rápidos), solo reordenada en columnas densas. "Pacientes
-       * atendidos"/"chart-row"/"Próximas citas" como secciones separadas
-       * desaparecen porque su contenido ya vive en "Agenda de hoy" y
-       * "Resumen de hoy" de abajo.
+       * Rediseño 10-nov-2026 (ver changelog): grid de 3 columnas, igual al
+       * boceto aprobado. Objetivo explícito del usuario: aprovechar el
+       * 100% de la pantalla sin espacios vacíos. Piezas nuevas construidas
+       * para igualar el boceto exacto (antes no existían): "Cobros" con
+       * acumulado del mes, "Reseñas recientes" (nueva llamada al
+       * Directorio, /api/resenas-publicadas), calendario de mes
+       * (`CalendarioMes`) y "Esta semana" en barras (`EstaSemanaBarras`,
+       * reemplaza la tira `TiraDiasSemana` — se pierde su paginación a
+       * otras semanas, que el boceto no tenía; /agenda sigue sirviendo
+       * para eso).
        */}
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
-        {/* Izquierda: accesos rápidos (mismas 5 tiles de siempre, ahora
-            agrupadas en su propia columna en vez de una fila debajo). */}
-        <div className="lg:col-span-3">
+        {/* Izquierda: accesos rápidos + cobros + reseñas recientes. */}
+        <div className="lg:col-span-3 flex flex-col gap-5">
           <section>
             <SectionLabel>Accesos rápidos</SectionLabel>
-            <div className="mt-2 grid grid-cols-1 gap-3">{accionesRapidas}</div>
+            <div className="mt-2 grid grid-cols-1 gap-3">
+              <QuickActionTile
+                href="/agenda"
+                icon={CalendarDays}
+                title="Ver agenda completa"
+                subtitle="Toda la semana"
+                accent="indigo"
+              />
+              <QuickActionTile
+                href="/caja"
+                icon={Wallet}
+                title="Registrar cobro"
+                subtitle="Cobros y caja del día"
+                accent="amber"
+              />
+              <QuickActionTile
+                href="/ficha-publica"
+                icon={IdCard}
+                title="Mi ficha pública"
+                subtitle="Cómo te ven tus pacientes"
+                accent="sky"
+              />
+            </div>
           </section>
+
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
+            <SectionLabel>Cobros</SectionLabel>
+            <div className="mt-2">
+              <p className="font-display text-page-title font-semibold text-text-primary">
+                {cobrosHoy.value}
+              </p>
+              <p className="mt-0.5 text-caption text-text-faint">
+                Hoy{deltaCobros.direccion !== "flat" && ` · ${deltaCobros.texto}`}
+                {deltaCobros.direccion === "flat" && " · igual que ayer"}
+              </p>
+            </div>
+            <div className="my-3 h-px bg-border" />
+            <div>
+              <p className="text-section-title font-semibold text-text-primary">
+                {cobrosMes.value}
+              </p>
+              <p className="mt-0.5 text-caption text-text-faint">
+                {ahora.toLocaleDateString("es", { month: "long" })}, acumulado
+              </p>
+            </div>
+          </section>
+
+          {resenas?.ok && (
+            <section className="rounded-card border border-border bg-surface px-4 py-3">
+              <div className="flex items-center justify-between">
+                <SectionLabel>Reseñas recientes</SectionLabel>
+                {resenas.promedio !== null && (
+                  <span className="text-caption font-semibold text-text-primary">
+                    {resenas.promedio.toFixed(1)} ★
+                  </span>
+                )}
+              </div>
+              {resenas.resenas.length === 0 ? (
+                <p className="mt-2 text-body-secondary text-text-faint">
+                  Todavía no tenés reseñas publicadas.
+                </p>
+              ) : (
+                <div className="mt-2 flex flex-col gap-2.5">
+                  {resenas.resenas.slice(0, 3).map((resena) => (
+                    <div key={resena.id}>
+                      <p className="text-caption font-semibold text-text-primary">
+                        {"★".repeat(resena.estrellas)}
+                        {"☆".repeat(5 - resena.estrellas)} {resena.nombre}
+                      </p>
+                      {resena.comentario && (
+                        <p className="mt-0.5 line-clamp-2 text-caption text-text-secondary">
+                          &quot;{resena.comentario}&quot;
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Link
+                href="/resenas"
+                className="mt-3 block text-caption font-semibold text-brand-primary hover:underline"
+              >
+                Ver todas las reseñas →
+              </Link>
+            </section>
+          )}
         </div>
 
         {/* Centro: la jornada de hoy — próxima consulta, agenda completa
@@ -388,7 +517,10 @@ export default async function HoyPage({
             )}
           </section>
 
-          <section className="rounded-card border border-border bg-surface px-4 py-3">
+          <section
+            id="actividad-del-mes"
+            className="rounded-card border border-border bg-surface px-4 py-3"
+          >
             <SectionLabel>Actividad del mes</SectionLabel>
             <p className="mt-0.5 text-body-secondary text-text-faint">
               {citasDelMes.length}{" "}
@@ -401,20 +533,24 @@ export default async function HoyPage({
           </section>
         </div>
 
-        {/* Derecha: tira de la semana + resumen del día (los mismos 4 KPIs
-            de siempre, solo que ahora en su propia columna sticky en vez
-            de una fila horizontal arriba de todo). */}
+        {/* Derecha: calendario de mes + esta semana (en barras) + resumen
+            del día (los mismos 4 KPIs de siempre). */}
         <aside className="lg:col-span-3 lg:sticky lg:top-8 flex flex-col gap-5">
           <section className="rounded-card border border-border bg-surface px-4 py-3">
+            <CalendarioMes hoy={ahora} />
+          </section>
+
+          <section className="rounded-card border border-border bg-surface px-4 py-3">
             <SectionLabel>Esta semana</SectionLabel>
-            <div className="mt-2">
-              <TiraDiasSemana
-                hoy={ahora}
-                fechaReferencia={fechaReferenciaSemana}
-                hrefSemanaAnterior={`/hoy?semana=${offsetSemana - 1}`}
-                hrefSemanaSiguiente={`/hoy?semana=${offsetSemana + 1}`}
-              />
+            <div className="mt-3">
+              <EstaSemanaBarras datos={actividadDeLaSemana} />
             </div>
+            <Link
+              href="#actividad-del-mes"
+              className="mt-3 block text-caption font-semibold text-brand-primary hover:underline"
+            >
+              Ver actividad del mes →
+            </Link>
           </section>
 
           <section className="rounded-card border border-border bg-surface px-4 py-3">
