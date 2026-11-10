@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -195,6 +196,20 @@ export function FichaPublicaForm({
     guardarFichaPublicaAction,
     null,
   );
+
+  // 10-nov-2026 (bug encontrado probando: el usuario reportó "le di a
+  // publicar, se borró el formulario y no la veo en el directorio" — en
+  // realidad SÍ se guardaba bien, pero esta pantalla no volvía a pedirle
+  // al servidor los datos reales después de guardar, así que seguía
+  // mostrando "Todavía no se publicó" y las modalidades sin marcar un
+  // instante eterno, aunque el banner de abajo ya dijera "Guardado").
+  // router.refresh() vuelve a traer los props reales (organizacion,
+  // medicoCompleto, etc.) sin perder este banner, que es estado de React,
+  // no de las props del servidor.
+  const router = useRouter();
+  useEffect(() => {
+    if (resultado?.ok) router.refresh();
+  }, [resultado, router]);
 
   // La foto no se manda como texto: se recorta/convierte a webp en el
   // navegador (RecortadorFoto) y se deja en este input oculto vía
