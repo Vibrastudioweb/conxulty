@@ -589,26 +589,22 @@ export function FichaPublicaForm({
 
         {atiendeDomicilio && (
           <div className="border-t border-border pt-4">
-            <label className={LABEL} htmlFor="zonasCobertura">
-              Zonas de cobertura a domicilio
-            </label>
-            <select
-              id="zonasCobertura"
-              name="zonasCobertura"
-              multiple
-              size={8}
-              defaultValue={zonasCobertura}
-              className={SELECT_CLASES}
-            >
+            <p className={LABEL}>Zonas de cobertura a domicilio</p>
+            {/* 10-nov-2026, pedido del usuario ("no me deja seleccionar
+                varias zonas de cobertura a domicilio"): el <select multiple>
+                de antes SÍ permitía varias, pero solo con Ctrl/Cmd+clic —
+                un clic normal reemplazaba la selección en vez de sumarla,
+                así que en la práctica no se sentía como "elegir varias".
+                Checkboxes (mismo patrón que las modalidades arriba) no
+                tienen ese problema: cada clic suma o saca una zona sola. */}
+            <div className="grid max-h-64 grid-cols-2 gap-x-4 gap-y-2 overflow-y-auto rounded-input border border-border p-3 sm:grid-cols-3">
               {MUNICIPIOS_TRUJILLO.map((m) => (
-                <option key={m} value={m}>
+                <label key={m} className="flex items-center gap-2 text-sm text-text-primary">
+                  <input type="checkbox" name="zonasCobertura" value={m} defaultChecked={zonasCobertura.includes(m)} />
                   {m}
-                </option>
+                </label>
               ))}
-            </select>
-            <p className="mt-1 text-caption text-text-faint">
-              Mantén Ctrl (o Cmd) presionado para elegir varias.
-            </p>
+            </div>
           </div>
         )}
         {/* 10-nov-2026: "Disponibilidad" se saca de acá — pedido del
