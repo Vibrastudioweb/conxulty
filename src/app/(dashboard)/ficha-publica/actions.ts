@@ -60,12 +60,13 @@ const fichaPublicaSchema = z.object({
   cedula: z.string().trim().max(40).optional(),
   numeroColegiado: z.string().trim().max(40).optional(),
   numeroMpps: z.string().trim().max(40).optional(),
+  // 10-nov-2026, corregido el mismo día: esto se había sacado del schema
+  // asumiendo que siempre llegaba de /registro — ya no es así, /registro
+  // se simplificó y esta pantalla volvió a ser la única donde se elige
+  // (ver FichaPublicaForm.tsx). El id real del catálogo del Directorio se
+  // sigue resolviendo solo, por texto, con `resolverEspecialidadId`.
+  especialidad: z.string().trim().max(160).optional(),
   especialidadSecundaria1: z.string().trim().max(160).optional(),
-  // 10-nov-2026: ya NO se pide acá (antes era un <select> manual) —
-  // pedido del usuario ("debería sincronizarse con la especialidad que el
-  // médico escoja en el onboarding"). El id real del catálogo del
-  // Directorio se resuelve solo, por texto, con `resolverEspecialidadId`
-  // (ver sincronizacion.ts) a partir de `Medico.especialidad`.
 });
 
 // Task #13: el médico edita la lista con ServiciosPreciosForm.tsx, que
@@ -163,6 +164,7 @@ export async function guardarFichaPublicaAction(
     cedula: vacio(formData.get("cedula")),
     numeroColegiado: vacio(formData.get("numeroColegiado")),
     numeroMpps: vacio(formData.get("numeroMpps")),
+    especialidad: vacio(formData.get("especialidad")),
     especialidadSecundaria1: vacio(formData.get("especialidadSecundaria1")),
   });
   if (!parseo.success) {
@@ -292,6 +294,7 @@ export async function guardarFichaPublicaAction(
   const numeroMppsNuevo =
     medicoCompleto.profesion === "MEDICO" ? parseo.data.numeroMpps ?? null : null;
   const zonasCoberturaNuevas = atiendeDomicilio ? zonasCoberturaForm : [];
+  const especialidadNueva = parseo.data.especialidad ?? null;
   const especialidadesSecundariasNuevas = parseo.data.especialidadSecundaria1
     ? [parseo.data.especialidadSecundaria1]
     : [];
@@ -302,6 +305,7 @@ export async function guardarFichaPublicaAction(
       cedula: parseo.data.cedula ?? null,
       numeroColegiado: parseo.data.numeroColegiado ?? null,
       numeroMpps: numeroMppsNuevo,
+      especialidad: especialidadNueva,
       especialidadesSecundarias: especialidadesSecundariasNuevas,
       zonasCobertura: zonasCoberturaNuevas,
       modalidades: modalidadesNuevas,
@@ -389,11 +393,12 @@ export async function guardarFichaPublicaAction(
     domicilioFiscal: parseo.data.domicilioFiscal ?? null,
     servicios,
     aseguradoras,
-    // 10-nov-2026: ya no lo elige el médico en esta pantalla — se resuelve
-    // solo a partir de lo que ya eligió en /registro (ver nota en el
-    // schema de arriba y en `resolverEspecialidadId`).
+    // 10-nov-2026: usa el valor recién guardado en este mismo submit (no
+    // `medicoCompleto.especialidad`, que es el de ANTES de este guardado) —
+    // si no hay match exacto en el catálogo del Directorio, la ficha queda
+    // sin especialidad ahí, no bloquea guardar.
     especialidadId: resolverEspecialidadId(
-      medicoCompleto.especialidad,
+      especialidadNueva,
       directorioActual.ok ? directorioActual.especialidades : [],
     ),
   });

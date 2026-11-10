@@ -41,6 +41,7 @@ export default async function FichaPublicaPage() {
         cedula: true,
         numeroMpps: true,
         numeroColegiado: true,
+        especialidad: true,
         especialidadesSecundarias: true,
         modalidades: true,
         zonasCobertura: true,
@@ -50,12 +51,11 @@ export default async function FichaPublicaPage() {
 
   const directorio = await obtenerFichaDirectorio(organizacion.fichaDirectorioId);
 
-  // 10-nov-2026: la especialidad ya NO se elige acá (antes había un
-  // <select> manual) — pedido del usuario ("debería sincronizarse con la
-  // especialidad que el médico escoja en el onboarding"). El id real del
-  // catálogo del Directorio se resuelve solo, por texto, al momento de
-  // guardar (ver `resolverEspecialidadId` y `guardarFichaPublicaAction` en
-  // actions.ts) — esta pantalla no necesita el catálogo para nada.
+  // 10-nov-2026 (corregido el mismo día): la especialidad PRINCIPAL se
+  // había sacado de acá asumiendo que siempre se elegía en /registro — ya
+  // no es así (/registro se simplificó: "poner todo lo demás en mi
+  // ficha"), así que un médico nuevo no tenía dónde elegirla nunca. Vuelve
+  // a ser un <select>/texto acá, igual que el que tenía /registro.
   const publicada = organizacion.fichaDirectorioSincronizada && Boolean(organizacion.fichaDirectorioSlug);
   const urlPublica = publicada ? `https://conxulty.com/medico/${organizacion.fichaDirectorioSlug}` : null;
 
@@ -129,6 +129,7 @@ export default async function FichaPublicaPage() {
           cedula={medicoCompleto.cedula}
           numeroMpps={medicoCompleto.numeroMpps}
           numeroColegiado={medicoCompleto.numeroColegiado}
+          especialidad={medicoCompleto.especialidad}
           especialidadesSecundarias={medicoCompleto.especialidadesSecundarias}
           zonasCobertura={medicoCompleto.zonasCobertura}
         />

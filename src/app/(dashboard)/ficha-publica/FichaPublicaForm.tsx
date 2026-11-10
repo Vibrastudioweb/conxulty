@@ -20,6 +20,7 @@ import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import { MODALIDADES_ATENCION, LABEL_MODALIDAD, type ModalidadAtencionId } from "@/modules/onboarding/modalidades";
 import { DIAS_SEMANA, type HorarioDia } from "@/modules/onboarding/horarioSede";
 import type { ProfesionId } from "@/modules/onboarding/profesiones";
+import { ESPECIALIDADES_MEDICAS } from "@/modules/consultas/plantillasEspecialidad";
 
 /** Mismo componente que `HorarioSedeFields` de /registro (page.tsx) — se
  *  copia en vez de compartirse porque ese vive en un Server Component y
@@ -167,6 +168,7 @@ export function FichaPublicaForm({
   cedula,
   numeroMpps,
   numeroColegiado,
+  especialidad,
   especialidadesSecundarias,
   zonasCobertura,
 }: {
@@ -189,6 +191,7 @@ export function FichaPublicaForm({
   cedula: string | null;
   numeroMpps: string | null;
   numeroColegiado: string | null;
+  especialidad: string | null;
   especialidadesSecundarias: string[];
   zonasCobertura: string[];
 }) {
@@ -350,19 +353,46 @@ export function FichaPublicaForm({
           <Input id="domicilioFiscal" name="domicilioFiscal" defaultValue={ficha?.domicilio_fiscal ?? ""} />
         </div>
 
-        {/* 10-nov-2026: antes había acá un <select> manual para elegir la
-            especialidad del Directorio (el OS guardaba `especialidad` como
-            texto libre y el Directorio usa catálogo cerrado). Pedido del
-            usuario ("debería sincronizarse con la especialidad que el
-            médico escoja en el onboarding"): ya no se vuelve a pedir — se
-            resuelve sola, por texto, a partir de la que eligió en
-            /registro (ver `resolverEspecialidadId` en sincronizacion.ts).
-            Si el texto no tiene match exacto en el catálogo del Directorio,
-            la ficha queda sin especialidad ahí (no rompe nada, no bloquea
-            guardar). */}
+        {/* 10-nov-2026, corregido el mismo día: esto vivía antes en /registro
+            (<select> para Médico, texto libre para el resto) — se sacó
+            asumiendo que la especialidad principal ya no hacía falta acá,
+            pero sin eso ningún médico nuevo tiene cómo elegirla en ningún
+            lado (rompe el badge de especialidad del Directorio y las
+            plantillas de consulta). Vuelve acá, con el mismo criterio por
+            profesión. El id real del catálogo del Directorio se sigue
+            resolviendo solo, por texto, al guardar (`resolverEspecialidadId`
+            en sincronizacion.ts) — si no hay match exacto, la ficha queda
+            sin especialidad ahí, no bloquea guardar. */}
+        <div>
+          {profesion === "MEDICO" ? (
+            <>
+              <label className={LABEL} htmlFor="especialidad">
+                Especialidad
+              </label>
+              <select
+                id="especialidad"
+                name="especialidad"
+                defaultValue={especialidad ?? ""}
+                className={SELECT_CLASES}
+              >
+                <option value="">— Selecciona —</option>
+                {ESPECIALIDADES_MEDICAS.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <>
+              <label className={LABEL} htmlFor="especialidad">
+                Especialidad (si eres Odontólogo, Psicólogo u Otra)
+              </label>
+              <Input id="especialidad" name="especialidad" placeholder="Ej.: Ortodoncia" defaultValue={especialidad ?? ""} />
+            </>
+          )}
+        </div>
 
-        {/* 10-nov-2026: cédula, MPPS, colegiado y especialidad secundaria se
-            sacaron del registro ("menos pasos") — se llenan/editan acá. */}
         <div className="border-t border-border pt-4">
           <p className={LABEL}>Credenciales</p>
           <div className="grid gap-4 sm:grid-cols-2">
