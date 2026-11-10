@@ -20,7 +20,12 @@ import {
  * y no puede llegar nunca a un Client Component.
  */
 
-export const DURACION_MINUTOS_DEFECTO = 30;
+// 09/11 — alineado a 60 (antes 30) a pedido del usuario: las consultas duran
+// 1h en la práctica, y el directorio público (conxulty.com, repo vitalud)
+// ya usa 60min como el tamaño de turno de su grilla de día×hora — con este
+// valor en 30 una reserva pública a las 9:00 no bloqueaba hasta las 10:00,
+// dejando un choque de horario sin detectar entre 9:30 y 10:00.
+export const DURACION_MINUTOS_DEFECTO = 60;
 /** Cota superior de duración usada para acotar la ventana de la consulta de
  *  conflictos (ver `hayConflictoHorario`). No es una regla de negocio, es
  *  una optimización: ninguna cita real dura más de 8 horas. */
