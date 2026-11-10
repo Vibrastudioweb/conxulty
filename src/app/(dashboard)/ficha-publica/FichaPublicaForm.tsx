@@ -312,7 +312,7 @@ export function FichaPublicaForm({
             <label className={LABEL} htmlFor="sitioWeb">
               Sitio web
             </label>
-            <Input id="sitioWeb" name="sitioWeb" type="url" placeholder="https://…" defaultValue={ficha?.sitio_web ?? ""} />
+            <Input id="sitioWeb" name="sitioWeb" placeholder="https://…" defaultValue={ficha?.sitio_web ?? ""} />
           </div>
           <div>
             <label className={LABEL} htmlFor="correo">
