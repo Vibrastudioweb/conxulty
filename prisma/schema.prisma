@@ -144,6 +144,14 @@ model Medico {
   cedula                  String?
   /// Solo aplica si `profesion` = MEDICO (ver changelog punto 29).
   numeroMpps              String?
+  /// WhatsApp público del médico (Directorio) — 10-nov-2026, "el único
+  /// teléfono que se debe pedir y existir es el whatsapp del médico, no
+  /// uno para cada sede": antes `Sede.telefono` se pedía por sede (varias
+  /// sedes de un mismo médico podían terminar con números distintos o
+  /// repetidos sin necesidad — es la misma persona contestando). Ahora
+  /// vive acá, una sola vez, y se manda igual (fanned out) a cada sede en
+  /// el sync con el Directorio para no tocar su esquema/gateo por sede.
+  telefonoPublico         String?
   especialidadesSecundarias String[]             @default([])
   /// Catálogo cerrado, multi-select — ver changelog punto 30 (addendum).
   modalidades             ModalidadAtencion[]    @default([])
@@ -177,7 +185,6 @@ model Sede {
   municipio      String
   direccion      String
   referencia     String?
-  telefono       String?
   /// Array de 7 entradas { dia, atiende, horaInicio, horaFin } — ver
   /// changelog punto 33. Se guarda como JSON (no una tabla aparte) porque
   /// el choque de horario entre sedes se calcula en la app, no con un query.

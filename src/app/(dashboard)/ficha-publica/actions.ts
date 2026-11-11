@@ -32,7 +32,7 @@ const SEDES_MAX = 3;
 function leerSedeDeFormData(
   formData: FormData,
   prefijo: string,
-): { municipio: string; direccion: string; referencia: string | null; telefono: string | null; horario: HorarioDia[] } | null {
+): { municipio: string; direccion: string; referencia: string | null; horario: HorarioDia[] } | null {
   const municipio = vacio(formData.get(`${prefijo}_municipio`));
   const direccion = vacio(formData.get(`${prefijo}_direccion`));
   if (!municipio || !direccion) return null;
@@ -40,7 +40,6 @@ function leerSedeDeFormData(
     municipio,
     direccion,
     referencia: vacio(formData.get(`${prefijo}_referencia`)) ?? null,
-    telefono: vacio(formData.get(`${prefijo}_telefono`)) ?? null,
     horario: leerHorarioSedeDeFormData(formData, prefijo),
   };
 }
@@ -67,6 +66,12 @@ const fichaPublicaSchema = z.object({
   // sigue resolviendo solo, por texto, con `resolverEspecialidadId`.
   especialidad: z.string().trim().max(160).optional(),
   especialidadSecundaria1: z.string().trim().max(160).optional(),
+  // 10-nov-2026, pedido del usuario ("el unico telefono que se debe pedir
+  // y existir el el whatsapp de el medico no uno para cada sede"): antes
+  // se pedía un teléfono por sede acá mismo (`sedeOs_<id>_telefono`) —
+  // ahora es uno solo para toda la ficha, se persiste en `Medico` y se
+  // manda igual a cada sede del Directorio (ver sedesConCiudad más abajo).
+  telefonoPublico: z.string().trim().max(40).optional(),
 });
 
 // Task #13: el médico edita la lista con ServiciosPreciosForm.tsx, que
@@ -166,6 +171,7 @@ export async function guardarFichaPublicaAction(
     numeroMpps: vacio(formData.get("numeroMpps")),
     especialidad: vacio(formData.get("especialidad")),
     especialidadSecundaria1: vacio(formData.get("especialidadSecundaria1")),
+    telefonoPublico: vacio(formData.get("telefonoPublico")),
   });
   if (!parseo.success) {
     return { ok: false, error: "Revisa los campos marcados — alguno quedó demasiado largo." };
@@ -195,11 +201,11 @@ export async function guardarFichaPublicaAction(
     }),
     prisma.medico.findUniqueOrThrow({
       where: { id: medico.id },
-      select: { profesion: true, numeroMpps: true, numeroColegiado: true, especialidad: true },
+      select: { profesion: true, numeroMpps: true, numeroColegiado: true, especialidad: true, telefonoPublico: true },
     }),
     prisma.sede.findMany({
       where: { medicoId: medico.id },
-      select: { id: true, direccion: true, referencia: true, telefono: true },
+      select: { id: true, direccion: true, referencia: true },
       orderBy: { createdAt: "asc" },
     }),
   ]);
@@ -251,7 +257,6 @@ export async function guardarFichaPublicaAction(
           municipio: editada.municipio,
           direccion: editada.direccion,
           referencia: editada.referencia,
-          telefono: editada.telefono,
           horario: editada.horario as unknown as Prisma.InputJsonValue,
         },
       });
@@ -264,7 +269,6 @@ export async function guardarFichaPublicaAction(
           municipio: nueva!.municipio,
           direccion: nueva!.direccion,
           referencia: nueva!.referencia,
-          telefono: nueva!.telefono,
           horario: nueva!.horario as unknown as Prisma.InputJsonValue,
         },
       });
@@ -277,7 +281,7 @@ export async function guardarFichaPublicaAction(
   // esto se re-renderizara sin recargar.
   const sedesFinal = await prisma.sede.findMany({
     where: { medicoId: medico.id },
-    select: { id: true, direccion: true, referencia: true, telefono: true, horario: true },
+    select: { id: true, direccion: true, referencia: true, horario: true },
     orderBy: { createdAt: "asc" },
   });
 
@@ -298,6 +302,11 @@ export async function guardarFichaPublicaAction(
   const especialidadesSecundariasNuevas = parseo.data.especialidadSecundaria1
     ? [parseo.data.especialidadSecundaria1]
     : [];
+  // 10-nov-2026: un único WhatsApp por médico, ya no uno por sede (ver
+  // nota en fichaPublicaSchema) — se persiste acá como el resto de los
+  // campos de "Mi ficha pública" y se manda igual a cada sede del
+  // Directorio más abajo.
+  const telefonoPublicoNuevo = parseo.data.telefonoPublico ?? null;
 
   await prisma.medico.update({
     where: { id: medico.id },
@@ -309,13 +318,14 @@ export async function guardarFichaPublicaAction(
       especialidadesSecundarias: especialidadesSecundariasNuevas,
       zonasCobertura: zonasCoberturaNuevas,
       modalidades: modalidadesNuevas,
+      telefonoPublico: telefonoPublicoNuevo,
     },
   });
 
   // Cada sede necesita una ciudad REAL del Directorio (catálogo distinto al
   // municipio de Trujillo que ya tiene cada Sede — ver sincronizacion.ts).
   // El formulario manda un campo `ciudadSede_<id>` por cada sede del OS.
-  type SedeOs = { id: string; direccion: string; referencia: string | null; telefono: string | null };
+  type SedeOs = { id: string; direccion: string; referencia: string | null };
   type SedeConCiudad = {
     ciudadId: string;
     direccion: string;
@@ -325,6 +335,9 @@ export async function guardarFichaPublicaAction(
     consultorio: string | null;
     sector: string | null;
     referencia: string | null;
+    // El Directorio sigue guardando `telefono` por sede (no se le tocó el
+    // esquema/gateo) — acá se manda el MISMO WhatsApp del médico en cada
+    // una, en vez de uno distinto por sede (ver telefonoPublicoNuevo).
     telefono: string | null;
     lat: number | null;
     lng: number | null;
@@ -350,7 +363,7 @@ export async function guardarFichaPublicaAction(
         consultorio: vacio(formData.get(`consultorioSede_${sede.id}`)) ?? null,
         sector: vacio(formData.get(`sectorSede_${sede.id}`)) ?? null,
         referencia: sede.referencia,
-        telefono: sede.telefono,
+        telefono: telefonoPublicoNuevo,
         lat: coordenada(formData.get(`lat_${sede.id}`)),
         lng: coordenada(formData.get(`lng_${sede.id}`)),
       };

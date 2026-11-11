@@ -68,35 +68,28 @@ function HorarioSedeFields({
   );
 }
 
-/** Mismos campos (municipio/dirección/teléfono/referencia/horario) para
- *  una sede nueva — igual que `SedeFields` de /registro, sin ciudad del
- *  Directorio ni mapa todavía (eso se elige recién cuando ya tenga un
- *  `id` real, en el próximo guardado). */
+/** Mismos campos (municipio/dirección/referencia/horario) para una sede
+ *  nueva — igual que `SedeFields` de /registro, sin ciudad del Directorio
+ *  ni mapa todavía (eso se elige recién cuando ya tenga un `id` real, en
+ *  el próximo guardado). El teléfono ya no es por sede (10-nov-2026, ver
+ *  el campo único "WhatsApp" en Contacto). */
 function SedeNuevaFields({ numero }: { numero: number }) {
   const prefijo = `sedeNueva${numero}`;
   return (
     <div className="space-y-3 rounded-input border border-dashed border-border p-3">
       <p className="text-sm font-semibold text-text-primary">Sede nueva</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className={LABEL} htmlFor={`${prefijo}_municipio`}>
-            Municipio
-          </label>
-          <select id={`${prefijo}_municipio`} name={`${prefijo}_municipio`} defaultValue="" className={SELECT_CLASES}>
-            <option value="">— Selecciona —</option>
-            {MUNICIPIOS_TRUJILLO.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className={LABEL} htmlFor={`${prefijo}_telefono`}>
-            Teléfono (opcional)
-          </label>
-          <Input id={`${prefijo}_telefono`} name={`${prefijo}_telefono`} />
-        </div>
+      <div>
+        <label className={LABEL} htmlFor={`${prefijo}_municipio`}>
+          Municipio
+        </label>
+        <select id={`${prefijo}_municipio`} name={`${prefijo}_municipio`} defaultValue="" className={SELECT_CLASES}>
+          <option value="">— Selecciona —</option>
+          {MUNICIPIOS_TRUJILLO.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label className={LABEL} htmlFor={`${prefijo}_direccion`}>
@@ -171,6 +164,7 @@ export function FichaPublicaForm({
   especialidad,
   especialidadesSecundarias,
   zonasCobertura,
+  telefonoPublico,
 }: {
   ficha: FichaDirectorio | null;
   ciudades: CiudadDirectorio[];
@@ -180,7 +174,6 @@ export function FichaPublicaForm({
     municipio: string;
     direccion: string;
     referencia: string | null;
-    telefono: string | null;
     horario: HorarioDia[];
   }[];
   /** Cupos libres para "+ Agregar sede" — `SEDES_MAX` menos las que ya
@@ -194,6 +187,10 @@ export function FichaPublicaForm({
   especialidad: string | null;
   especialidadesSecundarias: string[];
   zonasCobertura: string[];
+  /** Único WhatsApp del médico (10-nov-2026, "el unico telefono que se
+   *  debe pedir... es el whatsapp de el medico no uno para cada sede") —
+   *  reemplaza el teléfono que antes se pedía por sede. */
+  telefonoPublico: string | null;
 }) {
   const [resultado, accion, pendiente] = useActionState<GuardarFichaPublicaResultado, FormData>(
     guardarFichaPublicaAction,
@@ -457,6 +454,26 @@ export function FichaPublicaForm({
       </Card>
 
       <Card padding="spacious" className="space-y-4">
+        <SectionLabel>Contacto</SectionLabel>
+        <div>
+          <label className={LABEL} htmlFor="telefonoPublico">
+            WhatsApp
+          </label>
+          <Input
+            id="telefonoPublico"
+            name="telefonoPublico"
+            placeholder="Ej.: 04121234567"
+            defaultValue={telefonoPublico ?? ""}
+          />
+          <p className="mt-1 text-caption text-text-faint">
+            Un solo número para todas tus sedes — es donde te escribe el
+            paciente al reservar, no hace falta uno distinto por
+            consultorio.
+          </p>
+        </div>
+      </Card>
+
+      <Card padding="spacious" className="space-y-4">
         <SectionLabel>Sedes</SectionLabel>
 
         {sedesOs.length > 0 && (
@@ -471,34 +488,22 @@ export function FichaPublicaForm({
               <fieldset key={sede.id} className="space-y-3 rounded-input border border-border p-3">
                 <legend className="sr-only">Sede en {sede.direccion}</legend>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className={LABEL} htmlFor={`sedeOs_${sede.id}_municipio`}>
-                      Municipio
-                    </label>
-                    <select
-                      id={`sedeOs_${sede.id}_municipio`}
-                      name={`sedeOs_${sede.id}_municipio`}
-                      defaultValue={sede.municipio}
-                      className={SELECT_CLASES}
-                    >
-                      {MUNICIPIOS_TRUJILLO.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={LABEL} htmlFor={`sedeOs_${sede.id}_telefono`}>
-                      Teléfono (opcional)
-                    </label>
-                    <Input
-                      id={`sedeOs_${sede.id}_telefono`}
-                      name={`sedeOs_${sede.id}_telefono`}
-                      defaultValue={sede.telefono ?? ""}
-                    />
-                  </div>
+                <div>
+                  <label className={LABEL} htmlFor={`sedeOs_${sede.id}_municipio`}>
+                    Municipio
+                  </label>
+                  <select
+                    id={`sedeOs_${sede.id}_municipio`}
+                    name={`sedeOs_${sede.id}_municipio`}
+                    defaultValue={sede.municipio}
+                    className={SELECT_CLASES}
+                  >
+                    {MUNICIPIOS_TRUJILLO.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className={LABEL} htmlFor={`sedeOs_${sede.id}_direccion`}>

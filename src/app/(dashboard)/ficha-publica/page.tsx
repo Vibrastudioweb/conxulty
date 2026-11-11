@@ -28,7 +28,7 @@ export default async function FichaPublicaPage() {
     // existía esa pantalla en ningún lado, ver FichaPublicaForm.tsx).
     prisma.sede.findMany({
       where: { medicoId: medico.id },
-      select: { id: true, municipio: true, direccion: true, referencia: true, telefono: true, horario: true },
+      select: { id: true, municipio: true, direccion: true, referencia: true, horario: true },
       orderBy: { createdAt: "asc" },
     }),
     // 10-nov-2026: cédula, MPPS, colegiado, especialidades secundarias y
@@ -45,6 +45,7 @@ export default async function FichaPublicaPage() {
         especialidadesSecundarias: true,
         modalidades: true,
         zonasCobertura: true,
+        telefonoPublico: true,
       },
     }),
   ]);
@@ -132,6 +133,7 @@ export default async function FichaPublicaPage() {
           especialidad={medicoCompleto.especialidad}
           especialidadesSecundarias={medicoCompleto.especialidadesSecundarias}
           zonasCobertura={medicoCompleto.zonasCobertura}
+          telefonoPublico={medicoCompleto.telefonoPublico}
         />
       </div>
     </div>

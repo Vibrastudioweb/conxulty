@@ -17,7 +17,6 @@ export interface SedeInput {
   municipio: string;
   direccion: string;
   referencia?: string | null;
-  telefono?: string | null;
   horario: HorarioDia[];
 }
 
@@ -123,7 +122,6 @@ export async function registrarMedico(
               municipio: sede.municipio,
               direccion: sede.direccion,
               referencia: sede.referencia?.trim() || null,
-              telefono: sede.telefono?.trim() || null,
               horario: sede.horario as unknown as Prisma.InputJsonValue,
             },
           });
