@@ -63,28 +63,29 @@ export function KpiCard({
   /** Si se pasa, toda la tarjeta es clickeable (ver changelog: el usuario
    *  pidió que ninguna tarjeta del panel quede sin llevar a algún lado). */
   href?: string;
-  /** Variante compacta (10-nov-2026, panel lateral de /hoy): icono + valor
-   *  + label en una sola fila en vez de apilados, para que un grid 2x2 de
-   *  estas tarjetas ocupe mucho menos alto — el objetivo es que /hoy entre
-   *  en una sola pantalla sin scroll ("Scroll vertical de más", pedido del
-   *  usuario). El delta/hint se omite acá: no entra en una fila y, en este
-   *  resumen puntual, el valor y el label ya alcanzan. */
+  /** Variante compacta (10-nov-2026, panel lateral de /hoy): icono chico +
+   *  valor + label apilados pero con menos padding/alto que la versión
+   *  normal, para que un grid 2x2 de estas tarjetas ocupe mucho menos alto
+   *  — el objetivo es que /hoy entre en una sola pantalla sin scroll
+   *  ("Scroll vertical de más", pedido del usuario). Apilado (no en fila)
+   *  a propósito: en una columna angosta (panel lateral, grid de 2) una
+   *  fila icono+texto deja muy poco ancho para el label y lo trunca a una
+   *  letra — probado en vivo, ver changelog. El delta/hint se omite acá:
+   *  en este resumen puntual, el valor y el label ya alcanzan. */
   dense?: boolean;
 }) {
   if (dense) {
     const contenidoDenso = (
-      <div className="flex items-center gap-2.5">
+      <div>
         <span
-          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-input ${ACCENT_BG[accent]} ${ACCENT_TEXT[accent]}`}
+          className={`inline-flex h-6 w-6 items-center justify-center rounded-input ${ACCENT_BG[accent]} ${ACCENT_TEXT[accent]}`}
         >
-          <Icon size={14} aria-hidden="true" />
+          <Icon size={13} aria-hidden="true" />
         </span>
-        <div className="min-w-0">
-          <p className="font-display text-section-title font-semibold leading-tight text-text-primary">
-            {value}
-          </p>
-          <p className="truncate text-caption text-text-faint">{label}</p>
-        </div>
+        <p className="mt-1.5 font-display text-section-title font-semibold leading-tight text-text-primary">
+          {value}
+        </p>
+        <p className="mt-0.5 text-caption leading-snug text-text-faint">{label}</p>
       </div>
     );
 
@@ -92,7 +93,7 @@ export function KpiCard({
       return (
         <Link
           href={href}
-          className="block rounded-card border border-border bg-surface px-3 py-2.5 transition hover:border-brand-primary"
+          className="block rounded-card border border-border bg-surface px-3 py-2 transition hover:border-brand-primary"
         >
           {contenidoDenso}
         </Link>
@@ -100,7 +101,7 @@ export function KpiCard({
     }
 
     return (
-      <div className="rounded-card border border-border bg-surface px-3 py-2.5">
+      <div className="rounded-card border border-border bg-surface px-3 py-2">
         {contenidoDenso}
       </div>
     );
