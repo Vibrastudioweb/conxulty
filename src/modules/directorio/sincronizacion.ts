@@ -156,7 +156,19 @@ export async function subirFotoDirectorio(
     form.set("foto", foto, "foto.webp");
     const respuesta = await fetch(`${config.base}/api/sincronizar-profesional/foto`, {
       method: "POST",
-      headers: { "x-conxulty-secret": config.secreto },
+      // 11-nov-2026: esta llamada es multipart/form-data — SvelteKit la trata
+      // como un posible envío de formulario y la bloquea con 403 ("Cross-site
+      // POST form submissions are forbidden", protección CSRF propia del
+      // framework) cuando el header Origin no coincide con el host de
+      // destino. fetch servidor-a-servidor normalmente NO manda Origin, así
+      // que caía siempre en esa rama — confirmado en vivo (no aparecía en el
+      // WAF de Cloudflare de ninguna de las dos zonas, porque el bloqueo es
+      // del propio Worker, no de Cloudflare). El endpoint hermano
+      // (sincronizarFichaDirectorio) no lo sufre porque manda JSON, que
+      // SvelteKit no considera "form content type". Mandar el Origin real
+      // (el mismo host al que se apunta) deja pasar la petición sin tocar la
+      // protección CSRF para nadie más.
+      headers: { "x-conxulty-secret": config.secreto, origin: config.base },
       body: form,
     });
     const cuerpo = (await respuesta.json().catch(() => null)) as
