@@ -45,6 +45,19 @@ export interface SedeSincronizacion {
   /** Punto exacto marcado en el mapa (opcional) — ver changelog punto 80. */
   lat?: number | null;
   lng?: number | null;
+  /**
+   * 11-nov-2026: horario semanal de la sede, para que el Directorio pueda
+   * mostrar el widget "Agendar cita" (AgendaCita.svelte, vitalud) — antes
+   * esto NUNCA viajaba (el endpoint no tenía campo para esto), así que
+   * ningún médico sincronizado desde Conxulty podía activar ese flujo,
+   * aunque cargara teléfono y horario acá (descubierto en vivo con la Dra.
+   * Yamaruc: cargó horario, pero el botón de agendar nunca apareció).
+   * Mismo `dia_semana` 1-7 (1=lunes) que ya usa `horarios_sede` en
+   * vitalud-esquema.sql — sin mapeo, calzan directo con `DIAS_SEMANA` de
+   * horarioSede.ts. Solo los días que SÍ atiende (filtrado antes de
+   * mandar) — un día sin horario simplemente no manda fila.
+   */
+  horario?: Array<{ diaSemana: number; horaInicio: string; horaFin: string }>;
 }
 
 export interface DatosFichaDirectorio {

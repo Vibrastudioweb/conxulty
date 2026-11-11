@@ -19,6 +19,19 @@ import {
   type ChoqueHorario,
 } from "@/modules/onboarding/horarioSede";
 
+// 11-nov-2026: `HorarioDia[]` está en orden Lunes→Domingo — el mismo
+// orden que `dia_semana` 1-7 (ISO, 1=lunes) de `horarios_sede` en
+// vitalud. El índice (+1) es directamente ese número, sin tabla de mapeo.
+function horarioParaDirectorio(horario: HorarioDia[]): Array<{ diaSemana: number; horaInicio: string; horaFin: string }> {
+  return horario
+    .map((h, i) => ({ ...h, diaSemana: i + 1 }))
+    .filter(
+      (h): h is HorarioDia & { diaSemana: number; horaInicio: string; horaFin: string } =>
+        h.atiende && !!h.horaInicio && !!h.horaFin,
+    )
+    .map((h) => ({ diaSemana: h.diaSemana, horaInicio: h.horaInicio, horaFin: h.horaFin }));
+}
+
 // 10-nov-2026, pedido del usuario ("donde edita un medico sedes horarios y
 // ubicaciones y modalidad de consultas"): hasta ahora NO HABÍA pantalla
 // para esto — `Sede` solo se creaba una vez en /registro (nunca se
@@ -341,6 +354,7 @@ export async function guardarFichaPublicaAction(
     telefono: string | null;
     lat: number | null;
     lng: number | null;
+    horario: Array<{ diaSemana: number; horaInicio: string; horaFin: string }>;
   };
 
   // El picker de mapa manda `lat_<id>`/`lng_<id>` como string numérico solo
@@ -366,6 +380,7 @@ export async function guardarFichaPublicaAction(
         telefono: telefonoPublicoNuevo,
         lat: coordenada(formData.get(`lat_${sede.id}`)),
         lng: coordenada(formData.get(`lng_${sede.id}`)),
+        horario: horarioParaDirectorio(sede.horario),
       };
     })
     .filter((s: SedeConCiudad | null): s is SedeConCiudad => s !== null);
