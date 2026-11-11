@@ -523,10 +523,21 @@ export function FichaPublicaForm({
                 <HorarioSedeFields prefijoSede={`sedeOs_${sede.id}`} horarioActual={sede.horario} />
 
                 <div className="border-t border-border pt-3">
+                  {/* 10-nov-2026: justo después de guardar, esta sección
+                      seguía mostrando "Sin elegir" aunque el Directorio ya
+                      tenía la ciudad bien guardada (se veía correcto recién
+                      al recargar la página a mano) — React no vuelve a
+                      aplicar `defaultValue` a un <select>/<input> que ya
+                      estaba montado, así que un refresco de Server Action
+                      (sin recarga dura) dejaba estos campos pegados al
+                      valor de ANTES de guardar. Forzamos a React a crear un
+                      elemento nuevo cuando cambia el valor ya sincronizado,
+                      agregando ese valor al `key` de cada campo. */}
                   <label className={LABEL} htmlFor={`ciudadSede_${sede.id}`}>
                     Ciudad en el Directorio (conxulty.com)
                   </label>
                   <select
+                    key={`ciudad-${sede.id}-${ciudadPorDireccion.get(sede.direccion) ?? "none"}`}
                     id={`ciudadSede_${sede.id}`}
                     name={`ciudadSede_${sede.id}`}
                     defaultValue={ciudadPorDireccion.get(sede.direccion) ?? ""}
@@ -546,6 +557,7 @@ export function FichaPublicaForm({
                         Piso / consultorio (opcional)
                       </label>
                       <Input
+                        key={`consultorio-${sede.id}-${consultorioPorDireccion.get(sede.direccion) ?? "none"}`}
                         id={`consultorioSede_${sede.id}`}
                         name={`consultorioSede_${sede.id}`}
                         placeholder="Ej.: Piso 3, consultorio 302"
@@ -557,6 +569,7 @@ export function FichaPublicaForm({
                         Sector (opcional)
                       </label>
                       <Input
+                        key={`sector-${sede.id}-${sectorPorDireccion.get(sede.direccion) ?? "none"}`}
                         id={`sectorSede_${sede.id}`}
                         name={`sectorSede_${sede.id}`}
                         placeholder="Ej.: Las Acacias"
@@ -567,6 +580,7 @@ export function FichaPublicaForm({
 
                   <div className="mt-3">
                     <MapaSede
+                      key={`mapa-${sede.id}-${puntoPorDireccion.get(sede.direccion)?.lat ?? "none"}-${puntoPorDireccion.get(sede.direccion)?.lng ?? "none"}`}
                       sedeId={sede.id}
                       etiqueta={sede.direccion}
                       lat={puntoPorDireccion.get(sede.direccion)?.lat ?? null}
