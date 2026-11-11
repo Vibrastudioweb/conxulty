@@ -338,7 +338,7 @@ export async function guardarFichaPublicaAction(
   // Cada sede necesita una ciudad REAL del Directorio (catálogo distinto al
   // municipio de Trujillo que ya tiene cada Sede — ver sincronizacion.ts).
   // El formulario manda un campo `ciudadSede_<id>` por cada sede del OS.
-  type SedeOs = { id: string; direccion: string; referencia: string | null };
+  type SedeOs = { id: string; direccion: string; referencia: string | null; horario: Prisma.JsonValue };
   type SedeConCiudad = {
     ciudadId: string;
     direccion: string;
@@ -380,7 +380,7 @@ export async function guardarFichaPublicaAction(
         telefono: telefonoPublicoNuevo,
         lat: coordenada(formData.get(`lat_${sede.id}`)),
         lng: coordenada(formData.get(`lng_${sede.id}`)),
-        horario: horarioParaDirectorio(sede.horario),
+        horario: horarioParaDirectorio(sede.horario as unknown as HorarioDia[]),
       };
     })
     .filter((s: SedeConCiudad | null): s is SedeConCiudad => s !== null);
