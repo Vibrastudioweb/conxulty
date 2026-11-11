@@ -16,8 +16,8 @@ export function ActividadMensualChart({
 }) {
   const max = Math.max(1, ...datos.map((d) => d.total));
   const ancho = 640;
-  const alto = 120;
-  const paddingInferior = 18;
+  const alto = 90;
+  const paddingInferior = 16;
   const anchoBarra = ancho / datos.length;
 
   if (datos.every((d) => d.total === 0)) {
@@ -31,7 +31,7 @@ export function ActividadMensualChart({
   return (
     <svg
       viewBox={`0 0 ${ancho} ${alto}`}
-      className="h-28 w-full"
+      className="h-20 w-full"
       role="img"
       aria-label="Citas por día en el mes en curso"
     >

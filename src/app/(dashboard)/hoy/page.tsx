@@ -333,7 +333,7 @@ export default async function HoyPage() {
   );
 
   return (
-    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 lg:max-w-none lg:px-10 lg:py-12">
+    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 lg:max-w-none lg:px-10 lg:py-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-page-title font-semibold tracking-tight text-text-primary lg:text-display">
@@ -382,7 +382,7 @@ export default async function HoyPage() {
           las columnas pueden terminar a distinta altura, igual que en
           cualquier dashboard real (Stripe, Linear, Notion no igualan
           columnas a la fuerza). */}
-      <div className="mt-6 grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+      <div className="mt-4 grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
         {/* Izquierda: accesos rápidos + cobros + reseñas recientes. */}
         <div className="lg:col-span-3 flex flex-col gap-5">
           <section>
@@ -491,7 +491,7 @@ export default async function HoyPage() {
           {/* Misma tarjeta siempre (mismo tamaño, con o sin citas) — el
               usuario pidió explícitamente que no cambie de forma según
               haya o no citas, solo su contenido interno. */}
-          <section className="flex min-h-[220px] flex-col rounded-card border border-border bg-surface px-4 py-3">
+          <section className="flex min-h-[190px] flex-col rounded-card border border-border bg-surface px-4 py-3">
             <div className="flex items-baseline justify-between">
               <SectionLabel>Agenda de hoy</SectionLabel>
               <span className="text-caption text-text-faint">
@@ -547,28 +547,29 @@ export default async function HoyPage() {
 
         {/* Derecha: calendario de mes + esta semana (en barras) + resumen
             del día (los mismos 4 KPIs de siempre). */}
-        <aside className="lg:col-span-3 lg:sticky lg:top-8 flex flex-col gap-5">
-          <section className="rounded-card border border-border bg-surface px-4 py-3">
+        <aside className="lg:col-span-3 lg:sticky lg:top-8 flex flex-col gap-3">
+          <section className="rounded-card border border-border bg-surface px-4 py-2.5">
             <CalendarioMes hoy={ahora} />
           </section>
 
-          <section className="rounded-card border border-border bg-surface px-4 py-3">
+          <section className="rounded-card border border-border bg-surface px-4 py-2.5">
             <SectionLabel>Esta semana</SectionLabel>
-            <div className="mt-3">
+            <div className="mt-2">
               <EstaSemanaBarras datos={actividadDeLaSemana} />
             </div>
             <Link
               href="#actividad-del-mes"
-              className="mt-3 block text-caption font-semibold text-brand-primary hover:underline"
+              className="mt-2 block text-caption font-semibold text-brand-primary hover:underline"
             >
               Ver actividad del mes →
             </Link>
           </section>
 
-          <section className="rounded-card border border-border bg-surface px-4 py-3">
+          <section className="rounded-card border border-border bg-surface px-4 py-2.5">
             <SectionLabel>Resumen de hoy</SectionLabel>
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <KpiCard
+                dense
                 icon={CalendarDays}
                 label="Citas de hoy"
                 value={String(citas.length)}
@@ -577,6 +578,7 @@ export default async function HoyPage() {
                 href="/agenda"
               />
               <KpiCard
+                dense
                 icon={UserCheck}
                 label="Atendidos"
                 value={String(atendidas)}
@@ -585,6 +587,7 @@ export default async function HoyPage() {
                 href="/agenda?estado=ATENDIDA"
               />
               <KpiCard
+                dense
                 icon={CircleDollarSign}
                 label="Cobros"
                 value={cobrosHoy.value}
@@ -594,6 +597,7 @@ export default async function HoyPage() {
                 href="/caja"
               />
               <KpiCard
+                dense
                 icon={CalendarCheck2}
                 label="Por confirmar"
                 value={String(pendientesConfirmar)}

@@ -51,7 +51,7 @@ export function CalendarioMes({ hoy }: { hoy: Date }) {
       <p className="text-body-secondary font-semibold capitalize text-text-primary">
         {nombreMes} {año}
       </p>
-      <div className="mt-3 grid grid-cols-7 gap-y-1.5 text-center">
+      <div className="mt-2 grid grid-cols-7 gap-y-1 text-center">
         {DIAS_UNA_LETRA.map((letra) => (
           <span
             key={letra}
@@ -63,7 +63,7 @@ export function CalendarioMes({ hoy }: { hoy: Date }) {
         {celdas.map((celda, i) => (
           <span
             key={i}
-            className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-caption ${
+            className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full text-caption ${
               !celda.delMesActual
                 ? "text-text-faint/60"
                 : celda.esHoy

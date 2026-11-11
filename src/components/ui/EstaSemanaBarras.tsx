@@ -16,7 +16,7 @@ export function EstaSemanaBarras({
   const max = Math.max(1, ...datos.map((d) => d.total));
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-1.5">
       {datos.map((d) => (
         <div key={d.letra} className="flex items-center gap-2.5">
           <span

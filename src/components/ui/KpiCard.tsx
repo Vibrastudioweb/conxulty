@@ -52,6 +52,7 @@ export function KpiCard({
   accent = "indigo",
   delta,
   href,
+  dense = false,
 }: {
   icon: LucideIcon;
   label: string;
@@ -62,7 +63,49 @@ export function KpiCard({
   /** Si se pasa, toda la tarjeta es clickeable (ver changelog: el usuario
    *  pidió que ninguna tarjeta del panel quede sin llevar a algún lado). */
   href?: string;
+  /** Variante compacta (10-nov-2026, panel lateral de /hoy): icono + valor
+   *  + label en una sola fila en vez de apilados, para que un grid 2x2 de
+   *  estas tarjetas ocupe mucho menos alto — el objetivo es que /hoy entre
+   *  en una sola pantalla sin scroll ("Scroll vertical de más", pedido del
+   *  usuario). El delta/hint se omite acá: no entra en una fila y, en este
+   *  resumen puntual, el valor y el label ya alcanzan. */
+  dense?: boolean;
 }) {
+  if (dense) {
+    const contenidoDenso = (
+      <div className="flex items-center gap-2.5">
+        <span
+          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-input ${ACCENT_BG[accent]} ${ACCENT_TEXT[accent]}`}
+        >
+          <Icon size={14} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <p className="font-display text-section-title font-semibold leading-tight text-text-primary">
+            {value}
+          </p>
+          <p className="truncate text-caption text-text-faint">{label}</p>
+        </div>
+      </div>
+    );
+
+    if (href) {
+      return (
+        <Link
+          href={href}
+          className="block rounded-card border border-border bg-surface px-3 py-2.5 transition hover:border-brand-primary"
+        >
+          {contenidoDenso}
+        </Link>
+      );
+    }
+
+    return (
+      <div className="rounded-card border border-border bg-surface px-3 py-2.5">
+        {contenidoDenso}
+      </div>
+    );
+  }
+
   const contenido = (
     <>
       <span
