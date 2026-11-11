@@ -32,13 +32,26 @@ export async function obtenerAlertasTopbar(input: {
   const finHoy = new Date(inicioHoy);
   finHoy.setDate(finHoy.getDate() + 1);
 
-  const [cajaAbierta, citasPendientesHoy] = await Promise.all([
+  const [cajaAbierta, citasPendientesHoy, reservasDirectorioPendientes] = await Promise.all([
     obtenerCajaAbierta({ organizacionId: input.organizacionId }),
     prisma.cita.count({
       where: {
         organizacionId: input.organizacionId,
         estado: "PENDIENTE",
         fechaHora: { gte: inicioHoy, lt: finHoy },
+      },
+    }),
+    // Reservas hechas por el paciente desde la ficha pública (origen
+    // DIRECTORIO, ver citasPublicas.ts) — a diferencia de la alerta de
+    // arriba, SIN filtro de fecha: una reserva para la próxima semana no
+    // debía quedar sin avisar hasta el día mismo de la cita (10-nov-2026,
+    // "cuando alguien reserva una cita por el directorio donde ve el
+    // médico la cita para aprobar").
+    prisma.cita.count({
+      where: {
+        organizacionId: input.organizacionId,
+        estado: "PENDIENTE",
+        origen: "DIRECTORIO",
       },
     }),
   ]);
@@ -67,6 +80,19 @@ export async function obtenerAlertasTopbar(input: {
           : "citas de hoy están"
       } sin confirmar.`,
       href: "/agenda",
+      nivel: "info",
+    });
+  }
+
+  if (reservasDirectorioPendientes > 0) {
+    alertas.push({
+      id: "reservas-directorio-pendientes",
+      mensaje: `${reservasDirectorioPendientes} ${
+        reservasDirectorioPendientes === 1
+          ? "reserva en línea está"
+          : "reservas en línea están"
+      } pendientes de aprobar.`,
+      href: "/agenda?estado=PENDIENTE",
       nivel: "info",
     });
   }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Home, Video } from "lucide-react";
+import { ArrowRight, Globe, Home, Video } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import type { listarCitasDelDia } from "@/modules/core/citas";
@@ -8,6 +8,16 @@ const ICONO_MODALIDAD = {
   VIDEOCONSULTA: Video,
   DOMICILIO: Home,
 } as const;
+
+/** Cita reservada por el paciente desde la ficha pública (conxulty.com,
+ *  repo vitalud), sin intervención del médico ni su staff — `Cita.origen`
+ *  ya se guardaba desde que existe la reserva pública (ver
+ *  citasPublicas.ts), pero no se mostraba en ningún lado: una reserva en
+ *  línea se veía idéntica a una agendada manualmente, mismo PENDIENTE sin
+ *  forma de distinguirlas a simple vista (10-nov-2026, "cuando alguien
+ *  reserva una cita por el directorio donde ve el médico la cita para
+ *  aprobar"). */
+const ORIGEN_RESERVA_ONLINE = "DIRECTORIO";
 
 /**
  * Compartido entre /hoy y /agenda para no duplicar el render de una cita ni
@@ -97,8 +107,14 @@ export function CitaCard({
             <p className="mt-1.5 text-section-title font-medium text-text-primary">
               {cita.paciente.nombre} {cita.paciente.apellido}
             </p>
-            <p className="mt-1 text-body-secondary text-text-secondary">
+            <p className="mt-1 flex items-center gap-1.5 text-body-secondary text-text-secondary">
               {ETIQUETAS_MODALIDAD[cita.modalidad] ?? cita.modalidad}
+              {cita.origen === ORIGEN_RESERVA_ONLINE && (
+                <span className="inline-flex items-center gap-1 text-caption font-medium text-info-text">
+                  <Globe size={12} aria-hidden="true" />
+                  Reservada en línea
+                </span>
+              )}
             </p>
             {cita.motivo && (
               <p className="mt-1 text-body-secondary text-text-secondary">
@@ -163,6 +179,13 @@ export function CitaCard({
           <span className="truncate">
             {cita.paciente.nombre} {cita.paciente.apellido}
           </span>
+          {cita.origen === ORIGEN_RESERVA_ONLINE && (
+            <Globe
+              size={13}
+              className="shrink-0 text-info-text"
+              aria-label="Reservada en línea desde la ficha pública"
+            />
+          )}
         </span>
         <Badge tone={tone}>{etiqueta}</Badge>
       </>
@@ -203,6 +226,12 @@ export function CitaCard({
       </div>
       <div className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
         <span>{ETIQUETAS_MODALIDAD[cita.modalidad] ?? cita.modalidad}</span>
+        {cita.origen === ORIGEN_RESERVA_ONLINE && (
+          <span className="inline-flex items-center gap-1 font-medium text-info-text">
+            <Globe size={12} aria-hidden="true" />
+            Reservada en línea
+          </span>
+        )}
       </div>
       {cita.consulta && (
         <span className="mt-1 block text-xs text-brand-primary">
