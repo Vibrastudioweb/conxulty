@@ -3,7 +3,12 @@ import type { ModalidadAtencion, ModalidadCita } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { registrarEvento } from "@/modules/trazabilidad";
 import { crearPaciente } from "@/modules/core/pacientes";
-import { hayConflictoHorario, DURACION_MINUTOS_DEFECTO, CitaConflictoHorarioError } from "@/modules/core/citas";
+import {
+  hayConflictoHorario,
+  listarIntervalosOcupados,
+  DURACION_MINUTOS_DEFECTO,
+  CitaConflictoHorarioError,
+} from "@/modules/core/citas";
 
 /**
  * 10-nov-2026, pedido del usuario ("las modalidades que se activan en la
@@ -186,6 +191,51 @@ async function buscarOCrearPacientePorTelefono(input: {
     datos: { nombre, apellido, telefono: input.telefono.trim() },
   });
   return paciente.id;
+}
+
+/** Hasta cuántos días adelante informa disponibilidad la ficha pública
+ *  (la ficha muestra 30; se deja margen). */
+const DIAS_DISPONIBILIDAD = 45;
+
+/**
+ * Lo que la ficha pública necesita saber ANTES de ofrecer el formulario de
+ * reserva (12-nov-2026, auditoría del flujo Directorio → cita → OS):
+ *
+ * - `conectada`: si detrás de esa ficha hay un médico en el OS. Sin esto
+ *   el formulario aparecía en cualquier ficha con horario y, en las que no
+ *   tenían cuenta, fallaba recién al final con un mensaje técnico.
+ * - `ocupados`: los intervalos ya tomados, para no ofrecer un horario que
+ *   la reserva va a rechazar.
+ *
+ * Nunca lanza por "ficha sin médico": eso es una respuesta válida
+ * (`conectada: false`), no un error.
+ */
+export async function disponibilidadPorFicha(fichaDirectorioId: string): Promise<{
+  conectada: boolean;
+  duracionMinutos: number;
+  ocupados: { inicio: string; fin: string }[];
+}> {
+  const organizacion = await prisma.organizacion.findUnique({
+    where: { fichaDirectorioId },
+    select: { id: true, medicos: { select: { id: true }, take: 1, orderBy: { createdAt: "asc" } } },
+  });
+  const medico = organizacion?.medicos[0];
+  if (!organizacion || !medico) {
+    return { conectada: false, duracionMinutos: DURACION_MINUTOS_DEFECTO, ocupados: [] };
+  }
+  const desde = new Date();
+  const hasta = new Date(desde.getTime() + DIAS_DISPONIBILIDAD * 24 * 60 * 60 * 1000);
+  const ocupados = await listarIntervalosOcupados({
+    organizacionId: organizacion.id,
+    medicoId: medico.id,
+    desde,
+    hasta,
+  });
+  return {
+    conectada: true,
+    duracionMinutos: DURACION_MINUTOS_DEFECTO,
+    ocupados: ocupados.map((i) => ({ inicio: i.inicio.toISOString(), fin: i.fin.toISOString() })),
+  };
 }
 
 export async function crearCitaPublicaPorFicha(input: {

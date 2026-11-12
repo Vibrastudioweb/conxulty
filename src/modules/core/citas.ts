@@ -131,6 +131,37 @@ export async function hayConflictoHorario(input: {
   });
 }
 
+/**
+ * Intervalos ya tomados de la agenda de un médico en un rango (12-nov-2026,
+ * auditoría: la ficha pública ofrecía horarios ocupados). Usa los mismos
+ * estados que `hayConflictoHorario`, así lo que la ficha muestra como
+ * libre es exactamente lo que la reserva va a aceptar. Devuelve solo
+ * inicio y fin: nada del paciente ni del motivo sale de acá.
+ */
+export async function listarIntervalosOcupados(input: {
+  organizacionId: string;
+  medicoId: string;
+  desde: Date;
+  hasta: Date;
+}): Promise<{ inicio: Date; fin: Date }[]> {
+  const citas = await prisma.cita.findMany({
+    where: {
+      organizacionId: input.organizacionId,
+      medicoId: input.medicoId,
+      estado: { in: ESTADOS_QUE_BLOQUEAN_HORARIO },
+      fechaHora: {
+        gte: new Date(input.desde.getTime() - DURACION_MINUTOS_MAXIMA * 60_000),
+        lt: input.hasta,
+      },
+    },
+    select: { fechaHora: true, duracionMinutos: true },
+    orderBy: { fechaHora: "asc" },
+  });
+  return citas
+    .map((c) => ({ inicio: c.fechaHora, fin: calcularFin(c.fechaHora, c.duracionMinutos) }))
+    .filter((i) => i.fin > input.desde);
+}
+
 export async function listarCitasDelDia(input: {
   organizacionId: string;
   medicoId: string;

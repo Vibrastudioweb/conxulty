@@ -17,10 +17,10 @@
 //    — no hay WhatsApp Business API ni email en este flujo, el único
 //    canal hoy es que el consultorio llame/escriba al teléfono que dejó
 //    (mismo límite que ya tenía "Agendar cita" antes de esta tarea).
-//  - Sin vista previa de horarios ya ocupados en la ficha pública — el
-//    conflicto se detecta recién al reservar (hayConflictoHorario), no
-//    se filtran de antemano los cupos ya tomados. Construir esa vista
-//    previa es una pieza aparte (requiere un GET de disponibilidad).
+//  - La vista previa de horarios ocupados vive en el endpoint hermano
+//    /api/directorio/disponibilidad (12-nov-2026); el conflicto se sigue
+//    verificando acá al reservar, porque entre que la ficha consulta y el
+//    paciente confirma otro puede tomar el mismo horario.
 
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
@@ -142,7 +142,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: err.message }, { status: 429 });
     }
     if (err instanceof FichaNoEncontradaError || err instanceof FichaSinMedicoError) {
-      return NextResponse.json({ ok: false, error: err.message }, { status: 404 });
+      // Este texto lo lee el paciente en la ficha pública: nada de "id" ni
+      // "sincronizada". La ficha ya no debería ofrecer el formulario en
+      // este caso (consulta /disponibilidad antes), pero si llega igual,
+      // que el mensaje le diga qué hacer.
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Este profesional todavía no recibe reservas en línea. Escríbele por WhatsApp para pedir tu cita.",
+        },
+        { status: 404 },
+      );
     }
     if (err instanceof CitaConflictoHorarioError) {
       return NextResponse.json(
