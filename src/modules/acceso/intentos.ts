@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { prisma } from "@/db/client";
 
 /**
@@ -101,5 +102,68 @@ export async function registrarPedidoRecuperacion(email: string): Promise<void> 
     await prisma.intentoAcceso.create({ data: { clave: claveRecuperacion(email) } });
   } catch (err) {
     console.error("[acceso] No se pudo registrar el pedido de recuperación:", err);
+  }
+}
+
+/**
+ * Freno de la reserva pública de citas por conexión de origen (12-nov-2026,
+ * auditoría, hallazgo A1): 5 reservas por hora desde una misma IP. La IP la
+ * manda el Directorio (vitalud), que es quien ve al visitante; acá nunca se
+ * guarda en claro, solo un HMAC — alcanza para contar y no deja en la base
+ * un registro de quién reservó desde dónde.
+ *
+ * Inserta primero y cuenta después (al revés que el login): así, si llegan
+ * 50 pedidos en paralelo, todos se ven entre sí y se rechazan, en vez de
+ * pasar todos por haber contado antes de que ninguno quedara anotado.
+ *
+ * Límite conocido: en Venezuela muchas líneas móviles salen por una misma
+ * IP compartida. Con pocos médicos el tope no debería tocar a nadie real;
+ * si empieza a pasar, se sube MAXIMO_RESERVAS_POR_ORIGEN.
+ */
+const VENTANA_RESERVAS_MS = 60 * 60 * 1000;
+const MAXIMO_RESERVAS_POR_ORIGEN = 5;
+
+function claveOrigenReserva(ip: string): string {
+  const huella = crypto
+    .createHmac("sha256", process.env.AUTH_SECRET ?? "conxulty")
+    .update(ip.trim())
+    .digest("hex")
+    .slice(0, 32);
+  return `reserva:${huella}`;
+}
+
+/**
+ * Anota el intento y dice si esa conexión ya pasó el tope. Devuelve el id
+ * de la marca para poder devolverla con `devolverMarcaReserva` cuando la
+ * reserva no llegó a crearse (horario ocupado, datos inválidos): un
+ * paciente que prueba dos horarios tomados no debería gastar su cupo.
+ */
+export async function anotarReservaDeOrigen(
+  ip: string,
+): Promise<{ bloqueada: boolean; marcaId: string | null }> {
+  if (!ip.trim()) return { bloqueada: false, marcaId: null };
+  const clave = claveOrigenReserva(ip);
+  try {
+    const marca = await prisma.intentoAcceso.create({ data: { clave }, select: { id: true } });
+    const total = await prisma.intentoAcceso.count({
+      where: { clave, createdAt: { gte: new Date(Date.now() - VENTANA_RESERVAS_MS) } },
+    });
+    if (total > MAXIMO_RESERVAS_POR_ORIGEN) {
+      await prisma.intentoAcceso.delete({ where: { id: marca.id } }).catch(() => undefined);
+      return { bloqueada: true, marcaId: null };
+    }
+    return { bloqueada: false, marcaId: marca.id };
+  } catch (err) {
+    console.error("[acceso] No se pudo aplicar el freno de reservas (falla abierto):", err);
+    return { bloqueada: false, marcaId: null };
+  }
+}
+
+export async function devolverMarcaReserva(marcaId: string | null): Promise<void> {
+  if (!marcaId) return;
+  try {
+    await prisma.intentoAcceso.delete({ where: { id: marcaId } });
+  } catch (err) {
+    console.error("[acceso] No se pudo devolver la marca de reserva:", err);
   }
 }

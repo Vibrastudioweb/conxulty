@@ -112,26 +112,65 @@ async function resolverMedicoPorFicha(fichaDirectorioId: string) {
   };
 }
 
+/** Máximo de citas del Directorio todavía sin confirmar que una misma
+ *  persona (mismo teléfono) puede tener a futuro con un médico (auditoría
+ *  12-nov-2026, hallazgo A1). */
+const MAXIMO_PENDIENTES_POR_TELEFONO = 3;
+
+export class DemasiadasCitasPendientesError extends Error {
+  constructor() {
+    super(
+      "Ya tienes varias citas pendientes de confirmar con este profesional. Espera su confirmación o escríbele por WhatsApp.",
+    );
+    this.name = "DemasiadasCitasPendientesError";
+  }
+}
+
+/**
+ * Últimos 10 dígitos de un teléfono: la parte que identifica la línea sin
+ * importar cómo se escribió ("0414-123 4567", "+58 414 1234567" y
+ * "4141234567" dan lo mismo). Devuelve null si no llega a 10 dígitos.
+ */
+export function clavePorTelefono(telefono: string | null | undefined): string | null {
+  const digitos = (telefono ?? "").replace(/\D/g, "");
+  return digitos.length >= 10 ? digitos.slice(-10) : null;
+}
+
 /**
  * Busca un Paciente activo de la organización por teléfono (sin
  * documentoIdentidad, que el formulario público no pide) para no crear
  * un registro nuevo cada vez que la misma persona reserva de nuevo.
- * Comparación simple por teléfono normalizado (dígitos), no hay forma
- * más confiable sin pedir cédula.
+ *
+ * 12-nov-2026 (auditoría, M2): antes se buscaba con `contains` sobre los
+ * dígitos recibidos. Eso fallaba en los dos sentidos: un número corto
+ * ("12345") enganchaba la cita al primer paciente cuyo teléfono lo
+ * contuviera, y un paciente guardado como "0414-123 4567" nunca coincidía
+ * con "04141234567" y se duplicaba. Ahora se comparan los últimos 10
+ * dígitos de ambos lados. Se hace en memoria porque el teléfono se guarda
+ * tal como se escribió; son los pacientes de un solo consultorio.
  */
+async function buscarPacientePorTelefono(input: {
+  organizacionId: string;
+  telefono: string;
+}): Promise<string | null> {
+  const clave = clavePorTelefono(input.telefono);
+  if (!clave) return null;
+  const candidatos = await prisma.paciente.findMany({
+    where: { organizacionId: input.organizacionId, activo: true, telefono: { not: null } },
+    select: { id: true, telefono: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return candidatos.find((p) => clavePorTelefono(p.telefono) === clave)?.id ?? null;
+}
+
 async function buscarOCrearPacientePorTelefono(input: {
   organizacionId: string;
   actorId: string;
   nombreCompleto: string;
   telefono: string;
 }) {
-  const telefonoNormalizado = input.telefono.replace(/\D/g, "");
-
-  const existente = await prisma.paciente.findFirst({
-    where: { organizacionId: input.organizacionId, activo: true, telefono: { contains: telefonoNormalizado } },
-    select: { id: true },
-  });
-  if (existente) return existente.id;
+  const existente = await buscarPacientePorTelefono(input);
+  if (existente) return existente;
 
   // El formulario público pide un solo campo de nombre — se divide en
   // nombre/apellido lo mejor posible; si no hay espacio, todo va a
@@ -171,6 +210,27 @@ export async function crearCitaPublicaPorFicha(input: {
     duracionMinutos: DURACION_MINUTOS_DEFECTO,
   });
   if (conflicto) throw new CitaConflictoHorarioError();
+
+  // Tope por persona ANTES de crear nada: quien ya tiene 3 citas del
+  // Directorio sin confirmar con este médico no puede seguir apartando
+  // horarios (cada PENDIENTE bloquea su hueco en la agenda).
+  const pacienteExistente = await buscarPacientePorTelefono({
+    organizacionId,
+    telefono: input.telefonoPaciente,
+  });
+  if (pacienteExistente) {
+    const pendientes = await prisma.cita.count({
+      where: {
+        organizacionId,
+        medicoId,
+        pacienteId: pacienteExistente,
+        origen: "DIRECTORIO",
+        estado: "PENDIENTE",
+        fechaHora: { gte: new Date() },
+      },
+    });
+    if (pendientes >= MAXIMO_PENDIENTES_POR_TELEFONO) throw new DemasiadasCitasPendientesError();
+  }
 
   const pacienteId = await buscarOCrearPacientePorTelefono({
     organizacionId,

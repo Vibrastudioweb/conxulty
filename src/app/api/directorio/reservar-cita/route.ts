@@ -26,10 +26,13 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { z } from "zod";
 import {
+  clavePorTelefono,
   crearCitaPublicaPorFicha,
+  DemasiadasCitasPendientesError,
   FichaNoEncontradaError,
   FichaSinMedicoError,
 } from "@/modules/core/citasPublicas";
+import { anotarReservaDeOrigen, devolverMarcaReserva } from "@/modules/acceso/intentos";
 import { CitaConflictoHorarioError } from "@/modules/core/citas";
 import { PacienteArchivadoError } from "@/modules/core/pacientes";
 
@@ -62,7 +65,22 @@ const cuerpoSchema = z.object({
   // viaja aparte y `crearCitaPublicaPorFicha` la valida contra lo que el
   // médico tiene activo (ver citasPublicas.ts).
   modalidad: z.string().trim().max(20).optional().nullable(),
+  // 12-nov-2026 (auditoría, A1): IP del visitante, la manda vitalud (es
+  // quien lo ve). Opcional para no romper un Directorio desplegado antes
+  // que este cambio — sin IP simplemente no hay tope por conexión.
+  ipCliente: z.string().trim().max(64).optional().nullable(),
 });
+
+// Reglas de cordura de la fecha (auditoría, A1). No reemplazan al horario
+// real de cada sede (eso lo arma la ficha pública con lo que cargó el
+// médico): solo cortan lo que ninguna ficha ofrecería nunca.
+const MAXIMO_DIAS_ADELANTE = 90;
+const HORA_MINIMA_VENEZUELA = 5; // 05:00
+const DESFASE_VENEZUELA_HORAS = -4; // UTC-4 todo el año, sin horario de verano
+
+function horaEnVenezuela(fecha: Date): number {
+  return (fecha.getUTCHours() + DESFASE_VENEZUELA_HORAS + 24) % 24;
+}
 
 export async function POST(request: Request) {
   if (!verificarSecreto(request)) return noAutorizado();
@@ -80,6 +98,32 @@ export async function POST(request: Request) {
   if (fechaHora.getTime() < Date.now()) {
     return NextResponse.json({ ok: false, error: "Esa fecha/hora ya pasó." }, { status: 400 });
   }
+  if (fechaHora.getTime() > Date.now() + MAXIMO_DIAS_ADELANTE * 24 * 60 * 60 * 1000) {
+    return NextResponse.json(
+      { ok: false, error: "Solo se puede reservar con hasta 90 días de anticipación." },
+      { status: 400 },
+    );
+  }
+  if (horaEnVenezuela(fechaHora) < HORA_MINIMA_VENEZUELA) {
+    return NextResponse.json({ ok: false, error: "Ese horario no está disponible." }, { status: 400 });
+  }
+  if (!clavePorTelefono(parseo.data.telefonoPaciente)) {
+    return NextResponse.json(
+      { ok: false, error: "Escribe tu teléfono completo, con el código (por ejemplo 0414 1234567)." },
+      { status: 400 },
+    );
+  }
+
+  const freno = await anotarReservaDeOrigen(parseo.data.ipCliente ?? "");
+  if (freno.bloqueada) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Se hicieron demasiadas reservas desde esta conexión. Intenta en una hora o escribe por WhatsApp.",
+      },
+      { status: 429 },
+    );
+  }
 
   try {
     const resultado = await crearCitaPublicaPorFicha({
@@ -92,6 +136,11 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true, citaId: resultado.citaId, tokenResena: resultado.tokenResena });
   } catch (err) {
+    // La reserva no se creó: se devuelve el cupo de esta conexión.
+    await devolverMarcaReserva(freno.marcaId);
+    if (err instanceof DemasiadasCitasPendientesError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: 429 });
+    }
     if (err instanceof FichaNoEncontradaError || err instanceof FichaSinMedicoError) {
       return NextResponse.json({ ok: false, error: err.message }, { status: 404 });
     }
