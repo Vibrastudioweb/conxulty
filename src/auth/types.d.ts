@@ -5,6 +5,8 @@ declare module "next-auth" {
   interface User {
     organizacionId: string;
     rol: RolUsuario;
+    /** Huella de la contraseña vigente al iniciar sesión — ver auth/index.ts. */
+    huella?: string;
   }
 
   interface Session {
@@ -23,5 +25,7 @@ declare module "@auth/core/jwt" {
   interface JWT {
     organizacionId: string;
     rol: RolUsuario;
+    /** Ausente en sesiones abiertas antes del 12-nov-2026. */
+    huella?: string;
   }
 }

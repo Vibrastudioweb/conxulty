@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
+import { accesoBloqueado } from "@/modules/acceso/intentos";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { VibraSignature } from "@/components/brand/VibraSignature";
 import { Card } from "@/components/ui/Card";
@@ -10,6 +11,13 @@ import { Alert } from "@/components/ui/Alert";
 
 async function autenticar(formData: FormData) {
   "use server";
+
+  // El bloqueo de verdad vive en `authorize` (auth/index.ts); esta consulta
+  // previa es solo para poder decirle a la persona POR QUÉ no entra, en vez
+  // del "correo o contraseña incorrectos" de siempre.
+  if (await accesoBloqueado(String(formData.get("email") ?? ""))) {
+    redirect("/login?error=bloqueado");
+  }
 
   try {
     await signIn("credentials", {
@@ -74,7 +82,14 @@ export default async function LoginPage({
             <Input id="password" name="password" type="password" required />
           </div>
 
-          {error && <Alert tone="danger">Correo o contraseña incorrectos.</Alert>}
+          {error === "bloqueado" ? (
+            <Alert tone="danger">
+              Demasiados intentos fallidos. Espera 15 minutos o restablece tu contraseña desde
+              “¿Olvidaste tu contraseña?”.
+            </Alert>
+          ) : (
+            error && <Alert tone="danger">Correo o contraseña incorrectos.</Alert>
+          )}
 
           <Button type="submit" fullWidth>
             Iniciar sesión

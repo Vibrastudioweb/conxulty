@@ -61,6 +61,13 @@ ALTER TABLE public.registros_trazabilidad  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.suscripciones           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pagos                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.solicitudes_acceso      ENABLE ROW LEVEL SECURITY;
+-- 12-nov-2026 (auditoría, C1): estas dos se crearon DESPUÉS de correr este
+-- script y quedaron fuera — `tokens_recuperacion` estuvo dos días abierta
+-- en producción. Desde hoy cada tabla nueva se cierra en su propia
+-- migración (ver 20261112130000_intentos_acceso_y_rls_tokens); este
+-- archivo queda solo como referencia del conjunto completo.
+ALTER TABLE public.tokens_recuperacion     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.intentos_acceso         ENABLE ROW LEVEL SECURITY;
 
 -- No es una tabla del modelo de datos de la app — es la tabla interna que
 -- usa Prisma para su propio historial de migraciones (sin datos

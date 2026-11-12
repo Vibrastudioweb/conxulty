@@ -77,11 +77,12 @@ model Usuario {
 /// "Olvidé mi contraseña" (10-nov-2026, pedido del usuario: "falta olvide
 /// usuario y olvide contraseña" — el login es por correo, no hay un
 /// "usuario" separado que recuperar, así que esto cubre solo contraseña).
-/// Token de un solo uso, vida corta — igual que `tokenResena` en `Cita`
-/// (campo único, se consulta por igualdad; no se guarda hasheado porque
-/// vive poco y de un solo uso, mismo criterio que ese otro token). Se
-/// reemplaza/borra por completo en cada pedido nuevo del mismo usuario, no
-/// se acumulan tokens viejos sin usar.
+/// Token de un solo uso, vida corta. 12-nov-2026 (auditoría, hallazgo C1):
+/// la columna `token` guarda el SHA-256 del token, nunca el token en claro
+/// — el valor real solo viaja en el link del correo. Así, leer esta tabla
+/// no alcanza para restablecer la contraseña de nadie. Se reemplaza/borra
+/// por completo en cada pedido nuevo del mismo usuario, no se acumulan
+/// tokens viejos sin usar.
 model TokenRecuperacion {
   id         String   @id @default(cuid())
   usuarioId  String
@@ -93,6 +94,24 @@ model TokenRecuperacion {
 
   @@index([usuarioId])
   @@map("tokens_recuperacion")
+}
+
+/// Intentos fallidos de inicio de sesión (12-nov-2026, auditoría, hallazgo
+/// A3) — sin esto el login no tenía ningún freno contra probar contraseñas
+/// en serie. `clave` es el correo en minúsculas (exista o no la cuenta:
+/// registrar solo los que existen revelaría cuáles correos están
+/// registrados). Ver src/modules/acceso/intentos.ts.
+///
+/// OJO al crear tablas nuevas: Supabase expone todo `public` por su API
+/// REST — toda migración que cree una tabla debe terminar con
+/// `ENABLE ROW LEVEL SECURITY` (ver la migración de esta tabla).
+model IntentoAcceso {
+  id        String   @id @default(cuid())
+  clave     String
+  createdAt DateTime @default(now())
+
+  @@index([clave, createdAt])
+  @@map("intentos_acceso")
 }
 
 /// Perfil de clínica o farmacia (changelog punto 90/92) — equivalente de
