@@ -2,6 +2,7 @@ import { prisma } from "@/db/client";
 import { PRECIO_CENTAVOS_USD } from "./precios";
 import { actualizarVencimientoDirectorio } from "@/modules/directorio/sincronizacion";
 import { venceElParaDirectorio } from "@/modules/suscripcion/vencimientoDirectorio";
+import { notificarPagoReportado, notificarPagoConfirmado } from "./notificacionPago";
 
 /**
  * Link de pago genérico en SPIDI (cuenta personal del usuario, confirmado
@@ -87,6 +88,12 @@ export async function registrarPagoRealizado(
       },
     });
   });
+
+  // Hasta hoy el circuito se quedaba mudo acá: el pago quedaba esperando
+  // en /superadmin/pagos y nadie se enteraba (hallazgo de la auditoría
+  // Bloque 2). Va después de la transacción y sin await en el camino
+  // crítico de nada: el pago ya está guardado, el correo es el aviso.
+  await notificarPagoReportado(organizacionId, plan);
 }
 
 export interface PagoPendienteVista {
@@ -187,6 +194,11 @@ export async function confirmarPago(pagoId: string) {
   // auditoría Bloque 2). Best effort: un Directorio caído no puede
   // impedir que se registre un pago que ya se recibió; el próximo
   // guardado de "Mi ficha pública" la vuelve a mandar igual.
+  // Y del otro lado: el médico se entera de que su pago quedó confirmado
+  // y hasta cuándo. Antes tenía que volver a entrar a /ajustes a ver si
+  // alguien lo había procesado.
+  await notificarPagoConfirmado(pago.organizacionId, pago.plan, finPeriodoActual);
+
   const organizacion = await prisma.organizacion.findUnique({
     where: { id: pago.organizacionId },
     select: { fichaDirectorioId: true },

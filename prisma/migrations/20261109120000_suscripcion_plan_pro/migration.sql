@@ -1,5 +1,33 @@
+-- 13-nov-2026 (auditoría previa al lanzamiento): esta migración usaba
+-- "PlanOrganizacion" sin haberlo creado nunca —el enum y la columna
+-- `organizaciones.plan` se habían aplicado a mano en Supabase, sin archivo
+-- de migración— así que la cadena de migraciones se ROMPÍA acá sobre una
+-- base vacía: `type "PlanOrganizacion" does not exist`. Es decir, el repo
+-- no podía reconstruir su propia base, ni para pruebas ni tras un
+-- incidente. Se agrega lo que faltaba, en forma idempotente para que no
+-- choque donde ya existe (producción).
+--
+-- Se edita esta migración en vez de agregar una al final porque la falla
+-- ocurre a mitad de la cadena: nada que venga después llega a correr. No
+-- rompe nada en producción: el despliegue no corre `prisma migrate deploy`
+-- (ver package.json — las migraciones se aplican a mano en Supabase).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PlanOrganizacion') THEN
+    CREATE TYPE "PlanOrganizacion" AS ENUM ('FICHA', 'PRO');
+  END IF;
+END $$;
+
+ALTER TABLE "organizaciones"
+  ADD COLUMN IF NOT EXISTS "plan" "PlanOrganizacion" NOT NULL DEFAULT 'FICHA';
+
 -- CreateEnum
-CREATE TYPE "ProveedorPago" AS ENUM ('SPIDI');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ProveedorPago') THEN
+    CREATE TYPE "ProveedorPago" AS ENUM ('SPIDI');
+  END IF;
+END $$;
 
 -- CreateEnum
 CREATE TYPE "EstadoSuscripcion" AS ENUM ('ACTIVA', 'PENDIENTE_PAGO', 'BAJANDO_A_FICHA', 'SIN_METODO_DE_PAGO');

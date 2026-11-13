@@ -6,6 +6,7 @@ import {
   recuperacionBloqueada,
   registrarPedidoRecuperacion,
 } from "@/modules/acceso/intentos";
+import { enviarCorreo, urlBase } from "@/modules/correo/enviar";
 
 /**
  * "Olvidé mi contraseña" (10-nov-2026, pedido del usuario: "falta olvide
@@ -19,7 +20,6 @@ import {
  */
 
 const VIGENCIA_MS = 60 * 60 * 1000; // 1 hora — vida corta, de un solo uso.
-const REMITENTE_POR_DEFECTO = "Conxulty <no-reply@conxulty.com>";
 
 /**
  * Lo que se guarda en la base es el SHA-256 del token, nunca el token
@@ -32,9 +32,6 @@ function hashDeToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function urlBase(): string {
-  return (process.env.APP_URL ?? "https://app.conxulty.com").replace(/\/+$/, "");
-}
 
 /**
  * Crea un token nuevo y manda el correo con el link — best-effort en el
@@ -73,39 +70,19 @@ export async function solicitarRecuperacion(emailCrudo: string): Promise<void> {
 }
 
 async function enviarCorreoRecuperacion(email: string, token: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.warn("[recuperacion] RESEND_API_KEY no configurada: no se envió el correo de recuperación.");
-    return;
-  }
-
   const link = `${urlBase()}/restablecer?token=${token}`;
-  const texto = [
-    "Pediste restablecer tu contraseña en Conxulty.",
-    "",
-    `Entra acá para elegir una nueva (el link vence en 1 hora): ${link}`,
-    "",
-    "Si no fuiste tú, ignora este correo — tu contraseña actual sigue funcionando.",
-  ].join("\n");
-
-  try {
-    const respuesta = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? REMITENTE_POR_DEFECTO,
-        to: [email],
-        subject: "Restablece tu contraseña — Conxulty",
-        text: texto,
-      }),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!respuesta.ok) {
-      console.error(`[recuperacion] Resend respondió ${respuesta.status}: ${await respuesta.text()}`);
-    }
-  } catch (err) {
-    console.error("[recuperacion] Falló el envío del correo de recuperación:", err);
-  }
+  await enviarCorreo({
+    origen: "recuperacion",
+    para: email,
+    asunto: "Restablece tu contraseña — Conxulty",
+    texto: [
+      "Pediste restablecer tu contraseña en Conxulty.",
+      "",
+      `Entra acá para elegir una nueva (el link vence en 1 hora): ${link}`,
+      "",
+      "Si no fuiste tú, ignora este correo — tu contraseña actual sigue funcionando.",
+    ].join("\n"),
+  });
 }
 
 /** Solo valida (no consume) — para decidir si /restablecer muestra el

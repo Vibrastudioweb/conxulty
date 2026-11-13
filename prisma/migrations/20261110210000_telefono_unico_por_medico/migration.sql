@@ -5,7 +5,7 @@
 -- igual (repetido en cada sede) al Directorio para no tocar su esquema.
 
 -- AlterTable
-ALTER TABLE "medicos" ADD COLUMN "telefonoPublico" TEXT;
+ALTER TABLE "medicos" ADD COLUMN IF NOT EXISTS "telefonoPublico" TEXT;
 
 -- Migra el dato existente antes de borrar la columna: toma el primer
 -- teléfono no nulo que tenga alguna sede del médico (createdAt más
@@ -22,4 +22,5 @@ FROM (
 WHERE sub."medicoId" = m."id";
 
 -- AlterTable
-ALTER TABLE "sedes" DROP COLUMN "telefono";
+-- IF EXISTS: en producción esta columna ya se borró a mano.
+ALTER TABLE "sedes" DROP COLUMN IF EXISTS "telefono";

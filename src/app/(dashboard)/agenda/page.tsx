@@ -30,6 +30,7 @@ import {
   cancelarCitaAction,
   marcarAtendidaCitaAction,
   marcarNoAsistioCitaAction,
+  reabrirCitaAction,
 } from "./actions";
 
 const ACCIONES_ESTADO = {
@@ -56,6 +57,8 @@ export default async function AgendaPage({
     estado?: string;
     modalidad?: string;
     actualizada?: string;
+    cancelada?: string;
+    reabierta?: string;
     error?: string;
   }>;
 }) {
@@ -66,6 +69,8 @@ export default async function AgendaPage({
     estado: estadoParam,
     modalidad: modalidadParam,
     actualizada,
+    cancelada,
+    reabierta,
     error,
   } = await searchParams;
 
@@ -114,6 +119,45 @@ export default async function AgendaPage({
       {actualizada && (
         <div className="mt-4">
           <Alert tone="success">Cita actualizada.</Alert>
+        </div>
+      )}
+      {/* 13-nov-2026 (hallazgo de la auditoría): cancelar era un clic sin
+          vuelta atrás. En vez de pedir confirmación cada vez —que estorba
+          en el caso normal y se acepta sin leer— se ofrece deshacerlo
+          justo después. `reabrirCita` revalida el horario: el hueco pudo
+          habérsele dado a otro paciente mientras tanto. */}
+      {cancelada && (
+        <div className="mt-4">
+          <Alert tone="info">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              Cita cancelada.
+              <form action={reabrirCitaAction} className="inline">
+                <input type="hidden" name="citaId" value={cancelada} />
+                <input type="hidden" name="volverA" value={volverA} />
+                <button type="submit" className="font-semibold underline">
+                  Deshacer
+                </button>
+              </form>
+            </span>
+          </Alert>
+        </div>
+      )}
+      {reabierta && (
+        <div className="mt-4">
+          <Alert tone="success">La cita volvió a tu agenda, como pendiente.</Alert>
+        </div>
+      )}
+      {error === "reabrir_ocupado" && (
+        <div className="mt-4">
+          <Alert tone="danger">
+            No se pudo deshacer: ese horario ya está ocupado por otra cita.
+            Crea la cita de nuevo en un horario libre.
+          </Alert>
+        </div>
+      )}
+      {error === "reabrir_estado" && (
+        <div className="mt-4">
+          <Alert tone="danger">Esa cita ya no está cancelada.</Alert>
         </div>
       )}
       {error === "estado" && (

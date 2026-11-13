@@ -44,6 +44,13 @@ const ACCION_TRAZABILIDAD_POR_ESTADO: Record<EstadoCitaAccionable, string> = {
   NO_ASISTIO: "marcar_no_asistio",
 };
 
+export class CitaNoCanceladaError extends Error {
+  constructor() {
+    super("Solo se puede reabrir una cita que está cancelada.");
+    this.name = "CitaNoCanceladaError";
+  }
+}
+
 export class CitaConflictoHorarioError extends Error {
   constructor() {
     super("Ya existe una cita para este médico en ese horario.");
@@ -586,6 +593,84 @@ export async function cancelarCita(input: {
   citaId: string;
 }): Promise<void> {
   await cambiarEstadoCita({ ...input, estadoNuevo: "CANCELADA" });
+}
+
+/**
+ * Deshace una cancelación: devuelve la cita a PENDIENTE (13-nov-2026,
+ * hallazgo de la auditoría).
+ *
+ * Por qué existe: cancelar era un clic sin confirmación y sin vuelta
+ * atrás —`TRANSICIONES_PERMITIDAS.CANCELADA` está vacío a propósito— así
+ * que un clic equivocado, en el móvil, al lado de "Confirmar", mataba la
+ * cita de un paciente real y había que crearla de nuevo a mano. La
+ * alternativa era un "¿seguro?" en cada cancelación, pero cancelar es una
+ * acción legítima y frecuente (los pacientes cancelan todo el tiempo): un
+ * cuadro de confirmación que se ve siempre se termina aceptando sin leer,
+ * así que estorba en el caso normal y no protege en el malo. Mejor sin
+ * fricción y reversible.
+ *
+ * Es una acción EXPLÍCITA y aparte, no una transición más en la matriz
+ * (ver la nota de `TRANSICIONES_PERMITIDAS` en citasEstado.ts, que pide
+ * justamente eso): así reabrir no aparece como un botón genérico de
+ * cambio de estado, y ATENDIDA/NO_ASISTIO siguen siendo terminales de
+ * verdad.
+ *
+ * Revalida el choque de horario, que es el punto fino: mientras la cita
+ * estaba cancelada su hueco quedó libre y se lo pudieron dar a otro
+ * paciente (desde la agenda o desde el Directorio). Reabrirla a ciegas
+ * dejaría dos pacientes citados a la misma hora.
+ */
+export async function reabrirCita(input: {
+  organizacionId: string;
+  actorId: string;
+  medicoId: string;
+  citaId: string;
+}): Promise<void> {
+  const cita = await obtenerCitaDelMedico({
+    organizacionId: input.organizacionId,
+    medicoId: input.medicoId,
+    citaId: input.citaId,
+  });
+
+  if (cita.estado !== "CANCELADA") {
+    throw new CitaNoCanceladaError();
+  }
+
+  const conflicto = await hayConflictoHorario({
+    organizacionId: input.organizacionId,
+    medicoId: input.medicoId,
+    fechaHora: cita.fechaHora,
+    duracionMinutos: cita.duracionMinutos,
+    excluirCitaId: input.citaId,
+  });
+  if (conflicto) {
+    throw new CitaConflictoHorarioError();
+  }
+
+  // Mismo patrón de concurrencia que `cambiarEstadoCita`: si alguien tocó
+  // el estado entre la lectura y esta escritura, actualiza 0 filas.
+  const resultado = await prisma.cita.updateMany({
+    where: {
+      id: input.citaId,
+      organizacionId: input.organizacionId,
+      estado: "CANCELADA",
+    },
+    data: { estado: "PENDIENTE" },
+  });
+
+  if (resultado.count !== 1) {
+    throw new CitaNoCanceladaError();
+  }
+
+  await registrarEvento({
+    organizacionId: input.organizacionId,
+    actorId: input.actorId,
+    accion: "reabrir_cita",
+    entidadTipo: "Cita",
+    entidadId: input.citaId,
+    pacienteId: cita.pacienteId,
+    cambios: { estadoAnterior: "CANCELADA", estadoNuevo: "PENDIENTE" },
+  });
 }
 
 export async function marcarCitaAtendida(input: {

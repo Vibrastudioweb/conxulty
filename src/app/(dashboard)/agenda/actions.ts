@@ -11,11 +11,13 @@ import {
   cancelarCita,
   marcarCitaAtendida,
   marcarCitaNoAsistio,
+  reabrirCita,
   CitaConflictoHorarioError,
   CitaInexistenteError,
   CitaNoEditableError,
   TransicionEstadoInvalidaError,
   CitaConsultaEnCursoError,
+  CitaNoCanceladaError,
   DURACION_MINUTOS_DEFECTO,
 } from "@/modules/core/citas";
 import { PacienteArchivadoError } from "@/modules/core/pacientes";
@@ -155,6 +157,9 @@ async function ejecutarCambioEstado(
     medicoId: string;
     citaId: string;
   }) => Promise<void>,
+  /** Query extra para la agenda de destino — la usa cancelar para poder
+   *  ofrecer "Deshacer" sobre esa cita en concreto. */
+  queryAlTerminar: (citaId: string) => Record<string, string> = () => ({}),
 ) {
   const { session, medico } = await requireMedicoSesion();
 
@@ -181,15 +186,52 @@ async function ejecutarCambioEstado(
     throw err;
   }
 
-  redirect(destinoAgenda(formData));
+  redirect(destinoAgenda(formData, queryAlTerminar(citaId)));
 }
 
 export async function confirmarCitaAction(formData: FormData) {
   await ejecutarCambioEstado(formData, confirmarCita);
 }
 
+/**
+ * 13-nov-2026 (hallazgo de la auditoría): cancelar sigue siendo un clic sin
+ * confirmación —es una acción legítima y frecuente, un "¿seguro?" en cada
+ * una se termina aceptando sin leer— pero ahora vuelve con el id de la cita
+ * en la query, para que la agenda ofrezca deshacerlo. Fricción cero en el
+ * caso normal, recuperación completa en el equivocado.
+ */
 export async function cancelarCitaAction(formData: FormData) {
-  await ejecutarCambioEstado(formData, cancelarCita);
+  await ejecutarCambioEstado(formData, cancelarCita, (citaId) => ({ cancelada: citaId }));
+}
+
+/** Deshacer una cancelación. Puede fallar si en el intermedio le dieron el
+ *  hueco a otro paciente — ver `reabrirCita`. */
+export async function reabrirCitaAction(formData: FormData) {
+  const { session, medico } = await requireMedicoSesion();
+
+  const citaId = String(formData.get("citaId") ?? "");
+  if (!citaId) {
+    throw new Error("Falta la cita.");
+  }
+
+  try {
+    await reabrirCita({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      medicoId: medico.id,
+      citaId,
+    });
+  } catch (err) {
+    if (err instanceof CitaConflictoHorarioError) {
+      redirect(destinoAgenda(formData, { error: "reabrir_ocupado" }));
+    }
+    if (err instanceof CitaInexistenteError || err instanceof CitaNoCanceladaError) {
+      redirect(destinoAgenda(formData, { error: "reabrir_estado" }));
+    }
+    throw err;
+  }
+
+  redirect(destinoAgenda(formData, { reabierta: "1" }));
 }
 
 export async function marcarAtendidaCitaAction(formData: FormData) {
