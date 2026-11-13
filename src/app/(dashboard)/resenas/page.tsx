@@ -21,7 +21,7 @@ export default async function ResenasPage() {
         <h1 className="text-h2 font-semibold text-text-primary">Reseñas</h1>
         <div className="mt-4">
           <Alert tone="info" title="Todavía no tienes ficha pública">
-            Las reseñas viven en tu ficha del Directorio — completá
+            Las reseñas viven en tu ficha del Directorio — completa
             &quot;Mi ficha pública&quot; primero.
           </Alert>
         </div>

@@ -90,13 +90,13 @@ export function MapaSede({
       const resultados = (await respuesta.json()) as Array<{ lat: string; lon: string }>;
       if (idDeEstaBusqueda !== busquedaVigente.current) return;
       if (resultados.length === 0) {
-        setErrorBusqueda("No se encontró esa dirección — probá con menos detalle o marcá el punto directo en el mapa.");
+        setErrorBusqueda("No se encontró esa dirección — prueba con menos detalle o marca el punto directo en el mapa.");
         return;
       }
       setPunto({ lat: parseFloat(resultados[0].lat), lng: parseFloat(resultados[0].lon) });
     } catch {
       if (idDeEstaBusqueda !== busquedaVigente.current) return;
-      setErrorBusqueda("No se pudo buscar la dirección ahora — marcá el punto directo en el mapa.");
+      setErrorBusqueda("No se pudo buscar la dirección ahora — marca el punto directo en el mapa.");
     } finally {
       if (idDeEstaBusqueda === busquedaVigente.current) setBuscando(false);
     }
@@ -109,7 +109,7 @@ export function MapaSede({
     }
     navigator.geolocation.getCurrentPosition(
       (posicion) => setPunto({ lat: posicion.coords.latitude, lng: posicion.coords.longitude }),
-      () => setErrorBusqueda("No se pudo obtener tu ubicación — marcá el punto directo en el mapa."),
+      () => setErrorBusqueda("No se pudo obtener tu ubicación — marca el punto directo en el mapa."),
     );
   }
 
@@ -174,7 +174,7 @@ export function MapaSede({
         <p className="text-caption text-text-faint">
           {punto
             ? `Punto marcado: ${punto.lat.toFixed(5)}, ${punto.lng.toFixed(5)} — arrastrá el marcador para ajustar.`
-            : "Sin punto marcado todavía — buscá una dirección o tocá el mapa."}
+            : "Sin punto marcado todavía — busca una dirección o toca el mapa."}
         </p>
         <div className="flex gap-2">
           <Button type="button" variant="ghost" onClick={usarUbicacionActual}>

@@ -492,7 +492,7 @@ export function FichaPublicaForm({
           <div className="space-y-4">
             <p className="text-caption text-text-secondary">
               Esto es lo mismo que usa tu agenda — un cambio acá se refleja
-              ahí también. El municipio que usás para agendar y la ciudad
+              ahí también. El municipio que usas para agendar y la ciudad
               del Directorio son catálogos distintos, por eso hay dos
               selectores de ubicación por sede.
             </p>
