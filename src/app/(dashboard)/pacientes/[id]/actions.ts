@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { TipoAntecedente } from "@prisma/client";
-import { requireMedico, requireMedicoSesion } from "@/modules/core/autorizacion";
+import { requireMedico, requireMedicoSesion, requirePro } from "@/modules/core/autorizacion";
 import {
   abrirOCrearConsulta,
   CitaNoDisponibleError,
@@ -48,6 +48,7 @@ const datosPacienteSchema = z.object({
 
 export async function iniciarConsultaAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
 
   const pacienteId = String(formData.get("pacienteId") ?? "");
   const citaIdCampo = formData.get("citaId");
@@ -90,6 +91,7 @@ export async function iniciarConsultaAction(formData: FormData) {
  */
 export async function recetarAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
+  await requirePro("documentos");
 
   const pacienteId = String(formData.get("pacienteId") ?? "");
   const citaIdCampo = formData.get("citaId");
@@ -220,6 +222,7 @@ const antecedenteSchema = z.object({
 
 export async function crearAntecedenteAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
 
   const pacienteId = String(formData.get("pacienteId") ?? "");
   if (!pacienteId) {
@@ -249,6 +252,7 @@ export async function crearAntecedenteAction(formData: FormData) {
 
 export async function editarAntecedenteAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
 
   const pacienteId = String(formData.get("pacienteId") ?? "");
   const antecedenteId = String(formData.get("antecedenteId") ?? "");
@@ -289,6 +293,7 @@ export async function editarAntecedenteAction(formData: FormData) {
 
 export async function desactivarAntecedenteAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
 
   const pacienteId = String(formData.get("pacienteId") ?? "");
   const antecedenteId = String(formData.get("antecedenteId") ?? "");
@@ -323,6 +328,7 @@ export async function desactivarAntecedenteAction(formData: FormData) {
  */
 export async function actualizarOdontogramaAction(formData: FormData) {
   const { session } = await requireMedicoSesion();
+  await requirePro("consultas");
 
   const pacienteId = String(formData.get("pacienteId") ?? "");
   if (!pacienteId) {

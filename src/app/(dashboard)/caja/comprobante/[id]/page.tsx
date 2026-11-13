@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSesion } from "@/modules/core/autorizacion";
+import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/plan";
+import { PanelSoloPro } from "@/components/suscripcion/PanelSoloPro";
 import { prisma } from "@/db/client";
 import {
   obtenerComprobante,
@@ -26,6 +28,9 @@ export default async function ComprobantePage({
   params: Promise<{ id: string }>;
 }) {
   const session = await requireSesion();
+  if (!planIncluyeModulo(await planDeOrganizacion(session.user.organizacionId), "caja")) {
+    return <PanelSoloPro modulo="caja" />;
+  }
   const { id } = await params;
 
   const comprobante = await obtenerComprobante({

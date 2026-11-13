@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMedico } from "@/modules/core/autorizacion";
+import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/plan";
+import { PanelSoloPro } from "@/components/suscripcion/PanelSoloPro";
 import {
   obtenerDocumento,
   type ContenidoReceta,
@@ -18,6 +20,9 @@ export default async function DocumentoPage({
   // Clínica — Bloque D). No hace falta resolverMedicoAutenticado aquí
   // porque no hay ninguna verificación de ownership en la lectura.
   const session = await requireMedico();
+  if (!planIncluyeModulo(await planDeOrganizacion(session.user.organizacionId), "documentos")) {
+    return <PanelSoloPro modulo="documentos" />;
+  }
   const { id, documentoId } = await params;
 
   const documento = await obtenerDocumento({

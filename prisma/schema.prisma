@@ -761,6 +761,10 @@ enum ProveedorPago {
 /// SPIDI no hay API ni webhook; el cobro pasa por SPIDI, la confirmación
 /// es manual).
 enum EstadoSuscripcion {
+  /// Mes gratis del plan Ficha corriendo: `finPeriodoActual` dice cuándo
+  /// termina. No corta nada al vencer — el OS avisa y la cobranza se hace
+  /// a mano (decisión del founder, 13-nov-2026).
+  PRUEBA
   ACTIVA
   PENDIENTE_PAGO
   BAJANDO_A_FICHA

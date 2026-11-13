@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { CategoriaGasto } from "@prisma/client";
-import { requireSesion } from "@/modules/core/autorizacion";
+import { requireSesion, requirePro } from "@/modules/core/autorizacion";
 import {
   obtenerMedicoDeOrganizacion,
   MedicoNoEncontradoError,
@@ -49,6 +49,7 @@ function leerDescuento(formData: FormData): number {
 
 export async function abrirCajaAction(formData: FormData) {
   const session = await requireSesion();
+  await requirePro("caja");
 
   const parseoUsd = montoInicialSchema.safeParse(formData.get("montoInicialUsd"));
   const parseoBs = montoInicialSchema.safeParse(formData.get("montoInicialBs"));
@@ -75,6 +76,7 @@ export async function abrirCajaAction(formData: FormData) {
 
 export async function cerrarCajaAction(formData: FormData) {
   const session = await requireSesion();
+  await requirePro("caja");
 
   // Distingo "campo ausente/vacío" de "0 real": Number("") es 0 en JS, así
   // que si dejara que Zod coercionara directo, un campo vacío pasaría como
@@ -141,6 +143,7 @@ const tipoCobroSchema = z.enum(["consulta", "directo"]);
  */
 export async function registrarCobroAction(formData: FormData) {
   const session = await requireSesion();
+  await requirePro("caja");
 
   const parseoTipo = tipoCobroSchema.safeParse(formData.get("tipo"));
   const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));
@@ -230,6 +233,7 @@ export async function registrarCobroAction(formData: FormData) {
 
 export async function registrarGastoAction(formData: FormData) {
   const session = await requireSesion();
+  await requirePro("caja");
 
   const parseoCategoria = categoriaGastoSchema.safeParse(formData.get("categoria"));
   const parseoMonto = montoCobroSchema.safeParse(formData.get("monto"));

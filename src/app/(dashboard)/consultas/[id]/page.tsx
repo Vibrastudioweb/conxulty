@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
+import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/plan";
+import { PanelSoloPro } from "@/components/suscripcion/PanelSoloPro";
 import { obtenerConsulta } from "@/modules/core/consultas";
 import { listarDocumentosDeConsulta } from "@/modules/documentos/documentos";
 import { guardarConsultaAction, cerrarConsultaAction } from "./actions";
@@ -26,6 +28,9 @@ export default async function ConsultaPage({
   searchParams: Promise<{ guardado?: string; error?: string }>;
 }) {
   const { session, medico } = await requireMedicoSesion();
+  if (!planIncluyeModulo(await planDeOrganizacion(session.user.organizacionId), "consultas")) {
+    return <PanelSoloPro modulo="consultas" />;
+  }
 
   const { id } = await params;
   const { guardado, error } = await searchParams;

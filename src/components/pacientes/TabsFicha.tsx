@@ -52,18 +52,26 @@ export function TabsFicha({
   tabActual,
   pacienteId,
   mostrarOdontograma,
+  tabsPermitidas,
 }: {
   tabActual: TabFicha;
   pacienteId: string;
   /** Solo true cuando el médico logueado tiene profesión ODONTOLOGO. */
   mostrarOdontograma?: boolean;
+  /** Si viene, solo se dibujan estas (13-nov-2026: en el plan Ficha las
+   *  tabs clínicas no existen — ver `plan.ts`). Sin ella se dibujan todas,
+   *  como antes. */
+  tabsPermitidas?: readonly TabFicha[];
 }) {
   // Se inserta después de "Antecedentes" (misma posición temática que la
   // demo le da a datos clínicos de examen) — índice 3, antes de
   // "Historial clínico".
-  const opciones = mostrarOdontograma
+  const todas = mostrarOdontograma
     ? [...OPCIONES.slice(0, 3), OPCION_ODONTOGRAMA, ...OPCIONES.slice(3)]
     : OPCIONES;
+  const opciones = tabsPermitidas
+    ? todas.filter((o) => tabsPermitidas.includes(o.valor))
+    : todas;
 
   return (
     <div className="mt-4 border-b border-border">

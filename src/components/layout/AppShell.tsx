@@ -7,6 +7,7 @@ import { Sidebar } from "./Sidebar";
 import { SidebarFrame } from "./SidebarFrame";
 import { MobileHeader } from "./MobileHeader";
 import { Topbar } from "./Topbar";
+import { AvisoSuscripcion } from "@/components/suscripcion/AvisoSuscripcion";
 
 /**
  * Estructura persistente del dashboard: sidebar + contenido en desktop
@@ -48,6 +49,9 @@ export async function AppShell({
       <div className="flex min-h-screen flex-1 flex-col">
         <MobileHeader alertas={alertas} rol={user.rol} className="lg:hidden" />
         <Topbar alertas={alertas} className="hidden lg:flex" />
+        {/* Recordatorio de pago (13-nov-2026): solo MEDICO — es quien paga,
+            y /ajustes exige ese rol. No bloquea nada, solo avisa. */}
+        {user.rol === "MEDICO" && <AvisoSuscripcion organizacionId={user.organizacionId} />}
         {/* No es <main>: cada página ya renderiza su propio <main> — anidar
             landmarks "main" es inválido en HTML y duplica el landmark para
             lectores de pantalla. */}

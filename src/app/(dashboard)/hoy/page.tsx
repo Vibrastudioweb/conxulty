@@ -22,6 +22,7 @@ import {
   obtenerTotalCobradoEnRango,
 } from "@/modules/cobros-caja/cobros";
 import { listarResenasPublicadas } from "@/modules/directorio/resenas";
+import { planIncluyeModulo } from "@/modules/suscripcion/plan";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { KpiCard, type KpiDelta } from "@/components/ui/KpiCard";
 import { QuickActionTile } from "@/components/ui/QuickActionTile";
@@ -237,8 +238,14 @@ export default async function HoyPage() {
 
   const organizacion = await prisma.organizacion.findUniqueOrThrow({
     where: { id: session.user.organizacionId },
-    select: { fichaDirectorioId: true },
+    select: { fichaDirectorioId: true, plan: true },
   });
+  // 13-nov-2026 (hallazgo C2): cobros y consultas son del plan Pro. En
+  // Ficha no se muestran sus accesos ni el total de cobros — serían una
+  // tarjeta en cero y botones que terminan en la pantalla de "esto es de
+  // Pro". Crear pacientes sí es de Ficha, así que ese botón se queda, con
+  // el nombre que corresponde.
+  const tienePro = planIncluyeModulo(organizacion.plan, "caja");
 
   const [
     citas,
@@ -354,7 +361,7 @@ export default async function HoyPage() {
           className="inline-flex items-center gap-2 rounded-button bg-brand-primary px-4 py-2.5 text-body-secondary font-semibold text-white transition hover:bg-brand-primary-hover"
         >
           <Plus size={16} aria-hidden="true" />
-          Nueva consulta sin cita
+          {tienePro ? "Nueva consulta sin cita" : "Nuevo paciente"}
         </Link>
       </header>
 
@@ -395,13 +402,15 @@ export default async function HoyPage() {
                 subtitle="Toda la semana"
                 accent="indigo"
               />
-              <QuickActionTile
-                href="/caja"
-                icon={Wallet}
-                title="Registrar cobro"
-                subtitle="Cobros y caja del día"
-                accent="green"
-              />
+              {tienePro && (
+                <QuickActionTile
+                  href="/caja"
+                  icon={Wallet}
+                  title="Registrar cobro"
+                  subtitle="Cobros y caja del día"
+                  accent="green"
+                />
+              )}
               <QuickActionTile
                 href="/ficha-publica"
                 icon={IdCard}
@@ -412,27 +421,29 @@ export default async function HoyPage() {
             </div>
           </section>
 
-          <section className="rounded-card border border-border bg-surface px-4 py-3">
-            <SectionLabel>Cobros</SectionLabel>
-            <div className="mt-2">
-              <p className="font-display text-page-title font-semibold text-text-primary">
-                {cobrosHoy.value}
-              </p>
-              <p className="mt-0.5 text-caption text-text-faint">
-                Hoy{deltaCobros.direccion !== "flat" && ` · ${deltaCobros.texto}`}
-                {deltaCobros.direccion === "flat" && " · igual que ayer"}
-              </p>
-            </div>
-            <div className="my-3 h-px bg-border" />
-            <div>
-              <p className="text-section-title font-semibold text-text-primary">
-                {cobrosMes.value}
-              </p>
-              <p className="mt-0.5 text-caption text-text-faint">
-                {ahora.toLocaleDateString("es", { month: "long" })}, acumulado
-              </p>
-            </div>
-          </section>
+          {tienePro && (
+            <section className="rounded-card border border-border bg-surface px-4 py-3">
+              <SectionLabel>Cobros</SectionLabel>
+              <div className="mt-2">
+                <p className="font-display text-page-title font-semibold text-text-primary">
+                  {cobrosHoy.value}
+                </p>
+                <p className="mt-0.5 text-caption text-text-faint">
+                  Hoy{deltaCobros.direccion !== "flat" && ` · ${deltaCobros.texto}`}
+                  {deltaCobros.direccion === "flat" && " · igual que ayer"}
+                </p>
+              </div>
+              <div className="my-3 h-px bg-border" />
+              <div>
+                <p className="text-section-title font-semibold text-text-primary">
+                  {cobrosMes.value}
+                </p>
+                <p className="mt-0.5 text-caption text-text-faint">
+                  {ahora.toLocaleDateString("es", { month: "long" })}, acumulado
+                </p>
+              </div>
+            </section>
+          )}
 
           {resenas?.ok && (
             <section className="rounded-card border border-border bg-surface px-4 py-3">
@@ -586,16 +597,18 @@ export default async function HoyPage() {
                 delta={deltaAtendidas}
                 href="/agenda?estado=ATENDIDA"
               />
-              <KpiCard
-                dense
-                icon={CircleDollarSign}
-                label="Cobros"
-                value={cobrosHoy.value}
-                hint={cobrosHoy.hint}
-                accent="amber"
-                delta={deltaCobros}
-                href="/caja"
-              />
+              {tienePro && (
+                <KpiCard
+                  dense
+                  icon={CircleDollarSign}
+                  label="Cobros"
+                  value={cobrosHoy.value}
+                  hint={cobrosHoy.hint}
+                  accent="amber"
+                  delta={deltaCobros}
+                  href="/caja"
+                />
+              )}
               <KpiCard
                 dense
                 icon={CalendarCheck2}

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireMedicoSesion } from "@/modules/core/autorizacion";
+import { requireMedicoSesion, requirePro } from "@/modules/core/autorizacion";
 import { obtenerConsulta } from "@/modules/core/consultas";
 import { emitirDocumento, type ContenidoReceta } from "@/modules/documentos/documentos";
 import { EstadoConsultaInvalidoError } from "@/modules/core/consultas";
@@ -23,6 +23,7 @@ const recetaSchema = z.object({
 
 export async function emitirRecetaAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
+  await requirePro("documentos");
 
   const consultaId = String(formData.get("consultaId") ?? "");
   if (!consultaId) {

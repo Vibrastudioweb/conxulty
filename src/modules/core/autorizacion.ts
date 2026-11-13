@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/db/client";
 import { resolverMedicoAutenticado } from "@/modules/core/sesionMedica";
+import { planDeOrganizacion, planIncluyeModulo, type ModuloPro } from "@/modules/suscripcion/plan";
 
 /**
  * Guarda mínima compartida por toda ruta/acción autenticada, sin importar
@@ -117,4 +118,33 @@ export async function requireSuperadmin() {
   }
 
   return session;
+}
+
+/**
+ * Guarda de los módulos que solo trae el plan Pro (13-nov-2026, hallazgo
+ * C2 de la auditoría: el plan no se consultaba en ninguna parte y Ficha
+ * veía lo mismo que Pro).
+ *
+ * Va en las SERVER ACTIONS, que son endpoints públicos: esconder un botón
+ * no impide que alguien mande el formulario igual. Las páginas no usan
+ * esto — en vez de rebotar al médico, muestran la pantalla de "esto es
+ * de Pro" con el precio y el enlace de pago (ver PanelSoloPro).
+ *
+ * El plan vive en la Organizacion, no en el usuario: aplica igual a
+ * MEDICO, ADMIN y STAFF del mismo consultorio.
+ */
+export async function requirePro(modulo: ModuloPro) {
+  const session = await requireSesion();
+  const plan = await planDeOrganizacion(session.user.organizacionId);
+  if (!planIncluyeModulo(plan, modulo)) {
+    redirect(`/ajustes?pro=${modulo}`);
+  }
+  return session;
+}
+
+/** El plan de quien está en sesión, para que una página decida si muestra
+ *  su contenido o la pantalla de Pro. */
+export async function planDeSesion() {
+  const session = await requireSesion();
+  return { session, plan: await planDeOrganizacion(session.user.organizacionId) };
 }

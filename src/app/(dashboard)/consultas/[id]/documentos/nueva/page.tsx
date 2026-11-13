@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
+import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/plan";
+import { PanelSoloPro } from "@/components/suscripcion/PanelSoloPro";
 import { obtenerConsulta } from "@/modules/core/consultas";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -18,6 +20,9 @@ export default async function NuevaRecetaPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { session, medico } = await requireMedicoSesion();
+  if (!planIncluyeModulo(await planDeOrganizacion(session.user.organizacionId), "documentos")) {
+    return <PanelSoloPro modulo="documentos" />;
+  }
   const { id } = await params;
   const { error } = await searchParams;
 

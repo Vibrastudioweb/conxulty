@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireSesion } from "@/modules/core/autorizacion";
+import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/plan";
+import { PanelSoloPro } from "@/components/suscripcion/PanelSoloPro";
 import { obtenerResumenFinanciero } from "@/modules/reportes/reportes";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -35,6 +37,9 @@ export default async function ReportesPage({
   }>;
 }) {
   const session = await requireSesion();
+  if (!planIncluyeModulo(await planDeOrganizacion(session.user.organizacionId), "reportes")) {
+    return <PanelSoloPro modulo="reportes" />;
+  }
   const { vista: vistaParam, fecha: fechaParam, desde, hasta } = await searchParams;
 
   const vista: VistaReporte =

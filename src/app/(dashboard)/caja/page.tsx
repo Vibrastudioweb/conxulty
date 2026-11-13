@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireSesion } from "@/modules/core/autorizacion";
+import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/plan";
+import { PanelSoloPro } from "@/components/suscripcion/PanelSoloPro";
 import { obtenerCajaAbierta, obtenerSaldoPorCuenta } from "@/modules/cobros-caja/caja";
 import { METODOS_PAGO, INFO_METODO_PAGO } from "@/modules/cobros-caja/metodosPago";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -107,6 +109,9 @@ export default async function CajaPage({
   }>;
 }) {
   const session = await requireSesion();
+  if (!planIncluyeModulo(await planDeOrganizacion(session.user.organizacionId), "caja")) {
+    return <PanelSoloPro modulo="caja" />;
+  }
   const {
     error,
     abierta,

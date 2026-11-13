@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
+import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/plan";
 import { obtenerPaciente } from "@/modules/core/pacientes";
 import { obtenerCita, listarCitasDelPaciente } from "@/modules/core/citas";
 import { listarConsultasDelPaciente } from "@/modules/core/consultas";
@@ -85,25 +86,38 @@ export default async function PacientePage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const { session, medico } = await requireMedicoSesion();
-  const mostrarOdontograma = medico.profesion === "ODONTOLOGO";
+  // 13-nov-2026 (hallazgo C2): en el plan Ficha la ficha del paciente es
+  // su lista y sus datos de contacto — consultas, antecedentes, historial,
+  // tratamientos, documentos, IA y odontograma son del plan Pro. Las
+  // acciones que escriben cualquiera de esas cosas están cerradas aparte
+  // en actions.ts (`requirePro`); esto solo evita mostrar pestañas y
+  // botones que no van a funcionar.
+  const tienePro = planIncluyeModulo(
+    await planDeOrganizacion(session.user.organizacionId),
+    "consultas",
+  );
+  const mostrarOdontograma = tienePro && medico.profesion === "ODONTOLOGO";
 
   const { id } = await params;
   const { cita: citaId, error, tab: tabParam, ...resto } = await searchParams;
   const mensajeExito = Object.keys(MENSAJES_EXITO).find((clave) => clave in resto);
-  const TABS_VALIDAS: TabFicha[] = [
-    "resumen",
-    "datos",
-    "antecedentes",
-    "historial",
-    "tratamientos",
-    "citas",
-    "documentos",
-    "ia",
-    ...(mostrarOdontograma ? (["odontograma"] as TabFicha[]) : []),
-  ];
+  const TABS_VALIDAS: TabFicha[] = tienePro
+    ? [
+        "resumen",
+        "datos",
+        "antecedentes",
+        "historial",
+        "tratamientos",
+        "citas",
+        "documentos",
+        "ia",
+        ...(mostrarOdontograma ? (["odontograma"] as TabFicha[]) : []),
+      ]
+    : ["datos", "citas"];
+  const tabPorDefecto: TabFicha = tienePro ? "resumen" : "datos";
   const tab: TabFicha = TABS_VALIDAS.includes(tabParam as TabFicha)
     ? (tabParam as TabFicha)
-    : "resumen";
+    : tabPorDefecto;
 
   const paciente = await obtenerPaciente({
     organizacionId: session.user.organizacionId,
@@ -232,7 +246,7 @@ export default async function PacientePage({
         </div>
       ) : (
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {!citaNoDisponible && (
+          {tienePro && !citaNoDisponible && (
             <form action={iniciarConsultaAction}>
               <input type="hidden" name="pacienteId" value={paciente.id} />
               {citaId && <input type="hidden" name="citaId" value={citaId} />}
@@ -253,7 +267,7 @@ export default async function PacientePage({
               recetarAction, que abre/continúa la consulta y aterriza
               directo en el formulario de la receta — misma regla de
               citaNoDisponible que ya aplica a "Iniciar consulta". */}
-          {!citaNoDisponible && (
+          {tienePro && !citaNoDisponible && (
             <form action={recetarAction}>
               <input type="hidden" name="pacienteId" value={paciente.id} />
               {citaId && <input type="hidden" name="citaId" value={citaId} />}
@@ -275,6 +289,7 @@ export default async function PacientePage({
         tabActual={tab}
         pacienteId={paciente.id}
         mostrarOdontograma={mostrarOdontograma}
+        tabsPermitidas={TABS_VALIDAS}
       />
 
       {tab === "resumen" && (

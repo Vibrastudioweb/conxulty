@@ -37,8 +37,9 @@ export async function registrarMedicoAction(formData: FormData) {
   // después en "Mi ficha pública" (ver FichaPublicaForm.tsx y su action),
   // que ya exige al menos una modalidad antes de guardar/publicar — ese
   // candado ya no hace falta acá.
+  let quierePro = false;
   try {
-    await registrarMedico({
+    ({ quierePro } = await registrarMedico({
       nombre: parseo.data.nombre,
       email: parseo.data.email,
       password: parseo.data.password,
@@ -53,7 +54,7 @@ export async function registrarMedicoAction(formData: FormData) {
       zonasCobertura: [],
       sedes: [],
       planElegido: parseo.data.planElegido,
-    });
+    }));
   } catch (err) {
     if (err instanceof EmailYaRegistradoError) {
       redirect("/registro?error=email_registrado");
@@ -77,7 +78,11 @@ export async function registrarMedicoAction(formData: FormData) {
     await signIn("credentials", {
       email: parseo.data.email,
       password: parseo.data.password,
-      redirectTo: "/hoy",
+      // Quien eligió Pro entra a pagarlo: Pro no tiene mes gratis
+      // (decisión del founder, 13-nov-2026). Su cuenta ya quedó en Ficha
+      // con el mes de regalo corriendo, así que si no paga igual puede
+      // trabajar con agenda, pacientes y su ficha pública.
+      redirectTo: quierePro ? "/ajustes?pro=consultas" : "/hoy",
     });
   } catch (error) {
     if (error instanceof AuthError) {

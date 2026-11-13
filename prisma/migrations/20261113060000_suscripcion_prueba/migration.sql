@@ -1,0 +1,11 @@
+-- Mes gratis del plan Ficha (13-nov-2026, decisión del founder).
+--
+-- Hasta ahora una organización recién registrada quedaba con el plan que
+-- eligió y SIN fila en `suscripciones`: nada marcaba cuándo empezaba ni
+-- cuándo terminaba su mes de regalo, así que el "primer mes gratis" que
+-- promete la landing era en realidad gratis para siempre.
+--
+-- `PRUEBA` distingue ese mes de una suscripción `ACTIVA`, que significa
+-- "pagó y alguien lo confirmó". No corta nada por sí solo: el OS solo
+-- avisa, y la cobranza la hace el equipo a mano.
+ALTER TYPE "EstadoSuscripcion" ADD VALUE IF NOT EXISTS 'PRUEBA';

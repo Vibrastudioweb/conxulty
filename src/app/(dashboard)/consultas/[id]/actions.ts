@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { requireMedicoSesion } from "@/modules/core/autorizacion";
+import { requireMedicoSesion, requirePro } from "@/modules/core/autorizacion";
 import {
   obtenerConsulta,
   guardarConsulta,
@@ -35,6 +35,7 @@ function leerCampoNumerico(formData: FormData, campo: string): number | null | u
 
 export async function guardarConsultaAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
 
   const consultaId = String(formData.get("consultaId") ?? "");
   if (!consultaId) {
@@ -103,6 +104,7 @@ export async function guardarConsultaAction(formData: FormData) {
 
 export async function cerrarConsultaAction(formData: FormData) {
   const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
 
   const consultaId = String(formData.get("consultaId") ?? "");
   if (!consultaId) {
