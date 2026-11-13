@@ -59,7 +59,7 @@ export default async function FichaEntidadPage() {
       {!directorio.ok && (
         <div className="mt-4">
           <Alert tone="danger" title="No se pudo cargar el Directorio ahora">
-            {directorio.error} — podés seguir, pero no vas a poder guardar
+            {directorio.error} — puedes seguir, pero no vas a poder guardar
             hasta que el Directorio responda.
           </Alert>
         </div>

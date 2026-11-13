@@ -457,7 +457,7 @@ export default async function HoyPage() {
               </div>
               {resenas.resenas.length === 0 ? (
                 <p className="mt-2 text-body-secondary text-text-faint">
-                  Todavía no tenés reseñas publicadas.
+                  Todavía no tienes reseñas publicadas.
                 </p>
               ) : (
                 <div className="mt-2 flex flex-col gap-2.5">

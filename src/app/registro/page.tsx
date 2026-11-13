@@ -25,7 +25,7 @@ const MENSAJES_ERROR: Record<string, string> = {
  * cargada) y ahora se completan después en "Mi ficha pública"
  * (FichaPublicaForm.tsx), que ya tiene su propio CRUD para todo eso y su
  * propia validación antes de publicar. El registro queda en lo mínimo
- * para tener cuenta: quién sos, con qué entrás, tu profesión y tu plan.
+ * para tener cuenta: quién eres, con qué entras, tu profesión y tu plan.
  */
 export default async function RegistroPage({
   searchParams,

@@ -20,7 +20,7 @@ export default async function ResenasPage() {
       <div className="mx-auto max-w-2xl px-4 py-6 lg:px-8">
         <h1 className="text-h2 font-semibold text-text-primary">Reseñas</h1>
         <div className="mt-4">
-          <Alert tone="info" title="Todavía no tenés ficha pública">
+          <Alert tone="info" title="Todavía no tienes ficha pública">
             Las reseñas viven en tu ficha del Directorio — completá
             &quot;Mi ficha pública&quot; primero.
           </Alert>
@@ -51,7 +51,7 @@ export default async function ResenasPage() {
       {resultado.ok && resultado.pendientes.length === 0 && (
         <div className="mt-4">
           <Alert tone="success" title="Sin reseñas pendientes">
-            No tenés ninguna reseña esperando revisión por ahora.
+            No tienes ninguna reseña esperando revisión por ahora.
           </Alert>
         </div>
       )}
