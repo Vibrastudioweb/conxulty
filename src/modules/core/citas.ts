@@ -26,10 +26,39 @@ import {
 // valor en 30 una reserva pública a las 9:00 no bloqueaba hasta las 10:00,
 // dejando un choque de horario sin detectar entre 9:30 y 10:00.
 export const DURACION_MINUTOS_DEFECTO = 60;
-/** Cota superior de duración usada para acotar la ventana de la consulta de
- *  conflictos (ver `hayConflictoHorario`). No es una regla de negocio, es
- *  una optimización: ninguna cita real dura más de 8 horas. */
-const DURACION_MINUTOS_MAXIMA = 480;
+/**
+ * Cota superior de duración. Nació como una optimización para acotar la
+ * ventana de la consulta de conflictos (ver `hayConflictoHorario`), pero
+ * NO es opcional: si una cita durara más que esto, `hayConflictoHorario`
+ * dejaría de verla y se podrían montar dos pacientes a la misma hora sin
+ * que nada avise.
+ *
+ * 13-nov-2026 (auditoría Bloque 3): esa invariante se cumplía de casualidad
+ * —el `max(480)` de un zod en agenda/actions.ts— y nada ataba los dos
+ * números. Subir el máximo del formulario habría roto la detección de
+ * choques en silencio. Ahora se valida acá, que es el borde real.
+ */
+export const DURACION_MINUTOS_MAXIMA = 480;
+export const DURACION_MINUTOS_MINIMA = 5;
+
+export class CitaDuracionInvalidaError extends Error {
+  constructor() {
+    super(
+      `La duración de una cita tiene que estar entre ${DURACION_MINUTOS_MINIMA} y ${DURACION_MINUTOS_MAXIMA} minutos.`,
+    );
+    this.name = "CitaDuracionInvalidaError";
+  }
+}
+
+function exigirDuracionValida(duracionMinutos: number): void {
+  if (
+    !Number.isInteger(duracionMinutos) ||
+    duracionMinutos < DURACION_MINUTOS_MINIMA ||
+    duracionMinutos > DURACION_MINUTOS_MAXIMA
+  ) {
+    throw new CitaDuracionInvalidaError();
+  }
+}
 
 const ESTADOS_QUE_BLOQUEAN_HORARIO: EstadoCita[] = [
   "PENDIENTE",
@@ -364,6 +393,8 @@ export async function crearCita(input: {
   motivo?: string | null;
   notas?: string | null;
 }): Promise<{ citaId: string }> {
+  exigirDuracionValida(input.duracionMinutos);
+
   await validarConsistenciaCita({
     organizacionId: input.organizacionId,
     pacienteId: input.pacienteId,
@@ -436,6 +467,8 @@ export async function actualizarCita(input: {
   motivo?: string | null;
   notas?: string | null;
 }): Promise<void> {
+  exigirDuracionValida(input.duracionMinutos);
+
   const cita = await obtenerCitaDelMedico({
     organizacionId: input.organizacionId,
     medicoId: input.medicoId,

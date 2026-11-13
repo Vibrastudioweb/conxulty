@@ -57,7 +57,25 @@ export function combinarFechaHora(fecha: string, hora: string): Date | null {
   const [anio, mes, dia] = fecha.split("-").map(Number);
   const [horaNum, minutoNum] = hora.split(":").map(Number);
   const resultado = new Date(anio, mes - 1, dia, horaNum, minutoNum, 0, 0);
-  return Number.isNaN(resultado.getTime()) ? null : resultado;
+  if (Number.isNaN(resultado.getTime())) return null;
+
+  // 13-nov-2026 (auditoría Bloque 3): el formato no alcanza. "99:99" y
+  // "2026-13-45" pasan las dos expresiones regulares de arriba, y el
+  // constructor de Date NO falla con ellos: desborda en silencio. "99:99"
+  // del 14 de noviembre terminaba creando una cita el 18, y
+  // "2026-13-45" una en febrero de 2027 — sin un solo error, y con el
+  // paciente citado un día que nadie pidió.
+  //
+  // El navegador no manda eso desde un <input type="date">, pero una
+  // Server Action es un endpoint público: recibe lo que le manden.
+  // Se comprueba que la fecha resultante sea de verdad la que se pidió.
+  const coincide =
+    resultado.getFullYear() === anio &&
+    resultado.getMonth() === mes - 1 &&
+    resultado.getDate() === dia &&
+    resultado.getHours() === horaNum &&
+    resultado.getMinutes() === minutoNum;
+  return coincide ? resultado : null;
 }
 
 export function formatearHoraInput(fecha: Date): string {

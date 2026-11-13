@@ -18,6 +18,7 @@ import {
   TransicionEstadoInvalidaError,
   CitaConsultaEnCursoError,
   CitaNoCanceladaError,
+  CitaDuracionInvalidaError,
   DURACION_MINUTOS_DEFECTO,
 } from "@/modules/core/citas";
 import { PacienteArchivadoError } from "@/modules/core/pacientes";
@@ -31,6 +32,23 @@ const datosCitaSchema = z.object({
   motivo: z.string().trim().nullable(),
   notas: z.string().trim().nullable(),
 });
+
+/**
+ * 13-nov-2026 (auditoría Bloque 3): estas vueltas se armaban pegando
+ * strings —`?fecha=${fecha}&pacienteId=${pacienteId}&error=1`— con
+ * valores que vienen del formulario. Un `&` o un `#` adentro de
+ * cualquiera de los dos partía la URL y los parámetros siguientes se
+ * perdían o se mezclaban. URLSearchParams escapa.
+ */
+function destinoNuevaCita(params: Record<string, string>): string {
+  return `/agenda/nueva?${new URLSearchParams(params).toString()}`;
+}
+
+/** El id va en la RUTA, así que se escapa aparte: un id con `?` o `#`
+ *  cortaría la URL en dos. */
+function destinoEditarCita(citaId: string, error: string): string {
+  return `/agenda/${encodeURIComponent(citaId)}/editar?${new URLSearchParams({ error }).toString()}`;
+}
 
 function leerTexto(formData: FormData, campo: string): string | null {
   const valor = formData.get(campo);
@@ -72,7 +90,7 @@ export async function crearCitaAction(formData: FormData) {
   });
 
   if (!pacienteId || !fechaHora || !parseo.success) {
-    redirect(`/agenda/nueva?fecha=${fecha}&pacienteId=${pacienteId}&error=1`);
+    redirect(destinoNuevaCita({ fecha, pacienteId, error: "1" }));
   }
 
   try {
@@ -89,15 +107,18 @@ export async function crearCitaAction(formData: FormData) {
     });
   } catch (err) {
     if (err instanceof CitaConflictoHorarioError) {
-      redirect(`/agenda/nueva?fecha=${fecha}&pacienteId=${pacienteId}&error=conflicto`);
+      redirect(destinoNuevaCita({ fecha, pacienteId, error: "conflicto" }));
+    }
+    if (err instanceof CitaDuracionInvalidaError) {
+      redirect(destinoNuevaCita({ fecha, pacienteId, error: "1" }));
     }
     if (err instanceof PacienteArchivadoError) {
-      redirect(`/agenda/nueva?fecha=${fecha}&pacienteId=${pacienteId}&error=paciente_archivado`);
+      redirect(destinoNuevaCita({ fecha, pacienteId, error: "paciente_archivado" }));
     }
     throw err;
   }
 
-  redirect(`/agenda?fecha=${fecha}`);
+  redirect(`/agenda?${new URLSearchParams({ fecha }).toString()}`);
 }
 
 export async function actualizarCitaAction(formData: FormData) {
@@ -121,7 +142,7 @@ export async function actualizarCitaAction(formData: FormData) {
   });
 
   if (!fechaHora || !parseo.success) {
-    redirect(`/agenda/${citaId}/editar?error=1`);
+    redirect(destinoEditarCita(citaId, "1"));
   }
 
   try {
@@ -138,7 +159,10 @@ export async function actualizarCitaAction(formData: FormData) {
     });
   } catch (err) {
     if (err instanceof CitaConflictoHorarioError) {
-      redirect(`/agenda/${citaId}/editar?error=conflicto`);
+      redirect(destinoEditarCita(citaId, "conflicto"));
+    }
+    if (err instanceof CitaDuracionInvalidaError) {
+      redirect(destinoEditarCita(citaId, "1"));
     }
     if (err instanceof CitaInexistenteError || err instanceof CitaNoEditableError) {
       redirect(`/agenda?error=no_editable`);
