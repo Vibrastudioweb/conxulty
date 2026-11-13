@@ -32,7 +32,7 @@ export const EMAIL_EQUIPO = "equipo@conxulty.test";
  *
  * El orden importa y no es obvio: `registros_trazabilidad` apunta a
  * `usuarios`, así que cualquier acción que deje huella de auditoría —casi
- * todas— bloquea el borrado del usuario si no se limpia antes. Si agregás
+ * todas— bloquea el borrado del usuario si no se limpia antes. Si agregas
  * una tabla nueva que cuelgue de la organización, va en esta lista.
  */
 export async function limpiar() {

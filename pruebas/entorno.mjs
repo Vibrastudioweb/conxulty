@@ -29,7 +29,7 @@ const HOSTS_PERMITIDOS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 export function exigirBaseLocal() {
   const url = process.env.DATABASE_URL;
   if (!url) {
-    console.error("Falta DATABASE_URL. Mirá pruebas/README.md.");
+    console.error("Falta DATABASE_URL. Mira pruebas/README.md.");
     process.exit(2);
   }
   let host;
@@ -110,7 +110,7 @@ export async function exigirAppViva() {
     if (r.ok) return;
     console.error(`La app respondió ${r.status} en ${BASE_URL}. ¿Arrancó bien?`);
   } catch {
-    console.error(`No hay nada escuchando en ${BASE_URL}. Mirá pruebas/README.md.`);
+    console.error(`No hay nada escuchando en ${BASE_URL}. Mira pruebas/README.md.`);
   }
   process.exit(2);
 }

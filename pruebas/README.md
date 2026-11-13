@@ -86,7 +86,7 @@ pruebas, ahí sí vale meter un corredor de verdad.
 - `entorno.mjs` — la guarda de base local, consultas, sesiones falsas,
   aserciones y el informe.
 - `sembrar.mjs` — los datos de prueba. Idempotente: se puede correr mil
-  veces. `limpiar()` borra en orden de dependencia, y **si agregás una
+  veces. `limpiar()` borra en orden de dependencia, y **si agregas una
   tabla nueva que cuelgue de la organización, va en esa lista.**
 - `correr-todas.mjs` — las corre en serie (comparten base, en paralelo se
   pisarían).
