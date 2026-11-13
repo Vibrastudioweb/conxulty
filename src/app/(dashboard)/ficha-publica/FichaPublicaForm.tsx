@@ -39,6 +39,18 @@ function HorarioSedeFields({
       <summary className="cursor-pointer text-sm text-text-secondary">
         + Horario de atención (opcional)
       </summary>
+      {/* 13-nov-2026, decisión del founder: el horario queda corrido, un
+          solo bloque por día — no se construye el horario partido. Pero el
+          médico que cierre al mediodía igual va a escribir 8:00 a 5:00, y
+          entonces su ficha le ofrece cupos a las 12:30 a un paciente que
+          después llega a un consultorio cerrado. Ya que no lo resuelve el
+          formulario, que al menos lo diga antes de que pase. */}
+      <p className="mt-3 text-body-secondary text-text-secondary">
+        Es un solo bloque por día. Si cierras al mediodía, escribe el horario en el
+        que quieres recibir citas por internet — en el resto te siguen escribiendo
+        por WhatsApp. Si pones de corrido un horario en el que no estás, un paciente
+        puede reservar a esa hora.
+      </p>
       <div className="mt-3 space-y-2">
         {DIAS_SEMANA.map((dia) => {
           const h = porDia.get(dia);
