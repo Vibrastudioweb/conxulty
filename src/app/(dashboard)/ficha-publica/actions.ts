@@ -10,6 +10,7 @@ import {
   obtenerFichaDirectorio,
   resolverEspecialidadId,
 } from "@/modules/directorio/sincronizacion";
+import { venceElParaDirectorio } from "@/modules/suscripcion/vencimientoDirectorio";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import { MODALIDADES_ATENCION, type ModalidadAtencionId } from "@/modules/onboarding/modalidades";
 import {
@@ -444,6 +445,11 @@ export async function guardarFichaPublicaAction(
     // si no hay match exacto en el catálogo del Directorio, la ficha queda
     // sin especialidad ahí, no bloquea guardar.
     especialidadId: resolverEspecialidadId(especialidadNueva, directorioActual.especialidades),
+    // Hasta cuándo el Directorio muestra su teléfono y su botón de
+    // agendar (ver vencimientoDirectorio.ts) — se manda en cada guardado
+    // para que la ficha pública refleje el estado real de su plan sin
+    // depender de ninguna tarea programada.
+    venceEl: await venceElParaDirectorio(organizacion.id),
   });
 
   if (!resultado.ok) {

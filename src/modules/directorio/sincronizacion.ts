@@ -95,6 +95,13 @@ export interface DatosFichaDirectorio {
    * ficha pública" (10-nov-2026, ver esa función para el porqué).
    */
   especialidadId?: string | null;
+  /**
+   * Hasta cuándo el Directorio debe mostrar teléfono/WhatsApp y el botón
+   * de agendar de esta ficha, 'YYYY-MM-DD' (ver vencimientoDirectorio.ts).
+   * Omitir el campo = no tocar la suscripción del Directorio; `null` =
+   * nunca vence (cortesía). Nunca baja la ficha: solo apaga el contacto.
+   */
+  venceEl?: string | null;
 }
 
 export type ResultadoSincronizacion =
@@ -147,6 +154,38 @@ export async function sincronizarFichaDirectorio(
     });
     const cuerpo = (await respuesta.json().catch(() => null)) as
       | { ok: true; id: string; slug: string }
+      | { ok: false; error: string }
+      | null;
+    if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
+    return cuerpo;
+  } catch (err) {
+    return { ok: false, error: mensajeDeError(err) };
+  }
+}
+
+/**
+ * Solo mueve la fecha de vencimiento de una ficha ya existente, sin
+ * reenviar el resto de sus datos — para cuando se confirma un pago
+ * (pagoManual.ts) y lo único que cambió es hasta cuándo está al día.
+ */
+export async function actualizarVencimientoDirectorio(
+  fichaDirectorioId: string,
+  venceEl: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const config = configuracion();
+  if (!config) {
+    return { ok: false, error: "DIRECTORIO_API_URL / CONXULTY_SYNC_SECRET no configurados en este entorno." };
+  }
+
+  try {
+    const respuesta = await fetch(`${config.base}/api/sincronizar-profesional`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-conxulty-secret": config.secreto },
+      body: JSON.stringify({ id: fichaDirectorioId, venceEl }),
+      signal: AbortSignal.timeout(ESPERA_LECTURA_MS),
+    });
+    const cuerpo = (await respuesta.json().catch(() => null)) as
+      | { ok: true }
       | { ok: false; error: string }
       | null;
     if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };

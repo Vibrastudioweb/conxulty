@@ -35,6 +35,9 @@ export async function AvisoSuscripcion({ organizacionId }: { organizacionId: str
     );
   }
 
+  // Cortesía: no vence y no se le cobra — no tiene nada que recordarle.
+  if (suscripcion.estado === "CORTESIA") return null;
+
   if (!fin) return null;
 
   const dias = diasHasta(fin);

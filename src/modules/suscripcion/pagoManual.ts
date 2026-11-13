@@ -1,5 +1,7 @@
 import { prisma } from "@/db/client";
 import { PRECIO_CENTAVOS_USD } from "./precios";
+import { actualizarVencimientoDirectorio } from "@/modules/directorio/sincronizacion";
+import { venceElParaDirectorio } from "@/modules/suscripcion/vencimientoDirectorio";
 
 /**
  * Link de pago genérico en SPIDI (cuenta personal del usuario, confirmado
@@ -177,6 +179,27 @@ export async function confirmarPago(pagoId: string) {
       data: { plan: pago.plan },
     }),
   ]);
+
+  // El Directorio decide si muestra teléfono/WhatsApp y botón de agendar
+  // con `plan_activo(ficha_id)`, que lee su propia fecha de vencimiento —
+  // confirmar un pago acá sin empujar la fecha nueva allá dejaría la
+  // ficha apagada aunque el médico ya esté al día (hallazgo ALTO de la
+  // auditoría Bloque 2). Best effort: un Directorio caído no puede
+  // impedir que se registre un pago que ya se recibió; el próximo
+  // guardado de "Mi ficha pública" la vuelve a mandar igual.
+  const organizacion = await prisma.organizacion.findUnique({
+    where: { id: pago.organizacionId },
+    select: { fichaDirectorioId: true },
+  });
+  if (organizacion?.fichaDirectorioId) {
+    const venceEl = await venceElParaDirectorio(pago.organizacionId);
+    if (venceEl !== undefined) {
+      const resultado = await actualizarVencimientoDirectorio(organizacion.fichaDirectorioId, venceEl);
+      if (!resultado.ok) {
+        console.error("[pago] no se pudo actualizar el vencimiento en el Directorio:", resultado.error);
+      }
+    }
+  }
 }
 
 /** El médico dijo que pagó pero no se encontró el comprobante/pago real. */

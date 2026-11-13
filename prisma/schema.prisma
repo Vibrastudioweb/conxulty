@@ -766,6 +766,10 @@ enum EstadoSuscripcion {
   /// a mano (decisión del founder, 13-nov-2026).
   PRUEBA
   ACTIVA
+  /// Cortesía: la cuenta no vence y no se le cobra (decisión del founder,
+  /// 13-nov-2026, a propósito de la Dra. Yamaruc). El OS no le muestra
+  /// recordatorio de pago y su ficha del Directorio nunca se corta.
+  CORTESIA
   PENDIENTE_PAGO
   BAJANDO_A_FICHA
   SIN_METODO_DE_PAGO
