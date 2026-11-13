@@ -13,6 +13,7 @@ lo que falla sin que nadie se entere hasta que un cliente reclama.
 |---|---|---|
 | `reserva.test.mjs` | Un paciente reserva desde el Directorio | El único flujo donde la falla la ve un paciente y no el consultorio. Ya se rompió dos veces: una, el endpoint llevaba días devolviendo 503 en producción por una variable de entorno que faltaba; otra, las citas se guardaban con cuatro horas de corrimiento porque el servidor pensaba en UTC y Venezuela está en UTC-4. |
 | `dinero.test.mjs` | Reportar un pago → confirmarlo → plan activo → fecha al Directorio | Es el flujo que decide si el negocio cobra, y es manual de punta a punta: no hay pasarela que avise si un eslabón se desconecta. El último paso es el que apaga el contacto de una ficha impaga; si se corta, cualquiera usa el producto gratis para siempre. |
+| `verificacion.test.mjs` | Confirmar el correo al registrarse | Lo que cubre de verdad no es que la confirmación funcione, sino que **una médica que ya estaba adentro no quede trancada** por un requisito que nació después que ella. Esa comprobación corre el relleno leyéndolo del archivo de migración, así que si alguien lo borra, la prueba se entera. |
 | `agenda.test.mjs` | Cancelar una cita y deshacerlo | Cancelar es un clic sin confirmación, al lado de "Confirmar". Lo delicado no es devolver la cita: es **no** devolverla cuando ya le dieron ese hueco a otro paciente. Si eso falla, quedan dos personas citadas a la misma hora. |
 
 Lo que **no** se prueba, a propósito: que el botón sea azul, que el texto

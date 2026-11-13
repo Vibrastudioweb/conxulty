@@ -58,6 +58,11 @@ model Usuario {
   email                  String                 @unique
   passwordHash           String
   rol                    RolUsuario             @default(MEDICO)
+  /// Cuándo confirmó que el correo es suyo. Null = sin confirmar.
+  /// Importa por el caso aburrido y silencioso: quien se registra con un
+  /// correo mal escrito no puede recuperar su contraseña nunca, y pierde
+  /// su cuenta y su ficha sin que nadie se entere.
+  emailVerificado        DateTime?
   activo                    Boolean                  @default(true)
   createdAt                 DateTime                 @default(now())
   updatedAt                 DateTime                 @updatedAt
@@ -69,6 +74,7 @@ model Usuario {
   registrosTrazabilidad     RegistroTrazabilidad[]   @relation("TrazabilidadActor")
   organizacion              Organizacion             @relation(fields: [organizacionId], references: [id])
   tokensRecuperacion        TokenRecuperacion[]
+  tokensVerificacion        TokenVerificacion[]
 
   @@index([organizacionId])
   @@map("usuarios")
@@ -83,6 +89,24 @@ model Usuario {
 /// no alcanza para restablecer la contraseña de nadie. Se reemplaza/borra
 /// por completo en cada pedido nuevo del mismo usuario, no se acumulan
 /// tokens viejos sin usar.
+/// Confirmación del correo al registrarse. Separado de
+/// TokenRecuperacion a propósito: ese vive una hora y es de un flujo
+/// sensible que no conviene tocar, este vive dos días y es de un solo uso.
+model TokenVerificacion {
+  id         String   @id @default(cuid())
+  usuarioId  String
+  /// Hash SHA-256, nunca el token en claro: quien lea la base no puede
+  /// confirmar el correo de otro (mismo criterio que recuperacion.ts).
+  token      String   @unique
+  expiraEn   DateTime
+  usado      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("tokens_verificacion")
+}
+
 model TokenRecuperacion {
   id         String   @id @default(cuid())
   usuarioId  String

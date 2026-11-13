@@ -5,6 +5,7 @@ import { EmailYaRegistradoError } from "@/modules/acceso/solicitudes";
 import { type ProfesionId, esProfesionElegiblePro } from "@/modules/onboarding/profesiones";
 import { type ModalidadAtencionId } from "@/modules/onboarding/modalidades";
 import { type HorarioDia, detectarChoquesHorarioSedes, type ChoqueHorario } from "@/modules/onboarding/horarioSede";
+import { enviarVerificacion } from "@/modules/acceso/verificacionEmail";
 
 export class ProfesionOtraTextoRequeridoError extends Error {
   constructor() {
@@ -160,6 +161,11 @@ export async function registrarMedico(
 
       return { usuarioId: usuario.id, organizacionId: organizacion.id, quierePro };
     });
+
+    // Fuera de la transacción y sin bloquear: la cuenta ya existe y el
+    // médico está por entrar. Si el correo no sale, tiene el botón de
+    // reenviar en el aviso de adentro (ver verificacionEmail.ts).
+    await enviarVerificacion(resultado.usuarioId);
 
     return { ...resultado, choques };
   } catch (err) {

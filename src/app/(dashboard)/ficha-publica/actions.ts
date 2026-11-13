@@ -11,6 +11,7 @@ import {
   resolverEspecialidadId,
 } from "@/modules/directorio/sincronizacion";
 import { venceElParaDirectorio } from "@/modules/suscripcion/vencimientoDirectorio";
+import { usuarioVerificado } from "@/modules/acceso/verificacionEmail";
 import { MUNICIPIOS_TRUJILLO } from "@/modules/onboarding/municipiosTrujillo";
 import { MODALIDADES_ATENCION, type ModalidadAtencionId } from "@/modules/onboarding/modalidades";
 import {
@@ -172,6 +173,21 @@ export async function guardarFichaPublicaAction(
   formData: FormData,
 ): Promise<GuardarFichaPublicaResultado> {
   const { session, medico } = await requireMedicoSesion();
+
+  // 13-nov-2026: lo único que queda atado a confirmar el correo. El médico
+  // puede usar el OS completo sin confirmar —trancarlo en el primer minuto
+  // sería perder justo al que estamos tratando de confirmar— pero esta
+  // pantalla es la que lo expone a pacientes, y una ficha pública de
+  // alguien a quien no sabemos si podemos escribirle no debería existir.
+  // Las cuentas anteriores a esto quedaron confirmadas en la migración:
+  // se dieron de alta a mano, hablando con cada médico.
+  if (!(await usuarioVerificado(session.user.id))) {
+    return {
+      ok: false,
+      error:
+        "Confirma tu correo antes de publicar tu ficha. Te mandamos un enlace; si no llegó, usa el botón de reenviar en el aviso de arriba.",
+    };
+  }
 
   const parseo = fichaPublicaSchema.safeParse({
     descripcion: vacio(formData.get("descripcion")),

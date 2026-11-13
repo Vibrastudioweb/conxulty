@@ -8,6 +8,7 @@ import { SidebarFrame } from "./SidebarFrame";
 import { MobileHeader } from "./MobileHeader";
 import { Topbar } from "./Topbar";
 import { AvisoSuscripcion } from "@/components/suscripcion/AvisoSuscripcion";
+import { AvisoVerificarEmail } from "@/components/acceso/AvisoVerificarEmail";
 
 /**
  * Estructura persistente del dashboard: sidebar + contenido en desktop
@@ -51,6 +52,7 @@ export async function AppShell({
         <Topbar alertas={alertas} className="hidden lg:flex" />
         {/* Recordatorio de pago (13-nov-2026): solo MEDICO — es quien paga,
             y /ajustes exige ese rol. No bloquea nada, solo avisa. */}
+        <AvisoVerificarEmail usuarioId={user.id} />
         {user.rol === "MEDICO" && <AvisoSuscripcion organizacionId={user.organizacionId} />}
         {/* No es <main>: cada página ya renderiza su propio <main> — anidar
             landmarks "main" es inválido en HTML y duplica el landmark para
