@@ -41,7 +41,12 @@ function leerTexto(formData: FormData, campo: string): string | null {
  *  filtros incluidos), preservando el contexto en el que estaba el médico
  *  en vez de siempre resetear a la agenda del día actual. */
 function destinoAgenda(formData: FormData, query: Record<string, string> = {}) {
-  const volverA = String(formData.get("volverA") ?? "/agenda");
+  // 13-nov-2026 (auditoría Bloque 2): `volverA` viene del formulario, o
+  // sea del cliente, y va directo a `redirect()`. Sin este filtro,
+  // "https://otro-sitio.com" o "//otro-sitio.com" sacaban al médico del
+  // OS. Solo se aceptan rutas internas; cualquier otra cosa cae a /agenda.
+  const crudo = String(formData.get("volverA") ?? "/agenda");
+  const volverA = crudo.startsWith("/") && !crudo.startsWith("//") ? crudo : "/agenda";
   const params = new URLSearchParams(query);
   const queryString = params.toString();
   const separador = volverA.includes("?") ? "&" : "?";

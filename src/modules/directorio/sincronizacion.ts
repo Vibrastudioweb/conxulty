@@ -108,6 +108,28 @@ function configuracion(): { base: string; secreto: string } | null {
   return { base: base.replace(/\/+$/, ""), secreto };
 }
 
+/**
+ * 13-nov-2026 (auditoría Bloque 2): ninguna de estas llamadas tenía
+ * tiempo de espera. El Directorio corre en Cloudflare Workers y habla con
+ * su propio Supabase — si cualquiera de los dos se cuelga, el médico se
+ * queda con la rueda girando en "Mi ficha pública" sin saber qué pasó.
+ * Con tope, falla rápido y con un mensaje. El POST tiene más margen que
+ * el GET porque del otro lado hace varias escrituras seguidas.
+ */
+const ESPERA_LECTURA_MS = 8000;
+const ESPERA_ESCRITURA_MS = 15000;
+const ESPERA_FOTO_MS = 25000;
+
+/** El error de `AbortSignal.timeout` es técnico en inglés y este texto
+ *  llega tal cual a la pantalla del médico — se traduce a algo que
+ *  explique qué hacer. */
+function mensajeDeError(err: unknown): string {
+  if (err instanceof Error && err.name === "TimeoutError") {
+    return "El Directorio tardó demasiado en responder. Intenta de nuevo en un momento.";
+  }
+  return err instanceof Error ? err.message : "Error de red al contactar el Directorio.";
+}
+
 export async function sincronizarFichaDirectorio(
   datos: DatosFichaDirectorio,
 ): Promise<ResultadoSincronizacion> {
@@ -121,6 +143,7 @@ export async function sincronizarFichaDirectorio(
       method: "POST",
       headers: { "content-type": "application/json", "x-conxulty-secret": config.secreto },
       body: JSON.stringify(datos),
+      signal: AbortSignal.timeout(ESPERA_ESCRITURA_MS),
     });
     const cuerpo = (await respuesta.json().catch(() => null)) as
       | { ok: true; id: string; slug: string }
@@ -129,7 +152,7 @@ export async function sincronizarFichaDirectorio(
     if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
     return cuerpo;
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Error de red al contactar el Directorio." };
+    return { ok: false, error: mensajeDeError(err) };
   }
 }
 
@@ -170,6 +193,7 @@ export async function subirFotoDirectorio(
       // protección CSRF para nadie más.
       headers: { "x-conxulty-secret": config.secreto, origin: config.base },
       body: form,
+      signal: AbortSignal.timeout(ESPERA_FOTO_MS),
     });
     const cuerpo = (await respuesta.json().catch(() => null)) as
       | { ok: true; fotoUrl: string }
@@ -178,7 +202,7 @@ export async function subirFotoDirectorio(
     if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
     return cuerpo;
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Error de red al contactar el Directorio." };
+    return { ok: false, error: mensajeDeError(err) };
   }
 }
 
@@ -268,6 +292,7 @@ export async function obtenerFichaDirectorio(
     const respuesta = await fetch(url, {
       headers: { "x-conxulty-secret": config.secreto },
       cache: "no-store",
+      signal: AbortSignal.timeout(ESPERA_LECTURA_MS),
     });
     const cuerpo = await respuesta.json().catch(() => null);
     if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
@@ -280,7 +305,7 @@ export async function obtenerFichaDirectorio(
       especialidades: cuerpo.especialidades ?? [],
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Error de red al contactar el Directorio." };
+    return { ok: false, error: mensajeDeError(err) };
   }
 }
 

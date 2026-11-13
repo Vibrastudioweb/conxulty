@@ -34,6 +34,10 @@ export type ResultadoResenasPublicadas =
 
 export type ResultadoModerarResena = { ok: true } | { ok: false; error: string };
 
+/** Mismo criterio que sincronizacion.ts (auditoría Bloque 2, 13-nov-2026):
+ *  ninguna llamada al Directorio sin tope de espera. */
+const ESPERA_MS = 8000;
+
 function configuracion(): { base: string; secreto: string } | null {
   const base = process.env.DIRECTORIO_API_URL;
   const secreto = process.env.CONXULTY_SYNC_SECRET;
@@ -55,6 +59,7 @@ export async function listarResenasPendientes(
     const respuesta = await fetch(url, {
       headers: { "x-conxulty-secret": config.secreto },
       cache: "no-store",
+      signal: AbortSignal.timeout(ESPERA_MS),
     });
     const cuerpo = await respuesta.json().catch(() => null);
     if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
@@ -85,6 +90,7 @@ export async function listarResenasPublicadas(
     const respuesta = await fetch(url, {
       headers: { "x-conxulty-secret": config.secreto },
       cache: "no-store",
+      signal: AbortSignal.timeout(ESPERA_MS),
     });
     const cuerpo = await respuesta.json().catch(() => null);
     if (!cuerpo) return { ok: false, error: `Respuesta inválida del Directorio (HTTP ${respuesta.status}).` };
@@ -115,6 +121,7 @@ export async function moderarResena(
       method: "POST",
       headers: { "content-type": "application/json", "x-conxulty-secret": config.secreto },
       body: JSON.stringify({ fichaDirectorioId, resenaId, decision }),
+      signal: AbortSignal.timeout(ESPERA_MS),
     });
     const cuerpo = (await respuesta.json().catch(() => null)) as
       | { ok: true }

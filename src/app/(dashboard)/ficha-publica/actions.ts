@@ -258,6 +258,27 @@ export async function guardarFichaPublicaAction(
     return { ok: false, error: "Agrega al menos una sede para la modalidad presencial (o desmarca esa modalidad)." };
   }
 
+  // 13-nov-2026 (auditoría Bloque 2) — esta lectura se hacía al FINAL,
+  // justo antes de sincronizar, y su resultado alimenta dos campos del
+  // POST: `fotoUrl` (hay que reenviar la actual o el Directorio la pone
+  // en null) y `especialidadId` (se resuelve contra el catálogo que trae
+  // esta misma respuesta). Si el Directorio fallaba un segundo —red,
+  // Worker reiniciando, Supabase lento— ambos caían a null/[] y el POST
+  // BORRABA la foto y la especialidad de la ficha pública... devolviendo
+  // ok:true. El médico veía "guardado" y su ficha quedaba sin foto.
+  //
+  // Ahora se lee ANTES de escribir nada: si no se puede leer, no se
+  // guarda ni en el OS ni en el Directorio, y se dice la verdad.
+  const directorioActual = await obtenerFichaDirectorio(organizacion.fichaDirectorioId);
+  if (!directorioActual.ok) {
+    return {
+      ok: false,
+      error:
+        "No pudimos contactar al Directorio, así que no guardamos nada para no borrarte datos de tu ficha pública. Intenta de nuevo en un momento.",
+    };
+  }
+  const fotoUrlActual = directorioActual.ficha?.foto_url ?? null;
+
   await prisma.$transaction(async (tx) => {
     if (idsAEliminar.length > 0) {
       await tx.sede.deleteMany({ where: { id: { in: idsAEliminar }, medicoId: medico.id } });
@@ -393,14 +414,11 @@ export async function guardarFichaPublicaAction(
   }
 
   // La foto ya no se edita como texto (ver changelog punto 86) — este POST
-  // sigue necesitando MANDAR el valor actual de foto_url, o el Directorio
-  // la pondría en null en cada guardado de los demás campos. La subida de
-  // una foto nueva (si llegó un archivo) pasa aparte, DESPUÉS de este sync,
-  // porque necesita un fichaDirectorioId real (lo crea este mismo llamado
-  // si todavía no existía).
-  const directorioActual = await obtenerFichaDirectorio(organizacion.fichaDirectorioId);
-  const fotoUrlActual = directorioActual.ok ? directorioActual.ficha?.foto_url ?? null : null;
-
+  // sigue necesitando MANDAR el valor actual de foto_url (leído arriba, en
+  // `fotoUrlActual`), o el Directorio la pondría en null en cada guardado
+  // de los demás campos. La subida de una foto nueva (si llegó un archivo)
+  // pasa aparte, DESPUÉS de este sync, porque necesita un
+  // fichaDirectorioId real (lo crea este mismo llamado si no existía).
   const resultado = await sincronizarFichaDirectorio({
     fichaDirectorioId: organizacion.fichaDirectorioId,
     nombre: organizacion.nombre,
@@ -425,10 +443,7 @@ export async function guardarFichaPublicaAction(
     // `medicoCompleto.especialidad`, que es el de ANTES de este guardado) —
     // si no hay match exacto en el catálogo del Directorio, la ficha queda
     // sin especialidad ahí, no bloquea guardar.
-    especialidadId: resolverEspecialidadId(
-      especialidadNueva,
-      directorioActual.ok ? directorioActual.especialidades : [],
-    ),
+    especialidadId: resolverEspecialidadId(especialidadNueva, directorioActual.especialidades),
   });
 
   if (!resultado.ok) {
