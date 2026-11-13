@@ -109,15 +109,21 @@ export default async function RegistroPage({
             <label className="flex items-start gap-2 text-sm text-text-primary">
               <input type="radio" name="planElegido" value="FICHA" defaultChecked />
               <span>
-                <strong>Ficha</strong> — listado en el Directorio.
+                <strong>Ficha</strong> — $5/mes, primer mes gratis. Tu ficha pública en
+                el Directorio, agenda de citas y tus pacientes.
               </span>
             </label>
             <label className="flex items-start gap-2 text-sm text-text-primary">
               <input type="radio" name="planElegido" value="PRO" />
               <span>
-                <strong>Pro</strong> — Agenda, Pacientes, Caja y el resto del software.
+                <strong>Pro</strong> — $20/mes, sin mes gratis. Todo lo de Ficha, más
+                consultas y notas clínicas, recetas, caja y reportes.
               </span>
             </label>
+            <p className="text-caption text-text-faint">
+              Tu cuenta empieza en Ficha con el primer mes gratis. Si eliges Pro, al
+              terminar el registro te mostramos cómo pagarlo.
+            </p>
             <p className="text-caption text-text-faint">
               Pro solo aplica para Médico, Odontólogo o Psicólogo — si tu profesión es otra, tu
               cuenta queda en Ficha aunque elijas Pro.
