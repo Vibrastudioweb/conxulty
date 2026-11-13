@@ -20,6 +20,8 @@ import {
   actualizarOdontogramaAction,
 } from "./actions";
 import type { Odontograma } from "@/modules/consultas/odontograma";
+import { listarOdontogramasDelPaciente } from "@/modules/core/pacientes";
+import { HistorialOdontogramaSeccion } from "@/components/pacientes/HistorialOdontogramaSeccion";
 import { OdontogramaSeccion } from "@/components/pacientes/OdontogramaSeccion";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -132,7 +134,8 @@ export default async function PacientePage({
     ? await obtenerCita({ organizacionId: session.user.organizacionId, citaId })
     : null;
 
-  const [consultasPrevias, citas, antecedentes, documentos, eventos] = await Promise.all([
+  const [consultasPrevias, citas, antecedentes, documentos, eventos, versionesOdontograma] =
+    await Promise.all([
     listarConsultasDelPaciente({
       organizacionId: session.user.organizacionId,
       pacienteId: paciente.id,
@@ -153,7 +156,15 @@ export default async function PacientePage({
       organizacionId: session.user.organizacionId,
       pacienteId: paciente.id,
     }),
-  ]);
+    // Solo tiene sentido con el módulo de consultas; sin Pro la pestaña del
+    // odontograma ni se muestra, así que no se paga la consulta.
+    mostrarOdontograma
+      ? listarOdontogramasDelPaciente({
+          organizacionId: session.user.organizacionId,
+          pacienteId: paciente.id,
+        })
+      : Promise.resolve([]),
+    ]);
 
   const citaNoDisponible =
     cita && !cita.consulta && (cita.estado === "CANCELADA" || cita.estado === "NO_ASISTIO");
@@ -463,6 +474,10 @@ export default async function PacientePage({
             notasOdontograma={paciente.notasOdontograma}
             action={actualizarOdontogramaAction}
           />
+          {/* 13-nov-2026 (auditoría del núcleo clínico): antes cada
+              guardado pisaba al anterior, y para un odontólogo el valor
+              clínico está en la evolución del diente. */}
+          <HistorialOdontogramaSeccion versiones={versionesOdontograma} />
         </div>
       )}
 

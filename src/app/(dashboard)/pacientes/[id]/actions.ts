@@ -327,7 +327,7 @@ export async function desactivarAntecedenteAction(formData: FormData) {
  * resto de los formularios sin validación de esquema con zod.
  */
 export async function actualizarOdontogramaAction(formData: FormData) {
-  const { session } = await requireMedicoSesion();
+  const { session, medico } = await requireMedicoSesion();
   await requirePro("consultas");
 
   const pacienteId = String(formData.get("pacienteId") ?? "");
@@ -354,6 +354,7 @@ export async function actualizarOdontogramaAction(formData: FormData) {
       pacienteId,
       odontograma,
       notasOdontograma,
+      medicoId: medico.id,
     });
   } catch (err) {
     if (err instanceof PacienteNoEncontradoError) {

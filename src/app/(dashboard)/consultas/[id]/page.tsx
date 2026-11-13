@@ -5,7 +5,7 @@ import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/pla
 import { PanelSoloPro } from "@/components/suscripcion/PanelSoloPro";
 import { obtenerConsulta } from "@/modules/core/consultas";
 import { listarDocumentosDeConsulta } from "@/modules/documentos/documentos";
-import { guardarConsultaAction, cerrarConsultaAction } from "./actions";
+import { guardarConsultaAction, cerrarConsultaAction, anularConsultaAction } from "./actions";
 import { Textarea } from "@/components/ui/Textarea";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -100,7 +100,22 @@ export default async function ConsultaPage({
           <Alert tone="success">Guardado.</Alert>
         </div>
       )}
-      {error && (
+      {error === "sin_motivo" && (
+        <div className="mt-4">
+          <Alert tone="danger">
+            Escribe por qué se anula la consulta. Sin motivo no se anula.
+          </Alert>
+        </div>
+      )}
+      {error === "no_anulable" && (
+        <div className="mt-4">
+          <Alert tone="danger">
+            Esta consulta ya no se puede anular: una consulta cerrada es parte de la
+            historia clínica.
+          </Alert>
+        </div>
+      )}
+      {error && error !== "sin_motivo" && error !== "no_anulable" && (
         <div className="mt-2">
           <Alert tone="danger">No se pudo completar la acción.</Alert>
         </div>
@@ -304,6 +319,45 @@ export default async function ConsultaPage({
             Cerrar consulta
           </Button>
         </form>
+      )}
+
+      {/* 13-nov-2026 (auditoría del núcleo clínico): "Iniciar consulta" es
+          un clic desde la ficha de un paciente, y la lista es alfabética
+          con apellidos que se repiten. Una consulta abierta en el paciente
+          equivocado se quedaba para siempre en la historia de alguien que
+          nunca fue atendido, porque nada producía el estado ANULADA.
+
+          Va dentro de un <details> cerrado y al final: anular no es lo que
+          el médico viene a hacer acá, y un botón suelto al lado de "Cerrar
+          consulta" sería otro clic de más para equivocarse. */}
+      {!soloLectura && (
+        <details className="mt-6 rounded-input border border-border px-3 py-2">
+          <summary className="cursor-pointer text-body-secondary text-text-secondary">
+            Anular esta consulta
+          </summary>
+          <form action={anularConsultaAction} className="mt-3 space-y-2">
+            <input type="hidden" name="consultaId" value={consulta.id} />
+            <p className="text-body-secondary text-text-secondary">
+              Para cuando se abrió por error, por ejemplo en el paciente equivocado. La
+              consulta queda en la historia marcada como anulada, con el motivo — no se
+              borra. Las recetas emitidas en ella quedan anuladas también.
+            </p>
+            <label className="block">
+              <span className="text-body-secondary text-text-secondary">Motivo</span>
+              <input
+                type="text"
+                name="motivoAnulacion"
+                required
+                maxLength={300}
+                placeholder="Se abrió en el paciente equivocado"
+                className="mt-1 w-full rounded-input border border-border bg-surface px-3 py-2 text-body text-text-primary"
+              />
+            </label>
+            <Button type="submit" variant="secondary" fullWidth>
+              Anular consulta
+            </Button>
+          </form>
+        </details>
       )}
 
       <section className="mt-8 border-t border-border pt-4">

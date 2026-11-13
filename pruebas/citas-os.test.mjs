@@ -19,7 +19,7 @@
  */
 
 import { comprobar, correr, ejecutar, exigirAppViva, navegadorConSesion, valor, BASE_URL } from "./entorno.mjs";
-import { EMAIL_MEDICO, MEDICO, ORG, PACIENTE, PACIENTE_2, USUARIO, limpiar, sembrar } from "./sembrar.mjs";
+import { EMAIL_MEDICO, ORG, PACIENTE, PACIENTE_2, USUARIO, limpiar, sembrar } from "./sembrar.mjs";
 
 const citasDe = async (dia) =>
   Number(await valor(`select count(*) from citas where "organizacionId" = '${ORG}' and ("fechaHora" at time zone 'America/Caracas')::date = '${dia}'`));

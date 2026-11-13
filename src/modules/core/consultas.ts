@@ -336,6 +336,99 @@ export async function guardarConsulta(input: {
 }
 
 /**
+ * Anula una consulta abierta por error (13-nov-2026, auditoría del núcleo
+ * clínico).
+ *
+ * EL HUECO QUE CIERRA: el estado ANULADA existía en el enum y la interfaz
+ * ya sabía pintarlo y bloquear documentos sobre él, pero NADA en el
+ * sistema lo producía. Era un estado muerto. Y el error que debía cubrir
+ * es de los fáciles de cometer: desde la ficha de un paciente, "Iniciar
+ * consulta" es un clic, y la lista es alfabética con apellidos que se
+ * repiten. Una consulta abierta en el paciente equivocado se quedaba para
+ * siempre en la historia clínica de alguien que nunca fue atendido.
+ *
+ * SOLO DESDE EN_CURSO, a propósito. Una consulta cerrada es historia
+ * clínica: no se borra ni se invalida a posteriori, igual que no se
+ * arranca una hoja de un expediente. El error que esto arregla se nota en
+ * el momento —el médico ve el nombre equivocado arriba— y ahí todavía
+ * está EN_CURSO.
+ *
+ * El motivo es obligatorio: "anulada" sin decir por qué no le sirve a
+ * nadie que lea esa historia después.
+ *
+ * Arrastra los documentos emitidos sobre ella. Si la consulta no existió,
+ * sus recetas tampoco valen, y dejarlas vivas sería dejar una receta
+ * válida colgando de una consulta anulada.
+ */
+export async function anularConsulta(input: {
+  organizacionId: string;
+  actorId: string;
+  consultaId: string;
+  motivo: string;
+}): Promise<void> {
+  const motivo = input.motivo.trim();
+  if (!motivo) {
+    throw new EstadoConsultaInvalidoError("Hay que decir por qué se anula la consulta.");
+  }
+
+  const consulta = await prisma.consulta.findFirst({
+    where: { id: input.consultaId, organizacionId: input.organizacionId },
+    select: { estado: true, pacienteId: true },
+  });
+
+  if (!consulta) {
+    throw new ConsultaNoEncontradaError();
+  }
+  if (consulta.estado !== "EN_CURSO") {
+    throw new EstadoConsultaInvalidoError(
+      consulta.estado === "CERRADA"
+        ? "Una consulta cerrada ya es parte de la historia clínica: no se anula."
+        : "Esta consulta ya está anulada.",
+    );
+  }
+
+  const anuladoEn = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    // Mismo control de concurrencia que cerrarConsulta: si cambió de
+    // estado entre la lectura y esta escritura, actualiza 0 filas.
+    const resultado = await tx.consulta.updateMany({
+      where: {
+        id: input.consultaId,
+        organizacionId: input.organizacionId,
+        estado: "EN_CURSO",
+      },
+      data: { estado: "ANULADA" },
+    });
+
+    if (resultado.count !== 1) {
+      throw new EstadoConsultaInvalidoError(
+        "La consulta cambió de estado antes de poder anularse.",
+      );
+    }
+
+    await tx.documento.updateMany({
+      where: {
+        consultaId: input.consultaId,
+        organizacionId: input.organizacionId,
+        anuladoEn: null,
+      },
+      data: { anuladoEn, motivoAnulacion: "Se anuló la consulta: " + motivo },
+    });
+  });
+
+  await registrarEvento({
+    organizacionId: input.organizacionId,
+    actorId: input.actorId,
+    accion: "anular_consulta",
+    entidadTipo: "Consulta",
+    entidadId: input.consultaId,
+    pacienteId: consulta.pacienteId,
+    cambios: { motivo },
+  });
+}
+
+/**
  * Solo permitido si la consulta está EN_CURSO. Cambia Consulta -> CERRADA y,
  * si tiene citaId, Cita -> ATENDIDA, en una única transacción (si una falla,
  * ninguna queda modificada). Una consulta CERRADA o ANULADA no puede volver

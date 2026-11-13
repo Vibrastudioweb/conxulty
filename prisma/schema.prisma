@@ -40,6 +40,7 @@ model Organizacion {
   gastos                Gasto[]
   medicos               Medico[]
   movimientosCaja       MovimientoCaja[]
+  odontogramas           Odontograma[]
   pacientes             Paciente[]
   pagos                 Pago[]
   registrosTrazabilidad RegistroTrazabilidad[]
@@ -281,6 +282,7 @@ model Paciente {
   citas                      Cita[]
   cobros                     Cobro[]
   consultas                  Consulta[]
+  odontogramas               Odontograma[]
   organizacion               Organizacion        @relation(fields: [organizacionId], references: [id])
 
   @@unique([organizacionId, documentoIdentidad])
@@ -426,6 +428,29 @@ model Consulta {
 /// que crear una tabla nueva por cada tipo de documento. No lleva
 /// pacienteId propio: se deriva de consulta.pacienteId (relación real, no
 /// opcional) para no duplicar un dato que ya vive en el schema.
+/// Una versión del odontograma de un paciente. Para un odontólogo el
+/// valor clínico está en la EVOLUCIÓN del diente —cómo estaba antes del
+/// tratamiento y cómo quedó— y hasta hoy cada guardado pisaba al anterior.
+/// `Paciente.odontograma` sigue siendo la foto actual (lectura barata); acá
+/// queda el historial completo, una fila por guardado.
+model Odontograma {
+  id             String       @id @default(cuid())
+  organizacionId String
+  pacienteId     String
+  /// Quién lo registró. Opcional porque el paciente puede sobrevivir al
+  /// médico que lo atendió.
+  medicoId       String?
+  /// Mismo formato que `Paciente.odontograma`: { "<diente FDI>": estado }.
+  estado         Json
+  notas          String?
+  createdAt      DateTime     @default(now())
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  paciente       Paciente     @relation(fields: [pacienteId], references: [id])
+
+  @@index([organizacionId, pacienteId, createdAt])
+  @@map("odontogramas")
+}
+
 model Documento {
   id             String        @id @default(cuid())
   organizacionId String
@@ -434,6 +459,11 @@ model Documento {
   tipo           TipoDocumento
   contenido      Json
   fechaEmision   DateTime      @default(now())
+  /// Anulación: el documento NO se borra nunca — se marca. Una receta
+  /// equivocada que desaparece deja la historia clínica mintiendo; una
+  /// marcada como anulada la deja diciendo la verdad.
+  anuladoEn      DateTime?
+  motivoAnulacion String?
   consulta       Consulta      @relation(fields: [consultaId], references: [id])
   medico         Medico        @relation(fields: [medicoId], references: [id])
   organizacion   Organizacion  @relation(fields: [organizacionId], references: [id])

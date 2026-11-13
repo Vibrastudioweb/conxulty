@@ -360,18 +360,42 @@ export async function actualizarOdontograma(input: {
   pacienteId: string;
   odontograma: Record<string, string>;
   notasOdontograma?: string | null;
+  /** Quién lo registró, para que la versión guardada tenga autor. */
+  medicoId?: string | null;
 }): Promise<void> {
-  const resultado = await prisma.paciente.updateMany({
-    where: { id: input.pacienteId, organizacionId: input.organizacionId },
-    data: {
-      odontograma: input.odontograma,
-      notasOdontograma: input.notasOdontograma ?? null,
-    },
-  });
+  // 13-nov-2026 (auditoría del núcleo clínico): antes esto solo pisaba la
+  // foto actual. Para un odontólogo el valor clínico está en la EVOLUCIÓN
+  // del diente —cómo estaba antes del tratamiento y cómo quedó—, así que
+  // cada guardado perdía la mitad de la información. La foto en
+  // `pacientes.odontograma` se mantiene (lectura barata, nada que
+  // reescribir) y además queda una versión en `odontogramas`.
+  //
+  // En una transacción: una versión guardada sin que la foto cambie, o al
+  // revés, dejaría el historial contando algo distinto de lo que muestra
+  // la ficha.
+  await prisma.$transaction(async (tx) => {
+    const resultado = await tx.paciente.updateMany({
+      where: { id: input.pacienteId, organizacionId: input.organizacionId },
+      data: {
+        odontograma: input.odontograma,
+        notasOdontograma: input.notasOdontograma ?? null,
+      },
+    });
 
-  if (resultado.count !== 1) {
-    throw new PacienteNoEncontradoError();
-  }
+    if (resultado.count !== 1) {
+      throw new PacienteNoEncontradoError();
+    }
+
+    await tx.odontograma.create({
+      data: {
+        organizacionId: input.organizacionId,
+        pacienteId: input.pacienteId,
+        medicoId: input.medicoId ?? null,
+        estado: input.odontograma,
+        notas: input.notasOdontograma ?? null,
+      },
+    });
+  });
 
   await registrarEvento({
     organizacionId: input.organizacionId,
@@ -380,5 +404,20 @@ export async function actualizarOdontograma(input: {
     entidadTipo: "Paciente",
     entidadId: input.pacienteId,
     pacienteId: input.pacienteId,
+  });
+}
+
+/**
+ * Versiones del odontograma de un paciente, de la más nueva a la más
+ * vieja. Es el historial que antes se perdía en cada guardado.
+ */
+export async function listarOdontogramasDelPaciente(input: {
+  organizacionId: string;
+  pacienteId: string;
+}) {
+  return prisma.odontograma.findMany({
+    where: { organizacionId: input.organizacionId, pacienteId: input.pacienteId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, estado: true, notas: true, createdAt: true },
   });
 }

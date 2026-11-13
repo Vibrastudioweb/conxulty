@@ -6,6 +6,8 @@ import {
   obtenerConsulta,
   guardarConsulta,
   cerrarConsulta,
+  anularConsulta,
+  EstadoConsultaInvalidoError,
   type CamposClinicos,
   type CamposVitales,
 } from "@/modules/core/consultas";
@@ -131,4 +133,55 @@ export async function cerrarConsultaAction(formData: FormData) {
   }
 
   redirect("/hoy");
+}
+
+/**
+ * Anula una consulta abierta por error (ver `anularConsulta`).
+ *
+ * El motivo viaja en el formulario y es obligatorio: una consulta anulada
+ * sin decir por qué no le sirve a nadie que lea esa historia después. Si
+ * llega vacío se vuelve a la consulta con el error, sin anular nada.
+ */
+export async function anularConsultaAction(formData: FormData) {
+  const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
+
+  const consultaId = String(formData.get("consultaId") ?? "");
+  if (!consultaId) {
+    throw new Error("Falta la consulta.");
+  }
+
+  const motivo = String(formData.get("motivoAnulacion") ?? "").trim();
+
+  const consultaExistente = await obtenerConsulta({
+    organizacionId: session.user.organizacionId,
+    consultaId,
+  });
+
+  if (!consultaExistente || consultaExistente.medicoId !== medico.id) {
+    redirect("/hoy");
+  }
+
+  if (!motivo) {
+    redirect(`/consultas/${consultaId}?error=sin_motivo`);
+  }
+
+  try {
+    await anularConsulta({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      consultaId,
+      motivo,
+    });
+  } catch (err) {
+    if (err instanceof EstadoConsultaInvalidoError) {
+      redirect(`/consultas/${consultaId}?error=no_anulable`);
+    }
+    throw err;
+  }
+
+  // A la ficha del paciente: la consulta anulada ya no es un lugar donde
+  // trabajar, y lo que el médico quiere después de anular por paciente
+  // equivocado es volver a buscar al correcto.
+  redirect(`/pacientes/${consultaExistente.pacienteId}?anulada=1`);
 }
