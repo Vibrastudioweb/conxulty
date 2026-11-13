@@ -22,20 +22,21 @@ export async function requireSesion() {
 /**
  * Punto único de guarda para rutas y acciones clínicas. Si no hay sesión,
  * redirige a /login; si la sesión existe pero el rol no es MEDICO, redirige
- * al destino que le corresponde (/admin o /staff) en vez de dejarlo avanzar
- * hacia una pantalla u operación clínica.
+ * a `/`, que lo manda al destino de su rol, en vez de dejarlo avanzar hacia
+ * una pantalla u operación clínica.
  */
 export async function requireMedico() {
   const session = await requireSesion();
 
   if (session.user.rol !== "MEDICO") {
-    redirect(
-      session.user.rol === "ADMIN"
-        ? "/admin"
-        : session.user.rol === "SUPERADMIN"
-          ? "/superadmin"
-          : "/staff",
-    );
+    // 13-nov-2026: antes acá se repetía el mapa de roles a destinos, igual
+    // que en requireEntidad y en (dashboard)/page.tsx — tres copias de lo
+    // mismo, y la rama final mandaba a /staff a cualquier rol que no fuera
+    // ADMIN ni SUPERADMIN, así que una cuenta de clínica terminaba
+    // rebotando por una pantalla que no es suya antes de llegar a la que
+    // sí. `/` ya sabe a dónde va cada rol: que decida ahí, en un solo
+    // lugar.
+    redirect("/");
   }
 
   return session;
@@ -67,15 +68,7 @@ export async function requireEntidad() {
   const session = await requireSesion();
 
   if (session.user.rol !== "ENTIDAD") {
-    redirect(
-      session.user.rol === "MEDICO"
-        ? "/hoy"
-        : session.user.rol === "ADMIN"
-          ? "/admin"
-          : session.user.rol === "SUPERADMIN"
-            ? "/superadmin"
-            : "/staff",
-    );
+    redirect("/");
   }
 
   return session;

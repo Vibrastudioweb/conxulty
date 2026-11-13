@@ -109,32 +109,6 @@ export function ActivarSolicitudForm({
         <Input id="email" name="email" type="email" defaultValue={emailSugerido} required maxLength={160} />
       </div>
 
-      <div>
-        <label htmlFor="rol" className={LABEL}>
-          Rol
-        </label>
-        {/* 13-nov-2026 (auditoría Bloque 3): este menú venía con ADMIN por
-            defecto. Activar a un médico sin tocarlo le creaba una cuenta
-            SIN perfil de médico —sin agenda, sin pacientes, sin ficha
-            pública— y eso no se arregla desde el producto: hay que entrar
-            a la base a cambiarle el rol y crearle el perfil a mano.
-            Quien pide acceso a Conxulty es un médico; ese es el valor por
-            defecto, y la otra opción dice qué se pierde al elegirla. */}
-        <select
-          id="rol"
-          name="rol"
-          defaultValue="MEDICO"
-          className="w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-        >
-          <option value="MEDICO">Médico — agenda, pacientes, consultas y ficha pública</option>
-          <option value="ADMIN">Administrativo — solo caja y reportes, sin agenda ni ficha</option>
-        </select>
-        <p className="mt-1 text-body-secondary text-text-secondary">
-          Casi siempre es Médico. Administrativo no tiene perfil médico y no se
-          puede convertir después desde el producto.
-        </p>
-      </div>
-
       {resultado && !resultado.ok && <Alert tone="danger">{resultado.error}</Alert>}
 
       <Button type="submit" loading={pendiente}>

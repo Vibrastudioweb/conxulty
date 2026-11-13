@@ -18,7 +18,6 @@ const activarSchema = z.object({
   nombreOrganizacion: z.string().trim().min(2).max(160),
   nombreUsuario: z.string().trim().min(2).max(120),
   email: z.string().trim().toLowerCase().pipe(z.email().max(160)),
-  rol: z.enum(["ADMIN", "MEDICO"]),
 });
 
 export type ActivarResultado =
@@ -49,7 +48,15 @@ export async function activarSolicitudAction(
       nombreOrganizacion: parseo.data.nombreOrganizacion,
       nombreUsuario: parseo.data.nombreUsuario,
       email: parseo.data.email,
-      rol: parseo.data.rol,
+      // 13-nov-2026, aclaración del founder: "un médico se registra y ve
+      // todo, no hay roles". Antes esto venía de un menú del formulario
+      // con ADMIN marcado por defecto, así que activar a un médico sin
+      // tocarlo le creaba una cuenta SIN perfil de médico —sin agenda, sin
+      // pacientes, sin ficha pública— y eso no se arregla desde el
+      // producto: hay que entrar a la base a mano. Se quitó la elección en
+      // vez de cambiarle el valor por defecto: una opción que nadie debe
+      // elegir no debería estar ahí para elegirla por error.
+      rol: "MEDICO",
     });
     revalidatePath("/superadmin");
     return {
