@@ -25,7 +25,9 @@ export async function anularDocumentoAction(formData: FormData) {
     throw new Error("Falta el documento.");
   }
 
-  const motivo = String(formData.get("motivoAnulacion") ?? "").trim();
+  // Tope en el servidor: el maxLength del formulario no protege de una
+  // petición armada a mano.
+  const motivo = String(formData.get("motivoAnulacion") ?? "").trim().slice(0, 300);
   if (!motivo) {
     redirect(`/consultas/${consultaId}/documentos/${documentoId}?error=sin_motivo`);
   }

@@ -137,10 +137,14 @@ await correr("El circuito del dinero", async () => {
     await valor(`select plan from organizaciones where id = '${ORG}'`),
   );
 
+  // Las dos fechas se comparan en UTC, que es como se guarda
+  // `finPeriodoActual`. Con `current_date` (zona de la sesión) esta prueba
+  // fallaba cada noche después de las 8 pm de Caracas, cuando en UTC ya es
+  // el día siguiente.
   const fin = await valor(
     `select to_char("finPeriodoActual", 'YYYY-MM-DD') from suscripciones where id = '${SUSCRIPCION}'`,
   );
-  const esperado = await valor(`select to_char(current_date + 30, 'YYYY-MM-DD')`);
+  const esperado = await valor(`select to_char((now() at time zone 'utc')::date + 30, 'YYYY-MM-DD')`);
   comprobar("Queda al día por 30 días", fin === esperado, `${fin} vs ${esperado}`);
 
   // ── 3. La fecha que apaga (o enciende) la ficha del Directorio ────
@@ -148,7 +152,7 @@ await correr("El circuito del dinero", async () => {
   // pasado. El OS le manda ese fin de período más 15 días de gracia. Si
   // esta cuenta se rompe, o se corta a un médico que pagó, o se le regala
   // el producto a uno que no.
-  const esperadoVence = await valor(`select to_char(current_date + 45, 'YYYY-MM-DD')`);
+  const esperadoVence = await valor(`select to_char((now() at time zone 'utc')::date + 45, 'YYYY-MM-DD')`);
   const calculado = await valor(
     `select to_char("finPeriodoActual" + interval '15 days', 'YYYY-MM-DD') from suscripciones where id = '${SUSCRIPCION}'`,
   );

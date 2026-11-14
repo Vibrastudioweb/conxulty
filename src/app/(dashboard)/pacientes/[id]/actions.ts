@@ -22,6 +22,7 @@ import {
   crearAntecedente,
   editarAntecedente,
   desactivarAntecedente,
+  reactivarAntecedente,
   AntecedenteNoEncontradoError,
   AntecedenteNoEditableError,
 } from "@/modules/core/antecedentes";
@@ -316,6 +317,36 @@ export async function desactivarAntecedenteAction(formData: FormData) {
   }
 
   redirect(`/pacientes/${pacienteId}?antecedente_desactivado=1`);
+}
+
+export async function reactivarAntecedenteAction(formData: FormData) {
+  const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
+
+  const pacienteId = String(formData.get("pacienteId") ?? "");
+  const antecedenteId = String(formData.get("antecedenteId") ?? "");
+  if (!pacienteId || !antecedenteId) {
+    throw new Error("Falta el antecedente.");
+  }
+
+  try {
+    await reactivarAntecedente({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      medicoId: medico.id,
+      antecedenteId,
+    });
+  } catch (err) {
+    if (err instanceof AntecedenteNoEncontradoError) {
+      redirect(`/pacientes/${encodeURIComponent(pacienteId)}`);
+    }
+    if (err instanceof AntecedenteNoEditableError) {
+      redirect(`/pacientes/${encodeURIComponent(pacienteId)}?error=antecedente_no_editable`);
+    }
+    throw err;
+  }
+
+  redirect(`/pacientes/${encodeURIComponent(pacienteId)}?tab=antecedentes&antecedente_reactivado=1`);
 }
 
 /**

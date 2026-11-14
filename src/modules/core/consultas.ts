@@ -162,6 +162,14 @@ export async function abrirOCrearConsulta(input: {
       throw new CitaNoEncontradaError();
     }
 
+    // La cita tiene que ser de ESTE paciente. Antes solo se comprobaba que
+    // fuera de la misma organización: se podía crear la consulta de un
+    // paciente colgada de la cita de otro, y al cerrarla la cita ajena
+    // quedaba como atendida.
+    if (cita.pacienteId !== input.pacienteId) {
+      throw new CitaNoEncontradaError();
+    }
+
     if (cita.consulta) {
       return { consultaId: cita.consulta.id, creada: false };
     }
@@ -173,11 +181,40 @@ export async function abrirOCrearConsulta(input: {
     medicoEfectivo = cita.medicoId;
   }
 
-  // Continuar una consulta EN_CURSO ya existente (retorno arriba) nunca se
+  // Sin cita: si este médico ya tiene una consulta EN CURSO de este paciente
+  // abierta HOY, se continúa esa. Antes cada clic en "Iniciar consulta" o
+  // "Recetar" creaba una nueva —un doble clic, o volver atrás y pulsar otra
+  // vez, dejaba consultas vacías duplicadas en la historia— aunque los
+  // comentarios de las acciones prometían lo contrario.
+  //
+  // Solo las de hoy: una consulta que quedó abierta hace semanas es otra
+  // visita, y meter la de hoy ahí mezclaría dos atenciones en una nota.
+  if (!input.citaId) {
+    const inicioDeHoy = new Date();
+    inicioDeHoy.setHours(0, 0, 0, 0);
+    const enCurso = await prisma.consulta.findFirst({
+      where: {
+        organizacionId: input.organizacionId,
+        pacienteId: input.pacienteId,
+        medicoId: medicoEfectivo,
+        estado: "EN_CURSO",
+        citaId: null,
+        createdAt: { gte: inicioDeHoy },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    if (enCurso) {
+      return { consultaId: enCurso.id, creada: false };
+    }
+  }
+
+  // Continuar una consulta EN_CURSO ya existente (retornos arriba) nunca se
   // bloquea aunque el paciente se archive después; solo se bloquea INICIAR
   // una consulta nueva — igual que crearCita en modules/core/citas.ts.
-  const paciente = await prisma.paciente.findUnique({
-    where: { id: input.pacienteId },
+  // findFirst con organizacionId, como exige el resto del módulo.
+  const paciente = await prisma.paciente.findFirst({
+    where: { id: input.pacienteId, organizacionId: input.organizacionId },
     select: { activo: true },
   });
   if (!paciente?.activo) {
@@ -271,7 +308,11 @@ export async function guardarConsulta(input: {
   const vitalesModificados: CampoVital[] = [];
   if (input.vitales) {
     for (const campo of CAMPOS_VITALES) {
-      if (campo in input.vitales) {
+      // `!== undefined`, no `in`: la acción arma el objeto con las seis
+      // claves siempre, y un valor ausente o no numérico llega como
+      // `undefined`. Con `in` eso se escribía como null y BORRABA el signo
+      // vital ya guardado — al revés de lo que promete leerCampoNumerico.
+      if (input.vitales[campo] !== undefined) {
         // Asignación "a ciegas" deliberada: `campo` es un CampoVital (unión),
         // y TS no correlaciona el tipo de valor de `input.vitales[campo]`
         // con la clave en un loop genérico, aunque en runtime SÍ coincide
@@ -373,7 +414,7 @@ export async function anularConsulta(input: {
 
   const consulta = await prisma.consulta.findFirst({
     where: { id: input.consultaId, organizacionId: input.organizacionId },
-    select: { estado: true, pacienteId: true },
+    select: { estado: true, pacienteId: true, citaId: true },
   });
 
   if (!consulta) {
@@ -398,7 +439,11 @@ export async function anularConsulta(input: {
         organizacionId: input.organizacionId,
         estado: "EN_CURSO",
       },
-      data: { estado: "ANULADA" },
+      // Se suelta la cita. `citaId` es único, así que si la anulada se la
+      // quedaba, "Iniciar consulta" desde esa cita devolvía para siempre la
+      // consulta anulada (de solo lectura) y el paciente ya no podía ser
+      // atendido por su cita. Cuál era queda en la auditoría, más abajo.
+      data: { estado: "ANULADA", citaId: null },
     });
 
     if (resultado.count !== 1) {
@@ -424,7 +469,7 @@ export async function anularConsulta(input: {
     entidadTipo: "Consulta",
     entidadId: input.consultaId,
     pacienteId: consulta.pacienteId,
-    cambios: { motivo },
+    cambios: { motivo, ...(consulta.citaId ? { citaLiberada: consulta.citaId } : {}) },
   });
 }
 
@@ -500,4 +545,75 @@ export async function cerrarConsulta(input: {
       pacienteId: consulta.pacienteId,
     });
   }
+}
+
+/**
+ * Nota aclaratoria sobre una consulta CERRADA (13-nov-2026, segunda
+ * revisión del núcleo clínico).
+ *
+ * Una consulta cerrada no se edita: es historia clínica. Pero cerrar con
+ * un error en el diagnóstico no puede ser un callejón sin salida. La
+ * salida honesta es la de un expediente en papel: no se tacha lo escrito,
+ * se agrega una nota con fecha y autor que diga qué estaba mal.
+ *
+ * Solo se crean. No se editan ni se borran: una aclaración que se puede
+ * reescribir no aclara nada.
+ */
+export async function agregarNotaAclaratoria(input: {
+  organizacionId: string;
+  actorId: string;
+  medicoId: string;
+  consultaId: string;
+  texto: string;
+}): Promise<void> {
+  const texto = input.texto.trim();
+  if (!texto) {
+    throw new EstadoConsultaInvalidoError("La nota aclaratoria no puede estar vacía.");
+  }
+
+  const consulta = await prisma.consulta.findFirst({
+    where: { id: input.consultaId, organizacionId: input.organizacionId },
+    select: { estado: true, pacienteId: true },
+  });
+
+  if (!consulta) {
+    throw new ConsultaNoEncontradaError();
+  }
+  // En curso se corrige editando; anulada no es una atención que aclarar.
+  if (consulta.estado !== "CERRADA") {
+    throw new EstadoConsultaInvalidoError(
+      "Solo se agregan notas aclaratorias a una consulta cerrada.",
+    );
+  }
+
+  const nota = await prisma.notaAclaratoria.create({
+    data: {
+      organizacionId: input.organizacionId,
+      consultaId: input.consultaId,
+      medicoId: input.medicoId,
+      texto,
+    },
+  });
+
+  // Como en el resto de la auditoría clínica: qué pasó, nunca el contenido.
+  await registrarEvento({
+    organizacionId: input.organizacionId,
+    actorId: input.actorId,
+    accion: "agregar_nota_aclaratoria",
+    entidadTipo: "Consulta",
+    entidadId: input.consultaId,
+    pacienteId: consulta.pacienteId,
+    cambios: { notaId: nota.id },
+  });
+}
+
+export async function listarNotasAclaratorias(input: {
+  organizacionId: string;
+  consultaId: string;
+}) {
+  return prisma.notaAclaratoria.findMany({
+    where: { organizacionId: input.organizacionId, consultaId: input.consultaId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, texto: true, createdAt: true },
+  });
 }

@@ -4,9 +4,13 @@ import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ETIQUETAS_TIPO_ANTECEDENTE, ORDEN_TIPO_ANTECEDENTE } from "./tipoAntecedente";
-import type { listarAntecedentesDelPaciente } from "@/modules/core/antecedentes";
+import type {
+  listarAntecedentesDelPaciente,
+  listarAntecedentesInactivos,
+} from "@/modules/core/antecedentes";
 
 type Antecedente = Awaited<ReturnType<typeof listarAntecedentesDelPaciente>>[number];
+type AntecedenteInactivo = Awaited<ReturnType<typeof listarAntecedentesInactivos>>[number];
 type ServerAction = (formData: FormData) => void | Promise<void>;
 
 function formatearFecha(fecha: Date) {
@@ -44,23 +48,28 @@ function SelectorTipoAntecedente({ defaultValue }: { defaultValue: string }) {
  * de futuras atenciones (ver AlertaAlergias para el caso de ALERGIA, que
  * además se destaca arriba de la ficha).
  *
- * Edición controlada: solo se listan antecedentes activos (ver
- * listarAntecedentesDelPaciente), así que "Editar" siempre está disponible
- * aquí — uno desactivado deja de aparecer en esta lista y ya no es
- * editable (ver AntecedenteNoEditableError en modules/core/antecedentes.ts).
+ * Arriba van los activos, que son los que cuentan para atender. Abajo,
+ * plegados, los que ya no: los desactivados a mano (con "Reactivar",
+ * porque desactivar es un clic y sobre una alergia ese clic equivocado es
+ * un riesgo) y las versiones anteriores de los corregidos (solo lectura:
+ * son lo que decía el registro antes de la corrección).
  */
 export function AntecedentesSeccion({
   pacienteId,
   antecedentes,
+  inactivos,
   crearAction,
   editarAction,
   desactivarAction,
+  reactivarAction,
 }: {
   pacienteId: string;
   antecedentes: Antecedente[];
+  inactivos: AntecedenteInactivo[];
   crearAction: ServerAction;
   editarAction: ServerAction;
   desactivarAction: ServerAction;
+  reactivarAction: ServerAction;
 }) {
   return (
     <section className="mt-8">
@@ -115,8 +124,12 @@ export function AntecedentesSeccion({
                       defaultValue={antecedente.descripcion}
                       required
                     />
+                    <p className="text-caption text-text-faint">
+                      Lo que dice ahora no se borra: queda guardado abajo, en
+                      &ldquo;Ya no vigentes&rdquo;.
+                    </p>
                     <Button type="submit" variant="secondary" size="sm">
-                      Guardar cambios
+                      Guardar corrección
                     </Button>
                   </form>
                 </details>
@@ -125,6 +138,47 @@ export function AntecedentesSeccion({
           </ul>
         )}
       </div>
+
+      {inactivos.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-body-secondary text-text-secondary">
+            Ya no vigentes ({inactivos.length})
+          </summary>
+          <ul className="mt-2 space-y-2">
+            {inactivos.map((antecedente) => (
+              <li
+                key={antecedente.id}
+                className="rounded-card border border-border bg-surface-muted px-3 py-2"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Badge tone="neutral">
+                      {ETIQUETAS_TIPO_ANTECEDENTE[antecedente.tipo] ?? antecedente.tipo}
+                    </Badge>
+                    <p className="mt-1.5 text-body-secondary text-text-secondary">
+                      {antecedente.descripcion}
+                    </p>
+                    <p className="mt-1 text-caption text-text-faint">
+                      {antecedente.reemplazadoPorId
+                        ? `Versión anterior, corregida el ${formatearFecha(antecedente.updatedAt)}`
+                        : `Desactivado el ${formatearFecha(antecedente.updatedAt)}`}
+                    </p>
+                  </div>
+                  {!antecedente.reemplazadoPorId && (
+                    <form action={reactivarAction}>
+                      <input type="hidden" name="pacienteId" value={pacienteId} />
+                      <input type="hidden" name="antecedenteId" value={antecedente.id} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Reactivar
+                      </Button>
+                    </form>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <details className="mt-3">
         <summary className="cursor-pointer text-body-secondary font-medium text-brand-primary">

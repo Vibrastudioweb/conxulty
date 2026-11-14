@@ -5,7 +5,10 @@ import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/pla
 import { obtenerPaciente } from "@/modules/core/pacientes";
 import { obtenerCita, listarCitasDelPaciente } from "@/modules/core/citas";
 import { listarConsultasDelPaciente } from "@/modules/core/consultas";
-import { listarAntecedentesDelPaciente } from "@/modules/core/antecedentes";
+import {
+  listarAntecedentesDelPaciente,
+  listarAntecedentesInactivos,
+} from "@/modules/core/antecedentes";
 import { listarDocumentosDelPaciente } from "@/modules/documentos/documentos";
 import { listarEventosDelPaciente } from "@/modules/trazabilidad";
 import { formatearFechaISO } from "@/components/citas/fecha";
@@ -17,6 +20,7 @@ import {
   crearAntecedenteAction,
   editarAntecedenteAction,
   desactivarAntecedenteAction,
+  reactivarAntecedenteAction,
   actualizarOdontogramaAction,
 } from "./actions";
 import type { Odontograma } from "@/modules/consultas/odontograma";
@@ -75,8 +79,11 @@ const MENSAJES_EXITO: Record<string, string> = {
   archivado: "Paciente archivado.",
   reactivado: "Paciente reactivado.",
   antecedente_creado: "Antecedente registrado.",
-  antecedente_editado: "Antecedente actualizado.",
-  antecedente_desactivado: "Antecedente desactivado.",
+  antecedente_editado: "Antecedente corregido. La versión anterior quedó en «Ya no vigentes».",
+  antecedente_desactivado:
+    "Antecedente desactivado. Si fue un error, lo puedes reactivar en «Ya no vigentes».",
+  antecedente_reactivado: "Antecedente reactivado.",
+  anulada: "Consulta anulada. Quedó en la historia marcada como anulada.",
   odontograma_actualizado: "Odontograma actualizado.",
 };
 
@@ -134,8 +141,15 @@ export default async function PacientePage({
     ? await obtenerCita({ organizacionId: session.user.organizacionId, citaId })
     : null;
 
-  const [consultasPrevias, citas, antecedentes, documentos, eventos, versionesOdontograma] =
-    await Promise.all([
+  const [
+    consultasPrevias,
+    citas,
+    antecedentes,
+    documentos,
+    eventos,
+    versionesOdontograma,
+    antecedentesInactivos,
+  ] = await Promise.all([
     listarConsultasDelPaciente({
       organizacionId: session.user.organizacionId,
       pacienteId: paciente.id,
@@ -164,7 +178,11 @@ export default async function PacientePage({
           pacienteId: paciente.id,
         })
       : Promise.resolve([]),
-    ]);
+    listarAntecedentesInactivos({
+      organizacionId: session.user.organizacionId,
+      pacienteId: paciente.id,
+    }),
+  ]);
 
   const citaNoDisponible =
     cita && !cita.consulta && (cita.estado === "CANCELADA" || cita.estado === "NO_ASISTIO");
@@ -437,9 +455,11 @@ export default async function PacientePage({
           <AntecedentesSeccion
             pacienteId={paciente.id}
             antecedentes={antecedentes}
+            inactivos={antecedentesInactivos}
             crearAction={crearAntecedenteAction}
             editarAction={editarAntecedenteAction}
             desactivarAction={desactivarAntecedenteAction}
+            reactivarAction={reactivarAntecedenteAction}
           />
         </div>
       )}

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { emitirRecetaAction } from "../actions";
+import { RespaldoFormulario } from "@/components/formularios/RespaldoFormulario";
 
 const NUMERO_LINEAS_MEDICAMENTO = 4;
 
@@ -58,11 +59,18 @@ export default async function NuevaRecetaPage({
 
       {error && (
         <div className="mt-3">
-          <Alert tone="danger">Agrega al menos un medicamento.</Alert>
+          <Alert tone="danger">
+            Revisa la receta: hace falta al menos un medicamento, y cada uno con sus
+            indicaciones.
+          </Alert>
         </div>
       )}
 
       <form action={emitirRecetaAction} className="mt-4 space-y-5">
+        {/* Una línea con el medicamento pero sin indicaciones invalida la
+            receta entera; sin esto, la página volvía con las cuatro líneas
+            vacías. */}
+        <RespaldoFormulario clave={`receta:${id}`} restaurar={Boolean(error)} />
         <input type="hidden" name="consultaId" value={id} />
 
         {Array.from({ length: NUMERO_LINEAS_MEDICAMENTO }).map((_, i) => (

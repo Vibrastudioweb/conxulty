@@ -3,9 +3,14 @@ import { notFound } from "next/navigation";
 import { requireMedicoSesion } from "@/modules/core/autorizacion";
 import { planDeOrganizacion, planIncluyeModulo } from "@/modules/suscripcion/plan";
 import { PanelSoloPro } from "@/components/suscripcion/PanelSoloPro";
-import { obtenerConsulta } from "@/modules/core/consultas";
+import { obtenerConsulta, listarNotasAclaratorias } from "@/modules/core/consultas";
 import { listarDocumentosDeConsulta } from "@/modules/documentos/documentos";
-import { guardarConsultaAction, cerrarConsultaAction, anularConsultaAction } from "./actions";
+import {
+  guardarConsultaAction,
+  cerrarConsultaAction,
+  anularConsultaAction,
+  agregarNotaAclaratoriaAction,
+} from "./actions";
 import { Textarea } from "@/components/ui/Textarea";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -19,13 +24,14 @@ import {
 import { DocumentoResumenCard } from "@/components/documentos/DocumentoResumenCard";
 import { resolverPlantilla } from "@/modules/consultas/plantillasEspecialidad";
 import { LABEL_PROFESION, type ProfesionId } from "@/modules/onboarding/profesiones";
+import { RespaldoFormulario } from "@/components/formularios/RespaldoFormulario";
 
 export default async function ConsultaPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ guardado?: string; error?: string }>;
+  searchParams: Promise<{ guardado?: string; error?: string; nota?: string }>;
 }) {
   const { session, medico } = await requireMedicoSesion();
   if (!planIncluyeModulo(await planDeOrganizacion(session.user.organizacionId), "consultas")) {
@@ -33,7 +39,7 @@ export default async function ConsultaPage({
   }
 
   const { id } = await params;
-  const { guardado, error } = await searchParams;
+  const { guardado, error, nota: notaAgregada } = await searchParams;
 
   const consulta = await obtenerConsulta({
     organizacionId: session.user.organizacionId,
@@ -58,10 +64,16 @@ export default async function ConsultaPage({
   // soloLectura, que además exige EN_CURSO.
   const puedeEmitirDocumento = esPropia && consulta.estado !== "ANULADA";
 
-  const documentos = await listarDocumentosDeConsulta({
-    organizacionId: session.user.organizacionId,
-    consultaId: consulta.id,
-  });
+  const [documentos, notasAclaratorias] = await Promise.all([
+    listarDocumentosDeConsulta({
+      organizacionId: session.user.organizacionId,
+      consultaId: consulta.id,
+    }),
+    listarNotasAclaratorias({
+      organizacionId: session.user.organizacionId,
+      consultaId: consulta.id,
+    }),
+  ]);
 
   // Plantilla por especialidad (ver changelog punto 49) — por la
   // profesión/especialidad del médico DUEÑO de la consulta, no de quien la
@@ -100,6 +112,16 @@ export default async function ConsultaPage({
           <Alert tone="success">Guardado.</Alert>
         </div>
       )}
+      {notaAgregada && (
+        <div className="mt-4">
+          <Alert tone="success">Nota aclaratoria agregada.</Alert>
+        </div>
+      )}
+      {error === "nota_vacia" && (
+        <div className="mt-4">
+          <Alert tone="danger">Escribe la nota antes de agregarla.</Alert>
+        </div>
+      )}
       {error === "sin_motivo" && (
         <div className="mt-4">
           <Alert tone="danger">
@@ -115,7 +137,7 @@ export default async function ConsultaPage({
           </Alert>
         </div>
       )}
-      {error && error !== "sin_motivo" && error !== "no_anulable" && (
+      {error && error !== "sin_motivo" && error !== "no_anulable" && error !== "nota_vacia" && (
         <div className="mt-2">
           <Alert tone="danger">No se pudo completar la acción.</Alert>
         </div>
@@ -123,6 +145,11 @@ export default async function ConsultaPage({
 
       <form action={guardarConsultaAction} className="mt-4 space-y-6">
         <input type="hidden" name="consultaId" value={consulta.id} />
+        {/* Si guardar falla, la página vuelve con ?error y esto repone lo
+            tecleado en vez de dejar al médico frente a la nota vieja. */}
+        {!soloLectura && (
+          <RespaldoFormulario clave={`consulta:${consulta.id}`} restaurar={error === "1"} />
+        )}
 
         <section>
           <h2 className="font-display text-sm font-semibold text-text-primary">
@@ -310,16 +337,20 @@ export default async function ConsultaPage({
             Guardar
           </Button>
         )}
-      </form>
 
-      {!soloLectura && (
-        <form action={cerrarConsultaAction} className="mt-3">
-          <input type="hidden" name="consultaId" value={consulta.id} />
-          <Button type="submit" fullWidth>
-            Cerrar consulta
+        {/* 13-nov-2026 (segunda revisión del núcleo clínico): "Cerrar
+            consulta" vivía en un formulario aparte que solo mandaba el id.
+            El médico que escribía la nota y pulsaba Cerrar sin pasar antes
+            por Guardar cerraba la consulta con lo último guardado —quizá
+            nada—, perdía lo tecleado, y una consulta cerrada no se edita
+            ni se anula. Ahora es un botón de ESTE formulario: manda todos
+            los campos, y la acción guarda antes de cerrar. */}
+        {!soloLectura && (
+          <Button type="submit" formAction={cerrarConsultaAction} fullWidth>
+            Guardar y cerrar consulta
           </Button>
-        </form>
-      )}
+        )}
+      </form>
 
       {/* 13-nov-2026 (auditoría del núcleo clínico): "Iniciar consulta" es
           un clic desde la ficha de un paciente, y la lista es alfabética
@@ -358,6 +389,62 @@ export default async function ConsultaPage({
             </Button>
           </form>
         </details>
+      )}
+
+      {/* 13-nov-2026 (segunda revisión del núcleo clínico): una consulta
+          cerrada no se edita, pero cerrar con un error no puede ser un
+          callejón sin salida. Como en un expediente en papel: no se tacha
+          lo escrito, se agrega una nota con fecha. */}
+      {consulta.estado === "CERRADA" && (
+        <section className="mt-8">
+          <h2 className="font-display text-sm font-semibold text-text-primary">
+            Notas aclaratorias
+          </h2>
+          {notasAclaratorias.length === 0 ? (
+            <p className="mt-1 text-body-secondary text-text-secondary">
+              Esta consulta está cerrada y no se edita. Si algo quedó mal, agrega una
+              nota: queda con su fecha, debajo de lo escrito.
+            </p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {notasAclaratorias.map((nota) => (
+                <li
+                  key={nota.id}
+                  className="rounded-card border border-border bg-surface px-3 py-2"
+                >
+                  <p className="whitespace-pre-wrap text-body-secondary text-text-primary">
+                    {nota.texto}
+                  </p>
+                  <p className="mt-1 text-caption text-text-faint">
+                    {nota.createdAt.toLocaleDateString("es-VE", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {esPropia && (
+            <form action={agregarNotaAclaratoriaAction} className="mt-3 space-y-2">
+              <input type="hidden" name="consultaId" value={consulta.id} />
+              <Textarea
+                name="textoAclaratoria"
+                rows={3}
+                maxLength={4000}
+                required
+                placeholder="El diagnóstico correcto es…"
+              />
+              <Button type="submit" variant="secondary" size="sm">
+                Agregar nota aclaratoria
+              </Button>
+              <p className="text-caption text-text-faint">
+                Una nota agregada no se puede editar ni borrar.
+              </p>
+            </form>
+          )}
+        </section>
       )}
 
       <section className="mt-8 border-t border-border pt-4">

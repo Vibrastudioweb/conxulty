@@ -40,6 +40,7 @@ model Organizacion {
   gastos                Gasto[]
   medicos               Medico[]
   movimientosCaja       MovimientoCaja[]
+  notasAclaratorias      NotaAclaratoria[]
   odontogramas           Odontograma[]
   pacientes             Paciente[]
   pagos                 Pago[]
@@ -308,6 +309,12 @@ model AntecedenteMedico {
   tipo           TipoAntecedente
   descripcion    String
   activo         Boolean         @default(true)
+  /// Si este registro se CORRIGIÓ, el id de la versión que lo reemplazó.
+  /// Editar un antecedente ya no pisa el texto: crea la versión nueva y
+  /// deja esta inactiva apuntando a ella, para que "Alergia a penicilina"
+  /// corregida a "Alergia a sulfas" no borre lo que decía antes. Null en
+  /// un inactivo = se desactivó a mano (y se puede reactivar).
+  reemplazadoPorId String?
   fecha          DateTime        @default(now())
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -411,6 +418,7 @@ model Consulta {
   organizacion   Organizacion   @relation(fields: [organizacionId], references: [id])
   paciente       Paciente       @relation(fields: [pacienteId], references: [id])
   documentos     Documento[]
+  notasAclaratorias NotaAclaratoria[]
 
   @@index([organizacionId, pacienteId])
   @@map("consultas")
@@ -428,6 +436,24 @@ model Consulta {
 /// que crear una tabla nueva por cada tipo de documento. No lleva
 /// pacienteId propio: se deriva de consulta.pacienteId (relación real, no
 /// opcional) para no duplicar un dato que ya vive en el schema.
+/// Nota aclaratoria sobre una consulta CERRADA. Una consulta cerrada no
+/// se edita —es historia clínica— pero un error en ella tiene que poder
+/// corregirse de la única forma honesta: agregando, con fecha y autor, sin
+/// tocar lo que ya estaba escrito. Solo se crean; no se editan ni se borran.
+model NotaAclaratoria {
+  id             String       @id @default(cuid())
+  organizacionId String
+  consultaId     String
+  medicoId       String
+  texto          String
+  createdAt      DateTime     @default(now())
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  consulta       Consulta     @relation(fields: [consultaId], references: [id])
+
+  @@index([organizacionId, consultaId, createdAt])
+  @@map("notas_aclaratorias")
+}
+
 /// Una versión del odontograma de un paciente. Para un odontólogo el
 /// valor clínico está en la EVOLUCIÓN del diente —cómo estaba antes del
 /// tratamiento y cómo quedó— y hasta hoy cada guardado pisaba al anterior.

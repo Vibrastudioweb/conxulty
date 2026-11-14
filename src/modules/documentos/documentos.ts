@@ -93,6 +93,13 @@ export class DocumentoNoEncontradoError extends Error {
   }
 }
 
+export class MotivoAnulacionRequeridoError extends Error {
+  constructor() {
+    super("Hay que decir por qué se anula el documento.");
+    this.name = "MotivoAnulacionRequeridoError";
+  }
+}
+
 export class DocumentoYaAnuladoError extends Error {
   constructor() {
     super("Este documento ya está anulado.");
@@ -124,7 +131,7 @@ export async function anularDocumento(input: {
 }): Promise<void> {
   const motivo = input.motivo.trim();
   if (!motivo) {
-    throw new DocumentoNoEncontradoError();
+    throw new MotivoAnulacionRequeridoError();
   }
 
   const documento = await prisma.documento.findFirst({

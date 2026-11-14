@@ -7,6 +7,7 @@ import {
   guardarConsulta,
   cerrarConsulta,
   anularConsulta,
+  agregarNotaAclaratoria,
   EstadoConsultaInvalidoError,
   type CamposClinicos,
   type CamposVitales,
@@ -35,24 +36,21 @@ function leerCampoNumerico(formData: FormData, campo: string): number | null | u
   return Number.isFinite(numero) ? numero : undefined;
 }
 
-export async function guardarConsultaAction(formData: FormData) {
-  const { session, medico } = await requireMedicoSesion();
-  await requirePro("consultas");
-
-  const consultaId = String(formData.get("consultaId") ?? "");
-  if (!consultaId) {
-    throw new Error("Falta la consulta.");
-  }
-
-  const consultaExistente = await obtenerConsulta({
-    organizacionId: session.user.organizacionId,
-    consultaId,
-  });
-
-  if (!consultaExistente || consultaExistente.medicoId !== medico.id) {
-    redirect("/hoy");
-  }
-
+/**
+ * Lee los campos clínicos del formulario y los guarda. Compartido por
+ * Guardar y por Cerrar: cerrar SIEMPRE guarda antes (ver
+ * cerrarConsultaAction), así que las dos acciones tienen que leer el
+ * formulario exactamente igual.
+ */
+async function guardarDesdeFormulario(
+  formData: FormData,
+  ctx: {
+    organizacionId: string;
+    actorId: string;
+    consultaId: string;
+    medico: { profesion: Parameters<typeof resolverPlantilla>[0]["profesion"]; especialidad: string | null };
+  },
+): Promise<void> {
   const campos: CamposClinicos = {
     motivoConsulta: leerCampo(formData, "motivoConsulta"),
     anamnesis: leerCampo(formData, "anamnesis"),
@@ -73,29 +71,61 @@ export async function guardarConsultaAction(formData: FormData) {
   };
 
   // Plantilla por especialidad (ver changelog punto 49) — se resuelve por
-  // la profesión/especialidad del médico DUEÑO de la consulta (ya
-  // confirmado arriba que es el mismo que la sesión actual), nunca por lo
-  // que venga del formulario, igual criterio que el resto de esta acción.
+  // la profesión/especialidad del médico DUEÑO de la consulta, nunca por lo
+  // que venga del formulario.
   const plantilla = resolverPlantilla({
-    profesion: consultaExistente.medico.profesion,
-    especialidad: consultaExistente.medico.especialidad,
+    profesion: ctx.medico.profesion,
+    especialidad: ctx.medico.especialidad,
   });
-  const camposEspecialidad: Record<string, string> = {};
+
+  // Solo se toca camposEspecialidad si el formulario trae alguno de sus
+  // campos: un envío que no los incluye no debe borrarlos.
+  let camposEspecialidad: Record<string, string> | undefined;
   if (plantilla) {
-    for (const campo of plantilla) {
-      const valor = leerCampo(formData, `especialidad_${campo.id}`);
-      if (valor) camposEspecialidad[campo.id] = valor;
+    const presentes = plantilla.some((c) => formData.get(`especialidad_${c.id}`) !== null);
+    if (presentes) {
+      camposEspecialidad = {};
+      for (const campo of plantilla) {
+        const valor = leerCampo(formData, `especialidad_${campo.id}`);
+        if (valor) camposEspecialidad[campo.id] = valor;
+      }
     }
   }
 
+  await guardarConsulta({
+    organizacionId: ctx.organizacionId,
+    actorId: ctx.actorId,
+    consultaId: ctx.consultaId,
+    campos,
+    vitales,
+    camposEspecialidad,
+  });
+}
+
+export async function guardarConsultaAction(formData: FormData) {
+  const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
+
+  const consultaId = String(formData.get("consultaId") ?? "");
+  if (!consultaId) {
+    throw new Error("Falta la consulta.");
+  }
+
+  const consultaExistente = await obtenerConsulta({
+    organizacionId: session.user.organizacionId,
+    consultaId,
+  });
+
+  if (!consultaExistente || consultaExistente.medicoId !== medico.id) {
+    redirect("/hoy");
+  }
+
   try {
-    await guardarConsulta({
+    await guardarDesdeFormulario(formData, {
       organizacionId: session.user.organizacionId,
       actorId: session.user.id,
       consultaId,
-      campos,
-      vitales,
-      camposEspecialidad,
+      medico: consultaExistente.medico,
     });
   } catch {
     redirect(`/consultas/${consultaId}?error=1`);
@@ -122,7 +152,16 @@ export async function cerrarConsultaAction(formData: FormData) {
     redirect("/hoy");
   }
 
+  // Cerrar SIEMPRE guarda antes. El botón vive en el mismo formulario que
+  // las notas y manda todos los campos; si el guardado falla, no se cierra
+  // — cerrar con una nota a medio guardar es irreversible.
   try {
+    await guardarDesdeFormulario(formData, {
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      consultaId,
+      medico: consultaExistente.medico,
+    });
     await cerrarConsulta({
       organizacionId: session.user.organizacionId,
       actorId: session.user.id,
@@ -151,7 +190,9 @@ export async function anularConsultaAction(formData: FormData) {
     throw new Error("Falta la consulta.");
   }
 
-  const motivo = String(formData.get("motivoAnulacion") ?? "").trim();
+  // Tope en el servidor: el maxLength del formulario no protege de una
+  // petición armada a mano.
+  const motivo = String(formData.get("motivoAnulacion") ?? "").trim().slice(0, 300);
 
   const consultaExistente = await obtenerConsulta({
     organizacionId: session.user.organizacionId,
@@ -184,4 +225,49 @@ export async function anularConsultaAction(formData: FormData) {
   // trabajar, y lo que el médico quiere después de anular por paciente
   // equivocado es volver a buscar al correcto.
   redirect(`/pacientes/${consultaExistente.pacienteId}?anulada=1`);
+}
+
+/** Agrega una nota aclaratoria a una consulta cerrada (ver
+ *  `agregarNotaAclaratoria`). */
+export async function agregarNotaAclaratoriaAction(formData: FormData) {
+  const { session, medico } = await requireMedicoSesion();
+  await requirePro("consultas");
+
+  const consultaId = String(formData.get("consultaId") ?? "");
+  if (!consultaId) {
+    throw new Error("Falta la consulta.");
+  }
+  const destino = `/consultas/${encodeURIComponent(consultaId)}`;
+
+  const consultaExistente = await obtenerConsulta({
+    organizacionId: session.user.organizacionId,
+    consultaId,
+  });
+  if (!consultaExistente || consultaExistente.medicoId !== medico.id) {
+    redirect("/hoy");
+  }
+
+  // Tope de tamaño en el servidor: el maxLength del formulario no protege
+  // de una petición armada a mano.
+  const texto = String(formData.get("textoAclaratoria") ?? "").trim().slice(0, 4000);
+  if (!texto) {
+    redirect(`${destino}?error=nota_vacia`);
+  }
+
+  try {
+    await agregarNotaAclaratoria({
+      organizacionId: session.user.organizacionId,
+      actorId: session.user.id,
+      medicoId: medico.id,
+      consultaId,
+      texto,
+    });
+  } catch (err) {
+    if (err instanceof EstadoConsultaInvalidoError) {
+      redirect(`${destino}?error=1`);
+    }
+    throw err;
+  }
+
+  redirect(`${destino}?nota=1`);
 }

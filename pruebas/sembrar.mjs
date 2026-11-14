@@ -38,6 +38,7 @@ export const EMAIL_EQUIPO = "equipo@conxulty.test";
 export async function limpiar() {
   const orgs = `('${ORG}', '${ORG_EQUIPO}')`;
   for (const sql of [
+    `delete from notas_aclaratorias where "organizacionId" in ${orgs}`,
     `delete from documentos where "organizacionId" in ${orgs}`,
     `delete from consultas where "organizacionId" in ${orgs}`,
     `delete from odontogramas where "organizacionId" in ${orgs}`,

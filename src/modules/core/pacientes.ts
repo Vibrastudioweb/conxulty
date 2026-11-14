@@ -111,6 +111,7 @@ export async function buscarPacientes(input: {
 }) {
   const texto = input.texto.trim();
   if (!texto) return { items: [], haySiguiente: false };
+  const textoComoDocumento = normalizarDocumentoIdentidad(texto);
 
   const pagina = input.pagina && input.pagina > 0 ? input.pagina : 1;
 
@@ -122,6 +123,11 @@ export async function buscarPacientes(input: {
         { nombre: { contains: texto, mode: "insensitive" } },
         { apellido: { contains: texto, mode: "insensitive" } },
         { documentoIdentidad: { contains: texto, mode: "insensitive" } },
+        // La cédula se guarda sin puntos ni guiones: quien busque
+        // "12.345.678" tiene que encontrar "12345678".
+        ...(textoComoDocumento && textoComoDocumento !== texto.toUpperCase()
+          ? [{ documentoIdentidad: { contains: textoComoDocumento } }]
+          : []),
       ],
     },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
@@ -132,6 +138,31 @@ export async function buscarPacientes(input: {
   return dividirPagina(filas, PACIENTES_POR_PAGINA);
 }
 
+/**
+ * Forma única de guardar una cédula o pasaporte: mayúsculas, sin puntos,
+ * espacios ni guiones. "V-12.345.678", "v 12345678" y "V12345678" son la
+ * misma persona, y antes creaban tres pacientes distintos — la restricción
+ * de unicidad comparaba texto crudo y no se enteraba. Un paciente
+ * duplicado parte su historia clínica en dos, y no hay forma de fusionarla.
+ */
+export function normalizarDocumentoIdentidad(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  const limpio = valor.toUpperCase().replace(/[\s.\-]/g, "");
+  return limpio === "" ? null : limpio;
+}
+
+/**
+ * Formas con las que el mismo documento pudo haberse escrito: con o sin la
+ * letra de nacionalidad. "12345678" choca con "V12345678" y "E12345678";
+ * "V12345678" choca con "12345678" — pero V y E con el mismo número son
+ * personas distintas y no chocan entre sí.
+ */
+function variantesDeDocumento(normalizado: string): string[] {
+  if (/^\d+$/.test(normalizado)) return [normalizado, `V${normalizado}`, `E${normalizado}`];
+  if (/^[VE]\d+$/.test(normalizado)) return [normalizado, normalizado.slice(1)];
+  return [normalizado];
+}
+
 function normalizarDatos(datos: DatosPaciente) {
   return {
     nombre: datos.nombre,
@@ -140,7 +171,7 @@ function normalizarDatos(datos: DatosPaciente) {
     sexo: datos.sexo ?? null,
     telefono: datos.telefono ?? null,
     email: datos.email ?? null,
-    documentoIdentidad: datos.documentoIdentidad ?? null,
+    documentoIdentidad: normalizarDocumentoIdentidad(datos.documentoIdentidad),
     direccion: datos.direccion ?? null,
     contactoEmergenciaNombre: datos.contactoEmergenciaNombre ?? null,
     contactoEmergenciaTelefono: datos.contactoEmergenciaTelefono ?? null,
@@ -171,7 +202,7 @@ async function documentoIdentidadEnUso(input: {
   const existente = await prisma.paciente.findFirst({
     where: {
       organizacionId: input.organizacionId,
-      documentoIdentidad: input.documentoIdentidad,
+      documentoIdentidad: { in: variantesDeDocumento(input.documentoIdentidad) },
       ...(input.excluirPacienteId ? { id: { not: input.excluirPacienteId } } : {}),
     },
     select: { id: true },
@@ -184,10 +215,11 @@ export async function crearPaciente(input: {
   actorId: string;
   datos: DatosPaciente;
 }) {
-  if (input.datos.documentoIdentidad) {
+  const documentoNuevo = normalizarDocumentoIdentidad(input.datos.documentoIdentidad);
+  if (documentoNuevo) {
     const enUso = await documentoIdentidadEnUso({
       organizacionId: input.organizacionId,
-      documentoIdentidad: input.datos.documentoIdentidad,
+      documentoIdentidad: documentoNuevo,
     });
     if (enUso) {
       throw new DocumentoIdentidadDuplicadoError();
@@ -241,13 +273,11 @@ export async function actualizarPaciente(input: {
     throw new PacienteNoEncontradoError();
   }
 
-  if (
-    input.datos.documentoIdentidad &&
-    input.datos.documentoIdentidad !== paciente.documentoIdentidad
-  ) {
+  const documentoNuevo = normalizarDocumentoIdentidad(input.datos.documentoIdentidad);
+  if (documentoNuevo && documentoNuevo !== paciente.documentoIdentidad) {
     const enUso = await documentoIdentidadEnUso({
       organizacionId: input.organizacionId,
-      documentoIdentidad: input.datos.documentoIdentidad,
+      documentoIdentidad: documentoNuevo,
       excluirPacienteId: input.pacienteId,
     });
     if (enUso) {
@@ -373,6 +403,25 @@ export async function actualizarOdontograma(input: {
   // En una transacción: una versión guardada sin que la foto cambie, o al
   // revés, dejaría el historial contando algo distinto de lo que muestra
   // la ficha.
+  // Guardar sin haber cambiado nada no es una versión nueva: sin esto,
+  // cada clic en "Guardar" llenaba el historial de copias idénticas y la
+  // evolución real del diente quedaba enterrada entre ellas.
+  const actual = await prisma.paciente.findFirst({
+    where: { id: input.pacienteId, organizacionId: input.organizacionId },
+    select: { odontograma: true, notasOdontograma: true },
+  });
+  if (!actual) {
+    throw new PacienteNoEncontradoError();
+  }
+  const ordenado = (mapa: unknown) =>
+    JSON.stringify(Object.entries((mapa as Record<string, string> | null) ?? {}).sort());
+  if (
+    ordenado(actual.odontograma) === ordenado(input.odontograma) &&
+    (actual.notasOdontograma ?? null) === (input.notasOdontograma ?? null)
+  ) {
+    return;
+  }
+
   await prisma.$transaction(async (tx) => {
     const resultado = await tx.paciente.updateMany({
       where: { id: input.pacienteId, organizacionId: input.organizacionId },
