@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { BotonDescargarApp } from "@/components/pwa/BotonDescargarApp";
 
 async function autenticar(formData: FormData) {
   "use server";
@@ -110,6 +111,15 @@ export default async function LoginPage({
       <p className="mt-4 text-center text-sm text-text-secondary">
         ¿No tienes cuenta? <a href="/registro" className="text-brand-primary">Regístrate</a>
       </p>
+
+      {/* 14-nov-2026, pedido puntual del usuario: "en el login debe estar
+          también" el botón de instalar la app (equivalente al de
+          conxulty.com para pacientes, repo vitalud). Secundario a propósito
+          — iniciar sesión sigue siendo la acción principal de esta
+          pantalla. */}
+      <div className="mt-4 flex justify-center">
+        <BotonDescargarApp />
+      </div>
 
       <div className="mt-6">
         <VibraSignature className="text-center" />
