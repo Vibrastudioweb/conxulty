@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/feedback/toast/ToastProvider";
+import { PwaRegistrar } from "@/components/pwa/PwaRegistrar";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -21,6 +22,11 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "CONXULTY",
   description: "Plataforma de gestión para médicos, especialistas y consultorios.",
+  themeColor: "#0f172a",
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -30,6 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geist.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <PwaRegistrar />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
