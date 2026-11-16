@@ -234,13 +234,25 @@ export async function obtenerDocumento(input: {
     include: {
       consulta: {
         select: {
-          paciente: { select: { nombre: true, apellido: true } },
+          paciente: {
+            select: {
+              nombre: true,
+              apellido: true,
+              documentoIdentidad: true,
+              fechaNacimiento: true,
+            },
+          },
         },
       },
       medico: {
         select: {
           especialidad: true,
           numeroColegiado: true,
+          // Membrete del formato de impresión (RecetaImprimible).
+          numeroMpps: true,
+          cedula: true,
+          telefonoPublico: true,
+          sedes: { select: { direccion: true, municipio: true }, orderBy: { createdAt: "asc" }, take: 1 },
           usuario: { select: { nombre: true } },
         },
       },
