@@ -9,6 +9,7 @@ import {
 } from "@/modules/documentos/documentos";
 import { ETIQUETAS_TIPO_DOCUMENTO } from "@/components/documentos/tipoDocumento";
 import { PrintButton } from "@/components/documentos/PrintButton";
+import { RecetaImprimible } from "@/components/documentos/RecetaImprimible";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { anularDocumentoAction } from "../anularActions";
@@ -43,8 +44,36 @@ export default async function DocumentoPage({
   const contenido = documento.contenido as unknown as ContenidoReceta;
   const estaAnulada = documento.anuladoEn !== null;
 
+  const sede = documento.medico.sedes[0];
+
   return (
-    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 print:max-w-full print:bg-white print:py-0">
+    <>
+    {/* Lo que va al papel: hoja carta horizontal con récipe e indicaciones
+        (ver RecetaImprimible). Todo el <main> de abajo es solo pantalla. */}
+    <RecetaImprimible
+      datos={{
+        fechaEmision: documento.fechaEmision,
+        contenido,
+        anulada: documento.anuladoEn
+          ? { fecha: documento.anuladoEn, motivo: documento.motivoAnulacion }
+          : null,
+        paciente: documento.consulta.paciente,
+        medico: {
+          nombre: documento.medico.usuario.nombre,
+          especialidad: documento.medico.especialidad,
+          numeroColegiado: documento.medico.numeroColegiado,
+          numeroMpps: documento.medico.numeroMpps,
+          cedula: documento.medico.cedula,
+          telefono: documento.medico.telefonoPublico,
+        },
+        consultorio: {
+          nombre: documento.organizacion.nombre,
+          direccion: sede ? `${sede.direccion}, ${sede.municipio}` : null,
+          municipio: sede?.municipio ?? null,
+        },
+      }}
+    />
+    <main className="mx-auto min-h-screen max-w-md bg-background px-4 py-6 print:hidden">
       {/* 13-nov-2026 (auditoría del núcleo clínico): una receta anulada
           sigue existiendo —no se borra, para no dejar la historia clínica
           mintiendo— así que lo que no puede pasar es que se vea igual que
@@ -189,5 +218,6 @@ export default async function DocumentoPage({
         </details>
       )}
     </main>
+    </>
   );
 }
