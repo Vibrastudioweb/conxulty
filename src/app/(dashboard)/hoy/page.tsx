@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
+  BarChart3,
   CalendarDays,
   CalendarCheck2,
   CircleDollarSign,
@@ -411,6 +412,19 @@ export default async function HoyPage() {
                   accent="green"
                 />
               )}
+              {/* 16-nov-2026, pedido del usuario ("en el teléfono no tengo
+                  acceso a reportes en la primera pantalla"): Reportes no es
+                  uno de los 4 destinos del tab bar mobile (nav-config.ts), y
+                  hasta hoy solo se llegaba desde Caja. Se muestra a todos,
+                  igual que en el sidebar de escritorio; sin Plan Pro la
+                  propia página enseña PanelSoloPro. */}
+              <QuickActionTile
+                href="/reportes"
+                icon={BarChart3}
+                title="Reportes"
+                subtitle="Ingresos y consultas por período"
+                accent="amber"
+              />
               <QuickActionTile
                 href="/ficha-publica"
                 icon={IdCard}
